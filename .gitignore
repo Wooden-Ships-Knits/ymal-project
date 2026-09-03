@@ -1,0 +1,29 @@
+# Secrets
+.env
+.env.*
+!.env.example
+credentials/
+*.pem
+
+# Data outputs — regenerable, and can contain catalog data
+backend/data/
+*.csv
+*.jsonl
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb
+.ipynb_checkpoints/
+
+# Node
+node_modules/
+dist/
+.cache/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
