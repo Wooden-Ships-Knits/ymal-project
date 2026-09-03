@@ -103,7 +103,7 @@ def main() -> None:
 
     print(f"  matched: {[loc['name'] for loc in bali_locations]}")
     if len(bali_locations) > 1:
-        print("  ⚠️  more than one match — confirm all are production locations")
+        print("  WARNING: more than one match - confirm all are production locations")
 
     print("Fetching Bali inventory...")
     bali_stock = fetch_stock_by_product([loc["id"] for loc in bali_locations])
@@ -157,13 +157,13 @@ def main() -> None:
     # The number Phase 1 exists to produce (docs/caveats.md §2).
     print("\n" + "-" * 52)
     if summary["eligible"] < 100:
-        print("  ⚠️  Under 100 eligible products. The 30-deep pool and 6-slot")
-        print("      widget both need revisiting — see caveats.md §2.")
+        print("  WARNING: Under 100 eligible products. The 30-deep pool and")
+        print("           6-slot widget both need revisiting - see caveats.md section 2.")
     elif summary["eligible"] < 500:
-        print("  ⚠️  Modest eligible catalog. Pool depth may need reducing;")
-        print("      check that diversity rules stay satisfiable.")
+        print("  WARNING: Modest eligible catalog. Pool depth may need reducing;")
+        print("           check that diversity rules stay satisfiable.")
     else:
-        print("  ✅ Eligible catalog looks large enough for a 30-deep pool.")
+        print("  OK: Eligible catalog looks large enough for a 30-deep pool.")
     print("-" * 52)
 
 

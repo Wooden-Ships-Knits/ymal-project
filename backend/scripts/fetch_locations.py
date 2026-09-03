@@ -39,14 +39,14 @@ def main() -> None:
 
     if not matches:
         print(
-            "\n⚠️  Nothing matched. Update BALI_LOCATION_PATTERN in "
+            "\nWARNING: Nothing matched. Update BALI_LOCATION_PATTERN in "
             "ymal/settings.py before running fetch_products, or every product "
             "will be misclassified as fixed stock."
         )
     elif len(matches) > 1:
         print(
-            "\n⚠️  Multiple matches. Confirm whether all of them count as "
-            "production locations — see docs/caveats.md §1."
+            "\nWARNING: Multiple matches. Confirm whether all of them count as "
+            "production locations - see docs/caveats.md section 1."
         )
 
     settings.PHASE1_DIR.mkdir(parents=True, exist_ok=True)
