@@ -23,7 +23,9 @@ from collections import Counter
 
 from ymal import settings
 from ymal.catalog import (
+    count_products,
     fetch_active_products,
+    fetch_active_products_with_stock,
     fetch_stock_by_product,
     find_bali_locations,
     numeric_id,
@@ -102,16 +104,42 @@ def main() -> None:
         )
 
     print(f"  matched: {[loc['name'] for loc in bali_locations]}")
-    if len(bali_locations) > 1:
+
+    if settings.SKIP_SALE_MARKED_IN_QUERY:
+        skipped = count_products(f"status:active AND title:{settings.SALE_MARKER}")
+        print(
+            f"  SKIP_SALE_MARKED_IN_QUERY is on: {skipped} sale-marked active "
+            "product(s) are excluded from the query below and won't appear "
+            "in the CSV/JSON - only counted here."
+        )
+
+    if len(bali_locations) == 1:
+        # Single location: join products to stock in one pass instead of
+        # separately paging the location's whole inventory.
+        print("Fetching active products with Bali inventory...")
+        products, bali_stock, truncated_ids = fetch_active_products_with_stock(
+            bali_locations[0]["id"]
+        )
+        print(f"  {len(products)} active product(s), {len(bali_stock)} of them stocked at Bali")
+        if truncated_ids:
+            print(
+                f"  WARNING: {len(truncated_ids)} product(s) hit "
+                f"VARIANTS_PAGE_SIZE ({settings.VARIANTS_PAGE_SIZE}) exactly - "
+                "their variant count may be truncated, which can misclassify "
+                "at_bali. Raise VARIANTS_PAGE_SIZE in settings.py. IDs: "
+                f"{truncated_ids}"
+            )
+    else:
+        # 0 or >1 matches: fall back to the general path, which can combine
+        # stock across multiple locations.
         print("  WARNING: more than one match - confirm all are production locations")
+        print("Fetching Bali inventory...")
+        bali_stock = fetch_stock_by_product([loc["id"] for loc in bali_locations])
+        print(f"  {len(bali_stock)} product(s) stocked at Bali")
 
-    print("Fetching Bali inventory...")
-    bali_stock = fetch_stock_by_product([loc["id"] for loc in bali_locations])
-    print(f"  {len(bali_stock)} product(s) stocked at Bali")
-
-    print("Fetching active products...")
-    products = fetch_active_products()
-    print(f"  {len(products)} active product(s)")
+        print("Fetching active products...")
+        products = fetch_active_products()
+        print(f"  {len(products)} active product(s)")
 
     if not products:
         raise SystemExit("No active products returned — check scopes and credentials.")
