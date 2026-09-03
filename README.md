@@ -1,0 +1,193 @@
+# YMAL — You May Also Like
+
+In-house product recommendation engine for the Wooden Ships Shopify store,
+replacing the Wiser AI app so we control the recommendation logic.
+
+**Status: Phase 1 of 8.** No recommendations are generated yet, and nothing is
+live on the storefront. Phase 1 produces the eligible-product list that
+everything else is built on.
+
+---
+
+## Why we are building this
+
+Wiser works, but it is a black box: we cannot see why a product was
+recommended, cannot encode our own product knowledge, and cannot stop it
+surfacing products we do not want surfaced. The concrete failure that drove
+this project was Wiser showing fixed-stock and markdown items in the widget.
+
+That turned out to be a timing problem rather than a model problem — relevance
+was computed once and never re-checked against live stock and price state. The
+architecture here splits the two apart:
+
+| Layer | Question | Runs |
+|---|---|---|
+| Relevance | Which products are related to this one? | Nightly, offline |
+| Eligibility | Which of those may we show right now? | Serve time, on live state |
+
+See `docs/flow.md` for the full picture.
+
+---
+
+## Repository layout
+
+```
+ymal-project/
+├── backend/          Python data pipeline
+│   ├── ymal/         importable package (settings, auth, shopify, eligibility, catalog)
+│   ├── scripts/      runnable entry points
+│   └── data/         outputs (gitignored)
+├── frontend/         storefront widget - not started, begins at Phase 6
+└── docs/             PRD, strategy, flow, logic, caveats, SOP, memory
+```
+
+---
+
+## Setup
+
+Requires Python 3.10 or newer.
+
+```bash
+pip install -r backend/requirements.txt
+```
+
+Create `.env` at the repository root (it is gitignored - never commit it):
+
+```
+SHOPIFY_CLIENT_ID=...
+SHOPIFY_SECRET_KEY=...
+```
+
+The Shopify custom app needs these scopes for Phase 1:
+
+- `read_products`
+- `read_inventory`
+- `read_locations`
+
+Later phases additionally need `write_products` (to publish recommendations)
+and `read_orders` plus `read_all_orders`. **`read_all_orders` requires an
+approval request to Shopify** and without it order history is capped at 60
+days, which is not enough for a seasonal catalog. Submit that request early -
+it is the longest-lead item in the project.
+
+---
+
+## Phase 1 — Eligible product inventory
+
+**Goal:** know exactly which active product pages are eligible ("unfix") to
+appear in the recommendation widget.
+
+### The eligibility rule
+
+A product is eligible only if **both** conditions hold:
+
+1. It is stocked at the **Bali** production location, meaning stock is
+   replenishable rather than fixed.
+2. Its title does **not** contain the marker `*SALE*`.
+
+Anything fixed-stock or on markdown is excluded. The rule lives in
+`backend/ymal/eligibility.py` as pure functions with no I/O, so it can be
+tested without calling Shopify. Its configuration is in
+`backend/ymal/settings.py`.
+
+There is a third guard beyond the two stated conditions:
+`EXCLUDE_UNPUBLISHED` (on by default) drops products with no online-store URL,
+since a recommendation card that links nowhere is a broken card. Set it to
+`False` for the literal two-condition rule.
+
+### How to run
+
+Scripts run as modules from the `backend/` directory.
+
+**Step 1 — confirm the Bali location name.**
+
+```bash
+cd backend
+python -m scripts.fetch_locations
+```
+
+This lists every location on the shop and reports which ones match
+`BALI_LOCATION_PATTERN` in `ymal/settings.py`. That pattern currently defaults
+to the guess `"bali"`. Update it to the exact name before continuing.
+
+**Step 2 — produce the eligible-product list.**
+
+```bash
+python -m scripts.fetch_products
+```
+
+If no location matches the pattern, this script refuses to run rather than
+silently classifying the entire catalog as fixed stock.
+
+### Outputs
+
+Written to `backend/data/phase1/`:
+
+| File | Contents |
+|---|---|
+| `locations.json` | Every Shopify location |
+| `active_products.csv` | One row per active product, with `eligible` and `reason_if_not` |
+| `active_products.json` | The same data as JSON |
+| `summary.json` | Counts, plus the rule configuration that produced them |
+
+### Exit criteria
+
+Phase 1 is done when:
+
+1. The list has been produced from the Admin API.
+2. It has been diffed against the hand-built Google Sheet of eligible products
+   (see `docs/caveats.md` section 0).
+3. Any discrepancies are explained, or the rule is corrected and re-run.
+4. **The eligible-product count is known.** This number drives candidate pool
+   depth and widget slot count, both of which are provisional guesses until it
+   exists.
+
+---
+
+## Roadmap
+
+| Phase | Deliverable |
+|---|---|
+| 1 | Eligible product list (current) |
+| 2 | Product feature table |
+| 3 | Content-based recommendations |
+| 4 | Collaborative signal (needs `read_all_orders`) |
+| 5 | Publish to Shopify metafields |
+| 6 | Storefront widget and tracking |
+| 7 | A/B test against Wiser |
+| 8 | Machine-learning upgrade |
+
+Content-based recommendations deliberately come before the collaborative
+signal, so a slow `read_all_orders` approval cannot stall the project.
+Nothing reaches a customer until Phase 6, and Wiser stays installed until
+Phase 7 produces evidence to remove it.
+
+Full detail, including exit criteria per phase, is in `docs/strategy.md`.
+
+---
+
+## Documentation
+
+| File | Contents |
+|---|---|
+| `docs/prd.md` | Background, goals, requirements, risks |
+| `docs/strategy.md` | The eight phases and their exit criteria |
+| `docs/flow.md` | End-to-end data flow, batch and request paths |
+| `docs/logic.md` | Recommendation logic, including the eligibility rule |
+| `docs/backend.md` | Backend structure and extraction approach |
+| `docs/frontend.md` | Widget integration, placements, tracking |
+| `docs/caveats.md` | Unverified assumptions, platform limits, risks |
+| `docs/memory.md` | Checkpoint log and locked decisions |
+| `docs/github_SOP.md` | Branching and commit workflow |
+
+New to the project? Read `docs/memory.md` first — the stable facts plus the
+top two checkpoints are enough to pick up the work cold.
+
+---
+
+## Contributing
+
+All work goes through `feat/*` branches merged into `feat/dev-environment`.
+`main` is never pushed to directly. See `docs/github_SOP.md`.
+
+Never commit `.env`, access tokens, or anything under `backend/data/`.
