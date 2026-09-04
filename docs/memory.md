@@ -46,6 +46,44 @@ recommendation logic.
 
 ## 3. Checkpoint log
 
+### 2026-09-04 — Checkpoint 11: frontend/ restored, hierarchy follows wholesale-order-entry
+
+**Reverted checkpoint 10's rename.** `theme/` is `frontend/` again and `console/`
+is gone. Two top-level folders, `backend/` and `frontend/`, and they stay that
+way.
+
+**Both JavaScript surfaces live in `frontend/`:**
+
+```
+frontend/
+├── src/          the console (React + Vite) — one folder per tab
+└── storefront/   Liquid snippet + the JS that runs on wooden-ships.com
+```
+
+**Structure copied from `wholesale-order-entry`**, the closest sibling project —
+same team, same shape, already deployed:
+
+- React 18 + Vite, **no router**. Tabs are `useState` plus a `TABS` array and a
+  conditional render, exactly as `frontend/src/admin/AdminApp.jsx` does it there.
+- A folder per feature holding its screens **and its own `api.js`**
+  (`setup/`, `analytics/`, `exclude/`).
+- Shared pieces in `components/`, pure helpers in `lib/`.
+- `Dockerfile` + `nginx.conf` inside `frontend/`, serving the built static files.
+- Only `VITE_API_BASE` in its `.env` — never a Shopify credential.
+
+Adding a tab is one folder, one `TABS` entry, one conditional render.
+
+**Naming lesson worth keeping:** "frontend" was used as both a layer label in a
+table and a directory name within a few messages, which made an approved rename
+look like a contradiction. When a word names both a concept and a path, say
+which one is meant.
+
+**Next step:** the five-minute Liquid test — confirm a shop-level
+`list.product_reference` metafield resolves to product objects in Liquid the way
+a product-level one does. Section 2 of the config contract rests on it.
+
+---
+
 ### 2026-09-04 — Checkpoint 10: repo split, config contract written
 
 **Repo split.** `frontend/` meant one thing when there was one frontend; there

@@ -33,17 +33,23 @@ See `docs/flow.md` for the full picture.
 
 ```
 ymal-project/
-├── backend/          Python — the pipeline that computes the block lists
+├── backend/          Python — the pipeline, plus the FastAPI the console calls
 │   ├── ymal/         importable package (settings, auth, shopify, eligibility, catalog)
 │   ├── scripts/      runnable entry points
 │   └── data/         outputs (gitignored)
-├── theme/            Liquid + storefront JS — what the shopper sees
-├── console/          FastAPI + JavaScript — what the web team uses
+├── frontend/         JavaScript — both of the things shoppers and staff see
+│   ├── src/          the console (React + Vite), one folder per tab
+│   └── storefront/   the Liquid snippet + the JS that runs on the live store
 └── docs/             PRD, strategy, flow, logic, caveats, config contract, SOP, memory
 ```
 
-Three layers, joined by one settings document — see `docs/config-contract.md`.
-The console writes it, the theme reads it, the pipeline never touches it.
+Frontend structure follows `wholesale-order-entry`: React 18 + Vite, no router,
+tabs are `useState` plus a `TABS` array, one folder per feature with its own
+`api.js`.
+
+The three layers are joined by one settings document — see
+`docs/config-contract.md`. The console writes it, the storefront reads it, the
+pipeline never touches it.
 
 ---
 
