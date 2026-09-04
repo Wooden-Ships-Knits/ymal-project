@@ -98,10 +98,55 @@ SKIP_SALE_MARKED_IN_QUERY = False
 # occur), and a new spelling should not silently re-open the hole.
 EXCLUDED_PRODUCT_TYPE_PREFIXES = ("giftcard",)
 
+# Every real garment on this shop carries a productType - Crewneck, Cardigan,
+# V-Neck, Hoodie, Cowlneck, Mock Neck. A blank one means it is not a garment:
+# "Front & Back Placement Add-on" (product 7785812426800) is a customisation
+# service that sold 97 units in a fortnight and would have topped a raw-volume
+# Trending list. Requiring a type is a more general guard than naming each one.
+REQUIRE_PRODUCT_TYPE = True
+
 # Beyond the two stated conditions: a product with no online-store URL has
 # nowhere to link, so recommending it produces a dead card.
 # Set False to apply the literal two-condition rule only.
 EXCLUDE_UNPUBLISHED = True
+
+# ------------------------------------------------------------------
+# Orders  (Trending, Top Selling)
+# ------------------------------------------------------------------
+# Orders nest a lineItems connection, and nested connections multiply GraphQL
+# cost. Measured live 2026-09-04 on this shop: 100 x 20 costs 119 requested /
+# 38 actual against a 20,000 bucket restoring at 1000/s - nowhere near the
+# 1000-point per-query cap. Paging at 100 instead of 20 cuts ~3,000 orders from
+# 150 round-trips to 30.
+#
+# Largest line-item count observed in a real order was 5, so 20 leaves ample
+# headroom. Orders that hit the limit are reported by units_sold() rather than
+# silently undercounted.
+ORDERS_PAGE_SIZE = 100
+ORDER_LINE_ITEMS_PAGE_SIZE = 20
+
+# Trending = RISING, not raw volume (decided 2026-09-04). Raw 14-day and
+# 90-day rankings return nearly the same products, and two blocks showing one
+# list looks broken to a shopper.
+#
+# So: compare this window against the one before it. A product selling 20 units
+# after 4 last fortnight is trending; one selling a steady 40 is Top Selling.
+TRENDING_WINDOW_DAYS = 14
+
+# A product must sell at least this many units in the CURRENT window to be
+# considered at all. Without it, 1 unit -> 3 units is an infinite-looking rise
+# and noise tops the list.
+TRENDING_MIN_UNITS = 3
+
+# Growth is (now + k) / (before + k). The constant keeps a product with zero
+# prior sales from scoring infinity, and damps small numbers generally. Raise
+# it to favour established movers, lower it to favour new arrivals.
+TRENDING_SMOOTHING = 2.0
+
+# Store more than we display: the gate, the anchor exclusion and colorway
+# dedupe all remove items at render, and a list stored at its display length
+# arrives thin.
+STORED_LIST_DEPTH = 30
 
 # ------------------------------------------------------------------
 # Paths

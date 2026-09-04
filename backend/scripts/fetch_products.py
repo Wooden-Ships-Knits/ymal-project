@@ -173,6 +173,7 @@ def main() -> None:
             "excluded_product_type_prefixes": list(
                 settings.EXCLUDED_PRODUCT_TYPE_PREFIXES
             ),
+            "require_product_type": settings.REQUIRE_PRODUCT_TYPE,
         },
     }
 

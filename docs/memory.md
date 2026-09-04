@@ -46,6 +46,57 @@ recommendation logic.
 
 ## 3. Checkpoint log
 
+### 2026-09-04 — Checkpoint 15: Trending built, defined as RISING
+
+**Decision: Trending means rising, not raw volume.** Confirmed with data — the
+two top-tens overlap on only **2 of 10 products**, so the block genuinely says
+something Top Selling will not.
+
+```
+score = (units_now + k) / (units_before + k)      k = TRENDING_SMOOTHING = 2.0
+```
+
+Two equal windows back to back (14 days vs the 14 before), a floor of
+`TRENDING_MIN_UNITS = 3` in the current window to keep noise out, and ties
+broken by absolute volume.
+
+**Written:** `ymal/orders.py` (windowed line-item extract, one function and one
+window argument — Trending and Top Selling are the same code),
+`ymal/blocks/trending.py` (pure ranking, no I/O), `scripts/build_trending.py`.
+Output → `backend/data/blocks/trending.json`.
+
+**`read_orders` works.** 1,648 orders in the last 14 days, 1,311 in the previous
+14. No approval needed at this window; only Top Selling's 90 days is blocked.
+
+**Query cost was far lower than assumed.** Measured live: 100 orders × 20 line
+items costs 119 requested / 38 actual against a 20,000 bucket restoring at
+1000/s. Paging at 100 rather than 20 cuts ~3,000 orders from 150 round-trips to
+30. Largest real order had 5 line items, so 20 is ample headroom.
+
+**Colorway dedupe moved into the build, and it matters.** Before it, the top 15
+held RIHANNA twice, PERSONALIZED NUMBER JERSEY three times and CHANDELIER twice
+— a trending style trends in every colour at once. Deduping at build time rather
+than render is deliberate: colorway grouping is slow-changing and identical for
+every shopper, so only live-state checks (stock, publication) belong at render.
+
+**A second gate leak, found by running it.** `Front & Back Placement Add-on`
+(product 7785812426800) is a customisation service with a blank `productType`.
+It sold **97 units in a fortnight** and would have topped a raw-volume Trending
+list. Every real garment here carries a type — Crewneck, Cardigan, V-Neck,
+Hoodie, Cowlneck, Mock Neck — so `REQUIRE_PRODUCT_TYPE = True` is a more general
+guard than naming each offender.
+
+**Eligible: 253 → 252.**
+
+**Worth watching:** `TRENDING_MIN_UNITS = 3` lets products with 4-5 units reach
+the stored list. They sit below rank 10 and rarely display, but raise the floor
+if thin movers start showing up in the widget.
+
+**Next step:** New Arrivals — `publishedAt` is already fetched, and it is the
+simplest block in the set.
+
+---
+
 ### 2026-09-04 — Checkpoint 14: gift-card guard added, Recently Viewed written
 
 **Gift-card guard.** `EXCLUDED_PRODUCT_TYPE_PREFIXES = ("giftcard",)` in

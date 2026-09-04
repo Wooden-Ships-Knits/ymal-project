@@ -17,6 +17,7 @@ REASON_FIXED_STOCK = "fixed_stock"
 REASON_BALI_ZERO_QTY = "bali_zero_qty"
 REASON_SALE_MARKER = "sale_marker"
 REASON_EXCLUDED_TYPE = "excluded_type"
+REASON_NO_PRODUCT_TYPE = "no_product_type"
 REASON_NOT_PUBLISHED = "not_published"
 
 
@@ -84,5 +85,7 @@ def classify(
 
     if is_excluded_type(product_type):
         reasons.append(REASON_EXCLUDED_TYPE)
+    elif settings.REQUIRE_PRODUCT_TYPE and not (product_type or "").strip():
+        reasons.append(REASON_NO_PRODUCT_TYPE)
 
     return (not reasons), reasons
