@@ -40,8 +40,29 @@ ymal-project/
 ├── frontend/         JavaScript — both of the things shoppers and staff see
 │   ├── src/          the console (React + Vite), one folder per tab
 │   └── storefront/   the Liquid snippet + the JS that runs on the live store
-└── docs/             PRD, strategy, flow, logic, caveats, config contract, SOP, memory
+├── docs/             PRD, strategy, flow, logic, caveats, config contract, SOP, memory
+└── docker-compose.yml
 ```
+
+## Running it
+
+```bash
+# the pipeline, directly - fastest loop, no container build
+cd backend && python -m scripts.fetch_products
+cd backend && python -m scripts.build_blocks
+
+# the console, in dev
+cd frontend && npm install && npm run dev      # localhost:5173
+
+# everything, in Docker (from a LOCAL clone, not the Drive folder)
+docker compose up web                          # console on 127.0.0.1:8083
+docker compose run --rm pipeline               # rebuild the block lists
+docker compose --profile api up                # once backend/app exists
+```
+
+Docker is for the server. Keep running the pipeline directly while developing -
+`python -m scripts.<name>` takes seconds, and putting a container build in front
+of that only slows the loop.
 
 Frontend structure follows `wholesale-order-entry`: React 18 + Vite, no router,
 tabs are `useState` plus a `TABS` array, one folder per feature with its own

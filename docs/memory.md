@@ -46,6 +46,49 @@ recommendation logic.
 
 ## 3. Checkpoint log
 
+### 2026-09-04 — Checkpoint 18: Docker actually written
+
+Checkpoint 12 recorded the decision to use Docker; checkpoint 17 then scaffolded
+the frontend without it, and `frontend/README.md` listed a `Dockerfile` and
+`nginx.conf` that did not exist. Now written:
+
+```
+docker-compose.yml     db (Postgres 16) · pipeline · api (profiled) · web
+backend/Dockerfile     python:3.12-slim, defaults to build_blocks
+frontend/Dockerfile    node build -> nginx serve, two stages
+frontend/nginx.conf    serves the SPA, proxies /api
+```
+
+`docker compose config` validates. **The images have not been built** — Docker
+Desktop is not running on this machine, so `docker compose build` could not run.
+The Dockerfiles follow `wholesale-order-entry`'s working pattern but are
+unverified.
+
+**Two traps found while writing it, both worth remembering:**
+
+1. **nginx resolves `proxy_pass` hostnames at startup.** With a literal
+   `proxy_pass http://api:8000;` the web container refuses to boot — "host not
+   found in upstream" — whenever `api` is not running. Resolving through a
+   variable (`resolver 127.0.0.11; set $upstream ...; proxy_pass $upstream;`)
+   defers the lookup to request time, so the console loads and honestly reports
+   "not connected" rather than failing to start.
+2. **`depends_on` a profiled service implicitly enables that profile.** `web`
+   depending on `api` would have dragged in an api container that cannot start
+   until `backend/app` exists. Dropped the dependency; the lazy resolver makes
+   it unnecessary.
+
+The `api` service is profile-gated for the same reason — it would crash-loop on
+every `docker compose up` until the FastAPI app exists.
+
+`POSTGRES_PASSWORD` has no default and uses `:?`, so compose fails loudly if it
+is unset rather than shipping a password that is public in the repo — the
+opposite of PPA's plaintext default.
+
+**Next step:** `backend/app` (FastAPI) plus `ymal/publish.py`, which together
+un-gate the `api` service and put something real behind the console.
+
+---
+
 ### 2026-09-04 — Checkpoint 17: console scaffolded, every tab exists
 
 `frontend/` is now a working React 18 + Vite app. `npm run build` passes —

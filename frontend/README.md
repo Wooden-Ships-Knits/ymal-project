@@ -23,7 +23,14 @@ before it goes anywhere near the live store.
 cd frontend
 npm install
 npm run dev        # http://localhost:5173
+
+# or in Docker, from a local clone
+docker compose up web    # 127.0.0.1:8083
 ```
+
+`Dockerfile` and `nginx.conf` are written but the images have not been built —
+Docker Desktop was not running when they were added. They follow
+`wholesale-order-entry`'s working pattern; verify with `docker compose build web`.
 
 ---
 
