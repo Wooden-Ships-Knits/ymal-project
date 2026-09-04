@@ -42,6 +42,8 @@ query ActiveProducts($cursor: String) {
         totalInventory
         productType
         vendor
+        tags
+        publishedAt
       }
     }
   }
@@ -73,6 +75,8 @@ query ActiveProductsWithStock($cursor: String, $locationId: ID!) {
         totalInventory
         productType
         vendor
+        tags
+        publishedAt
         variants(first: %d) {
           nodes {
             inventoryItem {

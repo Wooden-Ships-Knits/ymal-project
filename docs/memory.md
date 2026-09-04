@@ -46,6 +46,56 @@ recommendation logic.
 
 ## 3. Checkpoint log
 
+### 2026-09-04 — Checkpoint 13: tags measured — Featured needs no ML
+
+Added `tags` and `publishedAt` to the product query and ran the numbers on the
+real catalog (`scripts/analyze_tags.py`). **Featured does not need machine
+learning, and the measurement says why.**
+
+| Measure | Value |
+|---|---|
+| Eligible products | 254 (of 421 active — catalog grew 29 since yesterday, all ineligible) |
+| Distinct tags | 834 |
+| Tags per product | median 40, max 83 |
+| Tags on >50% of products | 22 — the noise |
+| Tags on exactly one product | 287 — nothing to share with |
+| **Tags carrying real signal** | **525** |
+
+**Inverse weighting kills the noise for free.** `weight = log(N / df)`, so
+`sweatshirt` (253 of 254 products) scores 0.00 and drops out on its own. No
+stop-list to maintain as the catalog changes. Scoring is cosine similarity over
+weighted tag vectors — 254 × 254 pairs, arithmetic, not a model.
+
+Worked example, anchor `FLAG V COTTON`: AMERICANA V COTTON (0.75), FLAG
+ROLLNECK COTTON (0.72), CHUNKY FLAG V COTTON (0.63), LOBSTER ROLL CREW COTTON
+(0.56). A coherent Americana-cotton cluster, from counting.
+
+**Three findings that matter more than the scoring:**
+
+1. **Colorway dedupe is the whole game.** 124 distinct titles across 254
+   eligible products — **51% of the catalog is a repeat colorway**, and one
+   style has 11. Without dedupe, Featured returns the same sweater five times;
+   the un-deduped top 5 for `CHARLOTTE CREW COTTON` was five CHARLOTTE CREW
+   COTTONs. Dedupe by title (or PPA's style tag, which is `tags[0]`).
+2. **A GIFT CARD passes the eligibility gate.** `product_id 10208889354`,
+   `productType = "Gift Cards"`. It is at Bali To Produce, has no `*SALE*`
+   marker and is published, so the rule admits it. Needs a product-type guard.
+3. **Product types are not clean:** `V-Neck` (23), `V-neck` (16), `Vneck` (4) —
+   three spellings of one type. Normalize before using type as a scoring guard.
+
+**Where ML would genuinely help, later:** learning-to-rank on click data (needs
+months of tracking), and image embeddings for visual similarity (real value for
+a fashion catalog). Both improve a working system; neither replaces one.
+
+**Honest limit of tag similarity:** PPA derives tags from the style name, so tag
+similarity is close to style-name similarity. It cannot know that a cardigan
+pairs with a particular dress — that is co-purchase data, not a model.
+
+**Next step:** decide Trending volume vs rising; add the product-type guard to
+the gate.
+
+---
+
 ### 2026-09-04 — Checkpoint 12: Docker decided, anchor audited for drift
 
 **Docker, decided.** One `docker-compose`, copied from `wholesale-order-entry`,

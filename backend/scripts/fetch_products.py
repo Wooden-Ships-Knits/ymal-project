@@ -42,6 +42,8 @@ FIELDNAMES = [
     "bali_available",
     "published",
     "total_inventory",
+    "published_at",
+    "tags",
     "eligible",
     "reason_if_not",
 ]
@@ -68,6 +70,9 @@ def build_rows(products: list[dict], bali_stock: dict[str, int]) -> list[dict]:
             "bali_available": bali_stock.get(gid, 0),
             "published": bool(product.get("onlineStoreUrl")),
             "total_inventory": product.get("totalInventory"),
+            "published_at": product.get("publishedAt") or "",
+            # Joined for the CSV; the JSON keeps the list (see write_outputs).
+            "tags": ", ".join(product.get("tags") or []),
             "eligible": eligible,
             "reason_if_not": " + ".join(reasons),
         })
