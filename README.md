@@ -33,13 +33,17 @@ See `docs/flow.md` for the full picture.
 
 ```
 ymal-project/
-├── backend/          Python data pipeline
+├── backend/          Python — the pipeline that computes the block lists
 │   ├── ymal/         importable package (settings, auth, shopify, eligibility, catalog)
 │   ├── scripts/      runnable entry points
 │   └── data/         outputs (gitignored)
-├── frontend/         storefront widget - not started, begins at Phase 6
-└── docs/             PRD, strategy, flow, logic, caveats, SOP, memory
+├── theme/            Liquid + storefront JS — what the shopper sees
+├── console/          FastAPI + JavaScript — what the web team uses
+└── docs/             PRD, strategy, flow, logic, caveats, config contract, SOP, memory
 ```
+
+Three layers, joined by one settings document — see `docs/config-contract.md`.
+The console writes it, the theme reads it, the pipeline never touches it.
 
 ---
 
@@ -107,8 +111,10 @@ python -m scripts.fetch_locations
 ```
 
 This lists every location on the shop and reports which ones match
-`BALI_LOCATION_PATTERN` in `ymal/settings.py`. That pattern currently defaults
-to the guess `"bali"`. Update it to the exact name before continuing.
+`BALI_LOCATION_PATTERN` in `ymal/settings.py`. That pattern is set to
+`"bali to produce"`, confirmed against the live shop on 2026-09-03 — the full
+name, not just `"bali"`, because `Bali Stock` is a separate fixed-stock
+location that must not match. Re-run this step if the locations change.
 
 **Step 2 — produce the eligible-product list.**
 
@@ -178,10 +184,32 @@ Full detail, including exit criteria per phase, is in `docs/strategy.md`.
 | `docs/frontend.md` | Widget integration, placements, tracking |
 | `docs/caveats.md` | Unverified assumptions, platform limits, risks |
 | `docs/memory.md` | Checkpoint log and locked decisions |
+| `docs/config-contract.md` | **The contract between console, theme and pipeline** |
 | `docs/github_SOP.md` | Branching and commit workflow |
+| `docs/ymal-flow.drawio` | Anchor diagram — the whole project on six pages |
 
 New to the project? Read `docs/memory.md` first — the stable facts plus the
 top two checkpoints are enough to pick up the work cold.
+
+**`docs/ymal-flow.drawio` is the anchor.** Open it in draw.io (or the VS Code
+Draw.io extension). Six pages:
+
+| Page | Answers |
+|---|---|
+| 1. System Overview | The three layers — pipeline, storefront, console — and the config metafield that joins them |
+| 2. Block Specs | What each of the five blocks queries, computes and stores |
+| 3. The Shared Eligibility Gate | The rule as built, with the real counts, and which blocks it applies to |
+| 4. Data, Windows and Storage | What we fetch, the 60-day order cap, where each list lives |
+| 5. Admin Console | The Wiser Setup Widgets screen rebuilt: page-template cards, what Setup contains, stack options |
+| 6. Config Model and Storefront Contract | The `ymal.config` schema, every metafield, and what the Liquid snippet does |
+| 7. Attribution and Analytics | Events, the attribution model, and why a holdout is the only honest profit number |
+| 8. Build Order and Code Map | Ten build steps, what exists, what is still to write |
+| 9. Decisions | Locked decisions re-read after the reframe, blockers, open questions |
+
+It is stored as uncompressed XML on purpose: it stays greppable, and a page can
+be pasted straight into an LLM prompt as project context. When asking an LLM to
+work on this project, give it the relevant page plus `docs/memory.md` section 2
+and the top of section 3.
 
 ---
 

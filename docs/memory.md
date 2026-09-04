@@ -46,6 +46,239 @@ recommendation logic.
 
 ## 3. Checkpoint log
 
+### 2026-09-04 — Checkpoint 10: repo split, config contract written
+
+**Repo split.** `frontend/` meant one thing when there was one frontend; there
+are now two:
+
+```
+theme/     Liquid + storefront JS   — what the shopper sees
+console/   FastAPI + JavaScript     — what the web team uses
+```
+
+`git mv frontend theme`, both READMEs rewritten, `console/` created. Root README
+layout and docs table updated.
+
+**`docs/config-contract.md` written** — the keystone document. Contents: every
+metafield in the system; the `ymal.config` schema with a worked example; the
+five-block registry with a which-block-on-which-page matrix; the ten validation
+rules; versioning and one-click undo; what the Liquid snippet does; the console's
+API surface; and what deliberately stays in `settings.py` rather than becoming a
+console knob.
+
+**Two design points worth remembering:**
+
+1. **Publish lists as `list.product_reference`.** Liquid then gets live product
+   objects, so a list written at 03:00 cannot render yesterday's price — and the
+   pipeline never needs `featuredImage` or `priceRangeV2`. **Verify early** that
+   a *shop-level* reference list resolves to product objects in Liquid the way a
+   product-level one does; the design rests on it and it is a five-minute test.
+2. **The console validates and rejects rather than repairs.** A malformed config
+   silently blanks every block and nobody notices until traffic drops.
+
+**Still nothing committed** — the whole reframe (checkpoints 6-10) is sitting in
+the working tree on `feat/dev-environment`.
+
+**Next step:** run the five-minute Liquid metafield test, then either start the
+console API or add `tags` + `publishedAt` to the product query.
+
+---
+
+### 2026-09-04 — Checkpoint 9: console stack decided
+
+**No Streamlit.** The console is a real web page: **JavaScript frontend, FastAPI
+backend, deployed exactly the way PPA's console is** — Docker on the existing VM,
+behind the host nginx, password-gated.
+
+- The FastAPI layer lives in this repo and imports the `ymal` package directly,
+  so the console reuses `auth.py`, `shopify.py` and `eligibility.py` rather than
+  reimplementing them.
+- **Shopify credentials never reach the browser.** The JS page calls our API; our
+  API talks to Shopify.
+- Roughly four screens, so React-with-a-build and plain-JS-no-build are both
+  viable. Not yet decided, and not blocking.
+
+**Shopify embedded app rejected for now, not forever.** It would sit inside the
+Shopify admin and look native, but it needs App Bridge, session-token auth inside
+an iframe, an app registration and a Node stack nobody on the team runs — weeks,
+not days. Because the console's only job is writing the `ymal.config` metafield,
+it can be replaced later without touching the pipeline or the theme.
+
+**Repo split needed.** `frontend/` currently describes only the storefront widget.
+There are now two frontends:
+
+```
+theme/     Liquid snippets + storefront JS (what shoppers see)
+console/   the admin app (what the web team uses)
+```
+
+**Recently Viewed needs no tracking pipeline.** The browser remembers it itself:
+a few lines of JS append `{handle, id, ts}` to `localStorage` on each product
+page, and the block reads that list back and renders from it. It never leaves the
+device, needs no login, and works for logged-out shoppers. Per-browser by nature —
+a different phone is a different list — and empty in a fresh or private browser,
+where the block must hide itself. This is almost certainly how Wiser does it too.
+
+**Next step:** design the config contract (`ymal.config`), then split the repo
+into `theme/` and `console/`.
+
+---
+
+### 2026-09-04 — Checkpoint 8: the real deliverable is an admin console
+
+User shared a screenshot of **Wiser's "Active Widgets" screen** and named the two
+halves of the project explicitly:
+
+> **Backend** — handles the logic and fetches the data.
+> **Frontend** — an interface like the screenshot, where the web team can adjust
+> placement and see how much we profit.
+
+**This is three deliverables, not two.** A nightly pipeline, a storefront
+integration, and an internal console with an event store behind it. The
+recommendation logic is the smallest part of the work.
+
+**The keystone is a config contract**, not the UI. One shop metafield
+(`ymal.config`) holds, per page template, which blocks appear in what order with
+how many slots. The console writes it, Liquid reads it, the pipeline never
+touches it. That single fact is what lets the web team re-arrange the storefront
+with no deploy and no Liquid edit — which is the actual point of Wiser's screen.
+**Design it before writing any of the three layers.**
+
+**Publish the lists as `list.product_reference`, not our own JSON.** Liquid then
+receives live product objects, so a list written at 03:00 cannot render
+yesterday's price — and we never need to fetch `featuredImage` or
+`priceRangeV2` at all.
+
+**Console stack — open, and it decides the next several weeks.** PPA already
+runs a Streamlit app in Docker behind the VM's nginx, password-gated, with a
+companion hourly fetch service (`PPA/webapp/`, `docker-compose.yml`,
+`deploy/ppa.nginx.conf`). Reusing that answers auth, deploy and scheduling on day
+one, but will not look like the screenshot. A Shopify embedded app (Remix +
+Polaris) would, at the cost of a new stack and weeks instead of days.
+Recommended: Streamlit now, embedded app later if the look matters — the config
+metafield means the console can be swapped without touching the other layers.
+*(If reusing PPA's pattern: do not inherit its plaintext default password, which
+its own compose file flags as needing changing.)*
+
+**Attribution is the hardest part, and it is honest-number-hard, not
+code-hard.** Matching a click to an order measures what a block *touched*, not
+what it *caused*. The only truthful answer to "how much do we profit" is a
+**holdout** — a stable hash of session id keeps ~10% of sessions block-free — and
+it cannot be applied retroactively. It must be switched on with the first block
+that ships, exactly like the Wiser baseline we already know we must not lose.
+Also: "profit" needs cost. Shopify carries `unitCost` on InventoryItem — check
+whether PPA populates it, or report revenue and do not imply margin.
+
+**Decision #3 (App Proxy) is now superseded**: lists live in metafields and
+Liquid reads them, so nothing sits in the request path. We still need hosting,
+but for the console and the event endpoint. **Decisions #7-9 partly superseded**:
+the merchandiser override list belongs in the console's Exclude Products screen,
+not a Sheet that drifts.
+
+**`docs/ymal-flow.drawio` rebuilt to 9 pages**, adding Admin Console, Config
+Model / Storefront Contract, and Attribution.
+
+**Next step:** pick the console stack, then design the config contract. Both are
+decisions, not code, and everything else waits on them.
+
+---
+
+### 2026-09-04 — Checkpoint 7: goal reframed — a widget SET, not one recommender
+
+**The goal changed.** Not "build a smarter You May Also Like" but "match Wiser's
+set of blocks". Five blocks:
+
+| Block | Rule | Scope |
+|---|---|---|
+| Trending | order line items, last **14 days**, ranked by quantity | store-wide |
+| Top Selling | same code, **90-day** window | store-wide |
+| New Arrivals | `publishedAt` within the last 30 days | store-wide |
+| Featured | other products sharing tags with the current product page | per product |
+| Recently Viewed | the shopper's own last N views | per visitor |
+
+**What this does to the architecture.** Three of the five are ONE list for the
+whole store, not a list per product. That removes the 30-deep per-product pool,
+the ~254 metafield writes, the `metafieldsSet` batching problem, and most of the
+argument for an App Proxy backend. Only Featured needs per-product storage;
+Recently Viewed needs no backend at all. There is no ranking
+model here to train: Trending is a sort.
+
+**Decision #4 (30-deep pool) is superseded** for four of five blocks; the
+principle behind it — store roughly 3x what you display — still holds.
+**Decision #3 (App Proxy) is weakened**: Liquid can read a shop metafield
+directly, so nothing needs to sit in the request path. **Decision #6 (the
+eligibility rule) is promoted** — it is now the single shared gate behind four
+blocks, so validating it once pays four times.
+
+**Three findings from the sibling projects:**
+
+1. `PPA/` is Product Page Automation, and `Setup/tags_generator.py` **generates
+   the tags deterministically** from the style name — composition, ply, sleeve,
+   type, pattern, features, neck. The "tag quality is unaudited" risk in
+   `caveats.md` is largely dead.
+2. **`tags[0]` is the style itself**, so every colorway of one style carries the
+   same tag. That is the colorway-dedupe key, already in the data.
+3. But every product also gets `sweater, sweaters, sweatshirt, outfit, outfits,
+   casual` — near-universal tags with no discriminating power. Tag similarity
+   must weight by rarity or those swamp every score. **Measure tag frequency
+   across the 254 eligible products before building Featured.**
+
+**Two problems found while planning, both needing a decision before code:**
+
+- **The 60-day order cap bites Top Selling, not Trending.** 14 days sits inside
+  the window every app gets; 90 days does not. Recommended: request approval AND
+  start banking daily order snapshots now — the snapshot is the only option that
+  cannot be started retroactively.
+- **Trending and Top Selling will return nearly the same products.** A 14-day
+  bestseller is usually a 90-day bestseller. Either dedupe across blocks at
+  render, or redefine Trending as *rising* — this period's units versus the
+  previous period.
+
+**`docs/ymal-flow.drawio` rewritten** around the five blocks (6 pages). The
+previous ML-architecture version is not in git history; it is regenerable if the
+goal ever widens back.
+
+**Next step:** settle the Trending/Top Selling overlap question, start the daily
+order snapshot, then add `tags` and `publishedAt` to the product query and count
+tag frequency.
+
+---
+
+### 2026-09-04 — Checkpoint 6: anchor diagram created
+
+`docs/ymal-flow.drawio` — six pages covering the whole project, built from the
+docs plus the Phase 1 output rather than from a fresh guess:
+
+1. **System Overview** — the two-clock architecture (nightly relevance / serve-time
+   eligibility), with the boundary drawn explicitly and the tracking feedback loop
+   back into relevance.
+2. **Phase Plan** — the eight phases, their exit criteria, and the parallel track
+   (`read_all_orders`, Wiser baseline, the Sheet) wired to the phases it gates.
+3. **Eligibility Rule** — the rule as built, as a decision flow, carrying the real
+   numbers: 392 active, 254 eligible (64.8%), 126 fixed_stock, 118 sale_marker.
+4. **Serve-Time Flow** — one pageview end to end, plus the degraded path and the
+   five-level fallback chain.
+5. **Code Map** — every module that exists, what it does, and the ones still to
+   be written.
+6. **Decisions** — the nine locked decisions, the external blockers, and every
+   open question, sorted by who has to answer it.
+
+**Kept as uncompressed XML on purpose.** The file is meant to be pasted back
+into an LLM prompt as project context, so it has to stay readable and greppable
+rather than base64-compressed the way draw.io saves by default. Colour is a
+status legend, not decoration: green is built, blue is planned, red is blocked,
+amber is an open question.
+
+**Stale doc corrected while doing this:** the root README still said
+`BALI_LOCATION_PATTERN` "currently defaults to the guess `bali`". It has been
+`"bali to produce"` since the location names were confirmed.
+
+**Next step:** unchanged — diff the 254-row API list against the hand-built
+Sheet, which closes Phase 1 and three of the five open assumptions in
+`caveats.md` §5.
+
+---
+
 ### 2026-09-03 — Checkpoint 5: monorepo + Phase 1 backend written
 
 **Monorepo created:** `backend/` (Python) + `frontend/` (JS, placeholder until
