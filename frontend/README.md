@@ -42,7 +42,8 @@ and pure helpers in `lib/`.
 
 ```
 frontend/
-├── index.html
+├── index.html                  Vite's entry point: <div id="root"> + the main.jsx
+│                               script tag. Required at the root, rarely edited.
 ├── package.json
 ├── vite.config.js
 ├── Dockerfile                  build the static bundle, serve it with nginx
@@ -50,10 +51,10 @@ frontend/
 ├── .env.example                VITE_API_BASE — never a Shopify credential
 ├── public/                     favicon, logo
 └── src/
-    ├── main.jsx                mount point
+    ├── main.jsx                mount point — imports index.css, renders App
     ├── App.jsx                 the shell: sidebar, header, tab state
     ├── api.js                  shared fetch wrapper + error handling
-    ├── index.css
+    ├── index.css               the stylesheet (this is the CSS one)
     │
     ├── setup/                  TAB — Setup Widgets
     │   ├── SetupWidgets.jsx        the grid of page-template cards
@@ -87,6 +88,21 @@ frontend/
 
 One folder, one entry in the `TABS` array in `App.jsx`, one conditional render.
 That is the whole ceremony — same as `AdminApp.jsx` in the sibling project.
+
+### Tabs vs pages
+
+`wholesale-order-entry` uses two different patterns and it is worth copying the
+distinction rather than the code:
+
+- **Pages get a path.** `main.jsx` picks a component from a `PAGES` map keyed on
+  `window.location.pathname` — `/order_form`, `/admin`, `/reps`. Still no router
+  library, just an object lookup.
+- **Tabs inside a page get `useState`.** `AdminApp.jsx` holds `tab` in state and
+  conditionally renders.
+
+The console is one page with tabs, so it starts with the second pattern. If the
+web team ever wants to link someone straight to Analytics, promote the tabs to
+paths using the first.
 
 ---
 
