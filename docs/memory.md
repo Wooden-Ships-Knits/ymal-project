@@ -46,6 +46,62 @@ recommendation logic.
 
 ## 3. Checkpoint log
 
+### 2026-09-04 — Checkpoint 16: read_all_orders was never a blocker; three blocks build
+
+**Correction, and it undoes a lot of earlier planning.** The 60-day order cap
+does **not** apply to these credentials. Measured 2026-09-04: order counts and
+full line-item data come back from 100, 200 and **400 days ago**. The app
+already has full order access.
+
+Everything written in checkpoints 7-15 about `read_all_orders` being a blocker,
+Top Selling being gated, and daily order snapshots being urgent was **wrong for
+this shop**. The parallel-track approval request is unnecessary, and so is the
+snapshot-banking workaround.
+
+`ORDER_HISTORY_CAP_DAYS` is now `None` in settings, with the measurement
+recorded next to it. `window_is_reachable()` stays — credentials change, and
+Shopify's truncation is silent, so the guard is cheap insurance.
+
+**All three store-wide blocks now build.**
+
+| Block | Definition | Result |
+|---|---|---|
+| `trending` | rising: (now + 2) / (before + 2), 14d vs prior 14d | 30 styles |
+| `top_selling` | volume over 90 days | 30 styles, from 8,530 orders |
+| `new_arrivals` | published in the last 30 days | **27 styles — under the 30 depth** |
+
+**They are genuinely different lists**, which was the worry that drove the
+rising decision:
+
+```
+trending    x top_selling : 2/10 overlap
+trending    x new_arrivals: 5/10 overlap
+top_selling x new_arrivals: 0/10 overlap
+```
+
+Trending and New Arrivals overlapping 5/10 is expected and fine — a new product
+selling at all is rising by definition. Worth watching only if the two are
+placed adjacently on the same page.
+
+**New Arrivals returns 27, below the stored depth of 30.** Not a bug — the
+catalog published 27 eligible styles in 30 days. It means the block cannot go
+deeper than the drop calendar allows, so a widget showing 8 has thin headroom
+after the gate and dedupe. Widen `NEW_ARRIVALS_WINDOW_DAYS` if it renders short.
+
+**Written:** `ymal/blocks/top_selling.py`, `ymal/blocks/new_arrivals.py`, and
+`scripts/build_blocks.py` — one entry point for all three, replacing
+`build_trending.py`. It takes optional block names as arguments.
+
+**Still nothing is written to Shopify.** Every script is read-only; the blocks
+land as JSON in `backend/data/blocks/`. Publishing is deliberately a separate
+step so a bad run can be read before it reaches a storefront.
+
+**Next step:** the publish step — `ymal/publish.py` writing the three lists to
+shop metafields, plus the five-minute Liquid check that `list.product_reference`
+resolves at shop level.
+
+---
+
 ### 2026-09-04 — Checkpoint 15: Trending built, defined as RISING
 
 **Decision: Trending means rising, not raw volume.** Confirmed with data — the

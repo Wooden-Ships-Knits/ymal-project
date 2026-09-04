@@ -133,6 +133,25 @@ ORDER_LINE_ITEMS_PAGE_SIZE = 20
 # after 4 last fortnight is trending; one selling a steady 40 is Top Selling.
 TRENDING_WINDOW_DAYS = 14
 
+# Top Selling: plain volume over a long window. Same extract as Trending, one
+# argument apart.
+TOP_SELLING_WINDOW_DAYS = 90
+
+# New Arrivals: published within this many days, newest first.
+NEW_ARRIVALS_WINDOW_DAYS = 30
+
+# How far back orders can actually be read.
+#
+# Apps without read_all_orders are capped at 60 days, and Shopify truncates
+# SILENTLY - a 90-day ranking built on 60 days of data looks perfectly
+# plausible and is wrong. That risk drove much of the early planning here.
+#
+# Measured on this shop 2026-09-04: order history is NOT capped. Line items
+# come back intact from 100, 200 and 400 days ago, so these credentials already
+# carry full order access. Set to a number to re-impose a guard if that ever
+# changes; None means no limit and callers skip the check.
+ORDER_HISTORY_CAP_DAYS = None
+
 # A product must sell at least this many units in the CURRENT window to be
 # considered at all. Without it, 1 unit -> 3 units is an infinite-looking rise
 # and noise tops the list.

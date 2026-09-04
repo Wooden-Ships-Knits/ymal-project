@@ -7,10 +7,11 @@ Everything else (customer, address, payment) is deliberately not requested.
 One function, one window argument. Trending and Top Selling are the same
 extract with different dates — do not write it twice.
 
-Note on the 60-day cap: without `read_all_orders` approval, Shopify serves only
-the last 60 days and does so SILENTLY. A 90-day window will return 60 days of
-data and look perfectly plausible. `window_is_reachable()` exists so callers can
-refuse rather than publish a wrong ranking.
+Note on the 60-day cap: without `read_all_orders`, Shopify serves only the last
+60 days and does so SILENTLY — a 90-day window returns 60 days of data and looks
+perfectly plausible. Measured 2026-09-04, this shop's credentials are NOT capped
+(line items come back from 400 days ago), but `window_is_reachable()` stays
+because credentials change and the failure leaves no trace.
 """
 
 from collections import Counter
@@ -18,9 +19,6 @@ from datetime import datetime, timedelta, timezone
 
 from ymal import settings
 from ymal.shopify import graphql, paginate
-
-# Orders without read_all_orders are capped at this age.
-ORDER_HISTORY_CAP_DAYS = 60
 
 ORDERS_QUERY = """
 query Orders($cursor: String, $filter: String!) {
@@ -67,9 +65,14 @@ def window_is_reachable(days_ago_start: int) -> bool:
     False if the window reaches past what Shopify will serve.
 
     Callers should refuse rather than publish a ranking built on truncated
-    history — the failure is silent, which is what makes it dangerous.
+    history — the truncation is silent, which is what makes it dangerous.
+
+    On this shop the cap does not apply (settings.ORDER_HISTORY_CAP_DAYS is
+    None, measured 2026-09-04), so this returns True for any window. The check
+    stays because credentials change and the failure mode is invisible.
     """
-    return days_ago_start <= ORDER_HISTORY_CAP_DAYS
+    cap = settings.ORDER_HISTORY_CAP_DAYS
+    return cap is None or days_ago_start <= cap
 
 
 def units_sold(days_ago_start: int, days_ago_end: int = 0) -> tuple[Counter, dict]:
