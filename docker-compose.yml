@@ -45,6 +45,12 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # Profile-gated so `docker compose up` does not start it. This is a
+    # one-shot task, not a service: it runs, does the work, and exits. Left in
+    # the default set it would fire on every `up -d` and pull thousands of
+    # orders as a side effect of starting the console.
+    #   docker compose run --rm pipeline
+    profiles: ["pipeline"]
     restart: "no"
 
   # The console's API. Profile-gated because backend/app does not exist yet -

@@ -46,6 +46,45 @@ recommendation logic.
 
 ## 3. Checkpoint log
 
+### 2026-09-04 — Checkpoint 19: Docker verified running
+
+`docker compose up -d --build` **works**. Built and started in ~7 seconds, from
+the Google Drive folder — the Drive-mount worry in checkpoint 12 did not
+materialise for builds (bind mounts are still the risk, and there are none).
+
+| Check | Result |
+|---|---|
+| `db` | healthy, `pg_isready` accepting connections |
+| `web` | up, `127.0.0.1:8083` |
+| `GET /` | **200**, serves the built SPA |
+| `GET /api/config` | **502** — correct: no api container yet |
+
+The 502 rather than a boot failure confirms the nginx fix from checkpoint 18:
+resolving the upstream through a variable lets the container start even when
+`api` does not exist. A literal `proxy_pass http://api:8000` would have refused
+to boot.
+
+**One design flaw fixed first.** `pipeline` was in the default service set, so
+`docker compose up -d` would have started it as a side effect of launching the
+console — pulling thousands of orders every time. It is a one-shot task, not a
+service, so it is now profile-gated like `api`:
+
+```
+docker compose up -d --build       # db + web only
+docker compose run --rm pipeline   # rebuild the lists, explicitly
+docker compose --profile api up    # once backend/app exists
+```
+
+**First run inside Docker starts with an empty data volume.** `build_blocks`
+reads `data/phase1/active_products.json`, which lives in the `ymal_data` volume,
+not the local `backend/data/`. Run `fetch_products` in the container first or it
+exits with that instruction.
+
+**Next step:** `backend/app` (FastAPI) + `ymal/publish.py` — they un-gate the
+`api` service and turn the 502 into a real config.
+
+---
+
 ### 2026-09-04 — Checkpoint 18: Docker actually written
 
 Checkpoint 12 recorded the decision to use Docker; checkpoint 17 then scaffolded
