@@ -46,6 +46,48 @@ recommendation logic.
 
 ## 3. Checkpoint log
 
+### 2026-09-04 — Checkpoint 17: console scaffolded, every tab exists
+
+`frontend/` is now a working React 18 + Vite app. `npm run build` passes —
+55 modules, 160 kB. 21 `.jsx` files, one component per tab in the Wiser sidebar.
+
+**Structure follows `wholesale-order-entry`:** no router, tabs are `useState`
+plus a `SCREENS` map in `App.jsx`, a folder per feature holding its screens and
+its own `api.js`, shared pieces in `components/`, pure data in `lib/`.
+
+**Every sidebar item from the screenshot exists**, each carrying a `status` in
+`lib/nav.js` that the UI shows:
+
+| Status | Tabs |
+|---|---|
+| `planned` | Setup Widgets, Recommendations, Analytics, Exclude Products, Flush Cache |
+| `later` | Dashboard, Customize Widgets, Translations |
+| `n/a` | Intelli Search, Product Addons, Cart Drawer, My Plan |
+
+The `n/a` ones stay in the nav, greyed, each explaining what it was and why we
+do not replace it. They were separate Wiser products bundled into one app —
+**Intelli Search matters most: if the storefront relies on Wiser's search today,
+that needs its own decision before Wiser is uninstalled.**
+
+**Two mappings worth keeping.** Wiser's "Flush Cache" becomes *rebuild the block
+lists now* — the web team should not have to wait for tonight's run after a
+launch. Wiser's "Cart Drawer" is not a screen for us at all: the theme has its
+own drawer, so it is just another placement in Setup Widgets.
+
+**No fake data anywhere.** Unbuilt screens render an honest `Placeholder`
+explaining what is missing, and the Analytics table renders empty rather than
+with sample numbers — a mock that looks real ends up quoted in a meeting.
+
+**Correction made while committing:** I "fixed" `.gitignore` to un-ignore
+`.env.example` when `!.env.example` was already there. Reverted. `git check-ignore -v`
+exits 0 and prints the pattern even when the match is a *negation*, so it is not
+a test of whether a file is ignored — `git status --porcelain` is.
+
+**Next step:** the publish step, which is now the only thing between working
+lists and a real widget.
+
+---
+
 ### 2026-09-04 — Checkpoint 16: read_all_orders was never a blocker; three blocks build
 
 **Correction, and it undoes a lot of earlier planning.** The 60-day order cap

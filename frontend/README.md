@@ -10,8 +10,20 @@ Two things live here, both of them JavaScript:
 
 ## Status
 
-**Not started.** This folder is scaffolding — the structure is settled so that
-work can start, not because there is code in it yet.
+**Console: scaffolded and building.** Every tab from the Wiser sidebar exists as
+a component, `npm run build` passes, and Setup Widgets renders the real
+page-template grid. No backend behind it yet, so it loads an empty config and
+says so rather than pretending.
+
+**Storefront: Recently Viewed written, never installed.** The card template
+still holds placeholder markup — point it at the theme's own card snippet
+before it goes anywhere near the live store.
+
+```bash
+cd frontend
+npm install
+npm run dev        # http://localhost:5173
+```
 
 ---
 
