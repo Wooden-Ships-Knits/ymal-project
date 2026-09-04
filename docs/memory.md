@@ -46,6 +46,53 @@ recommendation logic.
 
 ## 3. Checkpoint log
 
+### 2026-09-04 — Checkpoint 12: Docker decided, anchor audited for drift
+
+**Docker, decided.** One `docker-compose`, copied from `wholesale-order-entry`,
+which already runs this exact shape on the GCP VM:
+
+| Service | Job |
+|---|---|
+| `db` | Postgres 16 — the event store |
+| `backend` | FastAPI — the only holder of Shopify credentials |
+| `nginx` | multi-stage: builds the SPA, serves `dist/`, reverse-proxies `/api` |
+| `pipeline` | the nightly job on a schedule (PPA's two-services-from-one-image pattern) |
+
+Two caveats recorded on the diagram:
+
+- **Do not require Docker to develop the pipeline.** `python -m scripts.<name>`
+  runs in seconds; a container build in front of that only slows the loop. PPA
+  keeps both paths working and so should we.
+- **Do not bind-mount the Google Drive path.** This repo sits on a shared drive,
+  where sync and file locking make Docker mounts unreliable. Clone from GitHub
+  onto the VM's local disk — PPA already works around this with
+  `IM_COLLECTION_BASE`.
+
+**Audited the anchor diagram for drift** rather than assuming it was current.
+Four things had gone stale and are fixed:
+
+1. Page 9 still listed the console framework as undecided.
+2. Page 9 still listed hosting and the event store as open — both settled by
+   reusing `wholesale-order-entry`'s compose.
+3. Page 9's next-actions still said "design the config contract", which is
+   written (`docs/config-contract.md`).
+4. Page 8's "what to add" had no FastAPI folder. Added `backend/app/`, laid out
+   like `wholesale-order-entry/backend/app` (routers, schemas, services, db).
+
+Also corrected the access note on page 5: copy `wholesale-order-entry`'s pattern
+of *requiring* secrets from `.env` (`${POSTGRES_PASSWORD:?}` fails loudly if
+unset), not PPA's plaintext default.
+
+**Still genuinely open:** Trending as volume or rising; which page templates ship
+in v1; holdout size; whether the gate applies to Recently Viewed; which service
+runs the nightly job; whether the purchase event needs a Web Pixel.
+
+**Next step:** add `tags` and `publishedAt` to the product query and count tag
+frequency across the 254 eligible products — the one measurement that says
+whether Featured works at all.
+
+---
+
 ### 2026-09-04 — Checkpoint 11: frontend/ restored, hierarchy follows wholesale-order-entry
 
 **Reverted checkpoint 10's rename.** `theme/` is `frontend/` again and `console/`
