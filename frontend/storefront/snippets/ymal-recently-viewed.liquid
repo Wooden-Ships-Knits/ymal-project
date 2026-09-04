@@ -1,0 +1,44 @@
+{%- comment -%}
+  YMAL — Recently Viewed
+
+  Usage:
+    {%- render 'ymal-recently-viewed',
+          page_type: 'product',
+          anchor: product,
+          heading: 'Recently Viewed',
+          slots: 4 -%}
+
+    {%- render 'ymal-recently-viewed', page_type: 'home', slots: 6 -%}
+
+  Renders an empty, hidden container. The script fills it from localStorage and
+  unhides it only if something survived — so a shopper with no history, or a
+  browser blocking storage, sees nothing at all rather than an empty heading.
+
+  `anchor` is optional and only meaningful on a product page: it both seeds the
+  list with the product being viewed and keeps that product out of its own
+  block.
+{%- endcomment -%}
+
+{%- if anchor -%}
+  {%- comment -%}
+    Seed for the recorder. Handle and id only — everything else is fetched
+    fresh at render time, so nothing stored here can go stale.
+  {%- endcomment -%}
+  <script type="application/json" id="ymal-current-product">
+    {"handle": {{ anchor.handle | json }}, "id": {{ anchor.id | json }}}
+  </script>
+{%- endif -%}
+
+<section
+  class="ymal ymal--recently-viewed"
+  data-ymal-block="recently_viewed"
+  data-ymal-page="{{ page_type | default: 'unknown' | escape }}"
+  data-ymal-anchor="{{ anchor.id }}"
+  data-ymal-slots="{{ slots | default: 4 }}"
+  hidden
+>
+  <h2 class="ymal__title">{{ heading | default: 'Recently Viewed' }}</h2>
+  <ul class="ymal__grid" data-ymal-items></ul>
+</section>
+
+<script src="{{ 'ymal-recently-viewed.js' | asset_url }}" defer></script>

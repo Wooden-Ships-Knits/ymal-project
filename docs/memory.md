@@ -46,6 +46,55 @@ recommendation logic.
 
 ## 3. Checkpoint log
 
+### 2026-09-04 — Checkpoint 14: gift-card guard added, Recently Viewed written
+
+**Gift-card guard.** `EXCLUDED_PRODUCT_TYPE_PREFIXES = ("giftcard",)` in
+settings, `is_excluded_type()` in `eligibility.py`, new exclusion reason
+`excluded_type`. Matched on `productType` normalised to lowercase alphanumerics
+and compared as a **prefix**, so "Gift Card" / "Gift Cards" / "gift-cards" all
+match — exact matching would have leaked on the next spelling, which this shop's
+data makes likely (`V-Neck` / `V-neck` / `Vneck` all occur).
+
+Eligible count: **254 → 253.** The GIFT CARD now reports
+`reason_if_not = "excluded_type"`.
+
+**Recently Viewed written** — `frontend/storefront/`, ready to install:
+
+```
+assets/ymal-recently-viewed.js       record + render
+snippets/ymal-recently-viewed.liquid the container
+templates/product.ymal-card.liquid   card-only alternate product template
+install.md                           steps + what to check
+```
+
+**The technique worth remembering: `?view=` alternate templates.** Cards are not
+built in JavaScript. The script fetches `/products/<handle>?view=ymal-card`,
+which returns the theme's own card markup with `{% layout none %}`. Three things
+fall out of that:
+
+1. The block uses the theme's real product card, so it looks native and stays
+   that way when the theme changes.
+2. Price, image and availability are read live at fetch time — a handle stored
+   three weeks ago cannot render a stale price.
+3. The sold-out check lives in Liquid, where the live product object is. An
+   unavailable product renders as an empty string and the script skips it.
+
+**Only `{handle, id, ts}` is stored**, twenty deep, and it never leaves the
+device. Every `localStorage` access is wrapped in try/catch — some privacy modes
+throw rather than returning null, and a browser that refuses storage simply
+never unhides the block.
+
+The script calls `window.ymalTrack()` only if it exists, so this block can ship
+before the events module and starts reporting the moment that lands.
+
+**Still to do before install:** point `product.ymal-card.liquid` at the theme's
+own card snippet — it ships with placeholder markup and must not go live that
+way.
+
+**Next step:** decide Trending volume vs rising, then build Trending.
+
+---
+
 ### 2026-09-04 — Checkpoint 13: tags measured — Featured needs no ML
 
 Added `tags` and `publishedAt` to the product query and ran the numbers on the

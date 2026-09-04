@@ -16,6 +16,7 @@ from ymal import settings
 REASON_FIXED_STOCK = "fixed_stock"
 REASON_BALI_ZERO_QTY = "bali_zero_qty"
 REASON_SALE_MARKER = "sale_marker"
+REASON_EXCLUDED_TYPE = "excluded_type"
 REASON_NOT_PUBLISHED = "not_published"
 
 
@@ -31,6 +32,22 @@ def has_sale_marker(title: str) -> bool:
     return settings.SALE_MARKER.lower() in title.lower()
 
 
+def is_excluded_type(product_type: str) -> bool:
+    """
+    True if the product type is one a recommendation widget should never show.
+
+    Normalises to lowercase alphanumerics before matching, so "Gift Card",
+    "Gift Cards" and "gift-cards" all collapse to the same prefix. This shop's
+    productType values are inconsistent enough (V-Neck / V-neck / Vneck) that
+    an exact match would leak on the next spelling.
+    """
+    normalised = "".join(ch for ch in (product_type or "").lower() if ch.isalnum())
+    return any(
+        normalised.startswith(prefix)
+        for prefix in settings.EXCLUDED_PRODUCT_TYPE_PREFIXES
+    )
+
+
 def matches_bali(location_name: str) -> bool:
     """True if a location name looks like the Bali production location."""
     return settings.BALI_LOCATION_PATTERN.lower() in location_name.lower()
@@ -41,6 +58,7 @@ def classify(
     at_bali: bool,
     bali_quantity: int = 0,
     published: bool = True,
+    product_type: str = "",
 ) -> tuple[bool, list[str]]:
     """
     Resolve eligibility for one product.
@@ -63,5 +81,8 @@ def classify(
 
     if settings.EXCLUDE_UNPUBLISHED and not published:
         reasons.append(REASON_NOT_PUBLISHED)
+
+    if is_excluded_type(product_type):
+        reasons.append(REASON_EXCLUDED_TYPE)
 
     return (not reasons), reasons

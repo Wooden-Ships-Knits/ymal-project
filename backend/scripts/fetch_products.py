@@ -59,6 +59,7 @@ def build_rows(products: list[dict], bali_stock: dict[str, int]) -> list[dict]:
             at_bali=at_bali,
             bali_quantity=bali_stock.get(gid, 0),
             published=bool(product.get("onlineStoreUrl")),
+            product_type=product.get("productType") or "",
         )
         rows.append({
             "product_id": numeric_id(gid),
@@ -169,6 +170,9 @@ def main() -> None:
             "sale_marker": settings.SALE_MARKER,
             "sale_marker_case_sensitive": settings.SALE_MARKER_CASE_SENSITIVE,
             "exclude_unpublished": settings.EXCLUDE_UNPUBLISHED,
+            "excluded_product_type_prefixes": list(
+                settings.EXCLUDED_PRODUCT_TYPE_PREFIXES
+            ),
         },
     }
 

@@ -85,6 +85,19 @@ SALE_MARKER_CASE_SENSITIVE = False
 # substring check are different implementations that happen to agree here.
 SKIP_SALE_MARKED_IN_QUERY = False
 
+# Beyond the two stated conditions: some products are not the kind of thing a
+# recommendation widget should ever surface. A GIFT CARD passes the stated rule
+# cleanly - it is stocked at Bali To Produce, carries no *SALE* marker and is
+# published - and would have appeared in the widget (product 10208889354, found
+# 2026-09-04).
+#
+# Matched on productType, normalised to lowercase with non-alphanumerics
+# stripped, then compared as a PREFIX - so "Gift Card", "Gift Cards" and
+# "gift-cards" all match "giftcard". Prefix rather than exact because this
+# shop's productType values are inconsistent (V-Neck / V-neck / Vneck all
+# occur), and a new spelling should not silently re-open the hole.
+EXCLUDED_PRODUCT_TYPE_PREFIXES = ("giftcard",)
+
 # Beyond the two stated conditions: a product with no online-store URL has
 # nowhere to link, so recommending it produces a dead card.
 # Set False to apply the literal two-condition rule only.
