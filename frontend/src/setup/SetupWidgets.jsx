@@ -4,6 +4,7 @@ import PageTemplateCard from './PageTemplateCard'
 import SetupPanel from './SetupPanel'
 import { getConfig, saveConfig } from './api'
 import TokenPrompt from '../auth/TokenPrompt'
+import useBlockStatus from './useBlockStatus'
 
 /*
  * The screen this console exists for: which blocks appear on which page.
@@ -23,6 +24,7 @@ export default function SetupWidgets() {
   const [saving, setSaving] = useState(false)
   const [needsToken, setNeedsToken] = useState(false)
   const [pending, setPending] = useState(null)
+  const { byId: blockStatus, loaded: statusLoaded } = useBlockStatus()
 
   useEffect(() => {
     getConfig()
@@ -60,6 +62,21 @@ export default function SetupWidgets() {
     save(next)
   }
 
+  // Blocks placed and enabled somewhere, whose list the pipeline has not
+  // published. They render nothing on the storefront, and that should be
+  // visible here rather than discovered there.
+  const unpublished = statusLoaded
+    ? [
+        ...new Set(
+          Object.values(config?.placements || {})
+            .flat()
+            .filter((row) => row.enabled)
+            .map((row) => row.block)
+            .filter((id) => blockStatus[id] && !blockStatus[id].list_published)
+        ),
+      ]
+    : []
+
   if (!config) return <p>Loading…</p>
 
   if (editing) {
@@ -94,6 +111,17 @@ export default function SetupWidgets() {
         </div>
       )}
       {saving && <p className="card__sub">Saving…</p>}
+
+      {unpublished.length > 0 && (
+        <div className="note" style={{ marginBottom: 18 }}>
+          <h3>WARNING: placed, but nothing published yet</h3>
+          <p>
+            {unpublished.map((id) => blockStatus[id].label).join(', ')} —
+            configured here, but the pipeline has not published a list. These
+            blocks render nothing on the storefront until it does.
+          </p>
+        </div>
+      )}
 
       <div className="grid">
         {PAGE_TEMPLATES.map((template) => (
