@@ -9,16 +9,31 @@ import pytest
 from fastapi.testclient import TestClient
 
 TOKEN = "test-token-value"
+
+# Set before importing app.main, which refuses to start without it.
 os.environ["YMAL_API_TOKEN"] = TOKEN
 
-from app.main import app  # noqa: E402  — import after the env var is set
+from app import main  # noqa: E402  — import after the env var is set
+from app.main import app  # noqa: E402
 
 from ymal import config_store  # noqa: E402
+
+# app.main calls load_dotenv(override=True), so a real token in the developer's
+# .env wins over the env var above. Pin the module global instead: these tests
+# must not depend on whether .env happens to hold a token, or on which one.
+main.API_TOKEN = TOKEN
 
 
 @pytest.fixture
 def client():
     return TestClient(app)
+
+
+def test_the_token_under_test_is_the_one_the_app_checks():
+    # Guards the pin above: if app.main ever reads the token per-request from
+    # somewhere else, every auth test below would silently pass for the wrong
+    # reason.
+    assert main.API_TOKEN == TOKEN
 
 
 @pytest.fixture(autouse=True)
