@@ -46,7 +46,33 @@ ymal-project/
 
 ## Running it
 
-Three pieces run independently. Do the Setup below first.
+### The whole thing, in one command
+
+```bash
+docker compose up -d --build
+```
+
+Builds both images and starts Postgres, the API and the console together. The
+console is on **http://127.0.0.1:8083** and talks to Shopify through nginx.
+Needs only `.env` at the repository root - see Setup below. Verified working
+2026-09-05, including from the Google Drive folder: the warning further down
+about Drive is specifically about bind mounts, and this uses named volumes.
+
+```bash
+docker compose logs -f api
+docker compose down
+docker compose run --rm pipeline
+```
+
+That is the right way to check the whole system works, and it is how the VM
+runs it. Everything below is the inner development loop, where a container
+build in front of a six-second script only slows you down.
+
+---
+
+### Piece by piece, for development
+
+Do the Setup below first.
 
 Comments are on their own lines on purpose: `zsh` does not treat `#` as a
 comment when you paste a command interactively, so a trailing `# note` becomes
@@ -100,22 +126,15 @@ cd backend
 73 tests, no network. The eligibility rule, the config validator and the
 metafield store all run against known inputs or a stubbed GraphQL client.
 
-### Everything, in Docker
+### Note on the pipeline in Docker
 
-From a LOCAL clone, not the Drive folder — Drive's sync and file locking make
-bind mounts unreliable.
+The pipeline is profile-gated, so `docker compose up` does not start it -
+otherwise every `up` would pull thousands of orders as a side effect of
+starting the console. Run it on demand:
 
 ```bash
-docker compose up
 docker compose run --rm pipeline
 ```
-
-`up` starts Postgres, the API and the console together; the console is on
-`127.0.0.1:8083`. The pipeline is profile-gated and runs on demand, so starting
-the console does not pull thousands of orders as a side effect.
-
-Docker is for the server. Keep running the pipeline directly while developing -
-a container build in front of a six-second script only slows the loop.
 
 Frontend structure follows `wholesale-order-entry`: React 18 + Vite, no router,
 tabs are `useState` plus a `TABS` array, one folder per feature with its own
