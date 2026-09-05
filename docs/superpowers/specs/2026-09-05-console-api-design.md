@@ -294,14 +294,21 @@ a real Shopify shop.
 
 ---
 
-## 9. Blocker
+## 9. Blocker — RESOLVED 2026-09-05
 
-`PUT` cannot succeed until the custom app has **write access to metafields**.
-Current scopes are `read_products`, `read_inventory`, `read_locations`.
+This section predicted that `PUT` could not succeed until the custom app was
+granted write access to metafields, and named it the one thing that had to wait
+on a Shopify admin change.
 
-Everything else — the API, reads, validation, the registries, the console
-wiring, the test suite — can be built and verified before that lands. The first
-successful save is the only thing that waits.
+**It was already granted.** Verified against the live shop on 2026-09-05: a
+`PUT /api/config` returned 200 and `metafieldsSet` accepted the write, with no
+scope change made. The documented scopes (`read_products`, `read_inventory`,
+`read_locations`) are the Phase 1 list from `backend/README.md`, not the full
+set these credentials actually carry — the same way `ORDER_HISTORY_CAP_DAYS`
+turned out not to bind either.
+
+Nothing waits. The full config round trip — write, read back, undo — works
+end to end today.
 
 Changing scopes may invalidate the current access token and require
 re-approving the app. That breaks the pipeline until re-approved, not the
