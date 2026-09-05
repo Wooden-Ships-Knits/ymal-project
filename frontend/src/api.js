@@ -6,6 +6,8 @@
  * Shopify credential — the backend does, and it is the only thing that talks
  * to Shopify.
  */
+import { getToken } from './auth/useToken'
+
 const BASE = '/api'
 
 async function request(path, options = {}) {
@@ -33,6 +35,15 @@ async function request(path, options = {}) {
   return body
 }
 
+// Writes carry the token; reads do not need one. The header name matches
+// app/main.py's require_token.
+const withToken = (options) => ({
+  ...options,
+  headers: { 'Content-Type': 'application/json', 'X-YMAL-Token': getToken() },
+})
+
 export const get = (path) => request(path)
-export const put = (path, data) => request(path, { method: 'PUT', body: JSON.stringify(data) })
-export const post = (path, data) => request(path, { method: 'POST', body: JSON.stringify(data) })
+export const put = (path, data) =>
+  request(path, withToken({ method: 'PUT', body: JSON.stringify(data) }))
+export const post = (path, data) =>
+  request(path, withToken({ method: 'POST', body: JSON.stringify(data) }))
