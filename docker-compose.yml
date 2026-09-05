@@ -10,7 +10,7 @@
 #
 #   docker compose up web                  # the console (build + serve)
 #   docker compose run --rm pipeline       # rebuild the block lists now
-#   docker compose --profile api up        # once backend/app exists
+#   docker compose up                     # console + api together
 #
 # Secrets come from .env at the repo root and are never baked into an image.
 
@@ -53,8 +53,8 @@ services:
     profiles: ["pipeline"]
     restart: "no"
 
-  # The console's API. Profile-gated because backend/app does not exist yet -
-  # without this it would crash-loop on every `docker compose up`.
+  # The console's API. No longer profile-gated: backend/app exists, so this
+  # starts with `docker compose up` alongside the console.
   api:
     build: ./backend
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
@@ -66,7 +66,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    profiles: ["api"]
     restart: unless-stopped
 
   # The console itself: builds the SPA and serves it, proxying /api to `api`.
