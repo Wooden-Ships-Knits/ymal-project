@@ -61,7 +61,7 @@ query YmalPublishedLists {
 """ % (NAMESPACE, NAMESPACE, NAMESPACE)
 
 SET_MUTATION = """
-mutation SetYmalMetafield($metafields: [MetafieldsSetInput!]!) {
+mutation SetYmalMetafields($metafields: [MetafieldsSetInput!]!) {
   metafieldsSet(metafields: $metafields) {
     metafields { key }
     userErrors { field message }
@@ -102,19 +102,25 @@ def write(config: dict, updated_by: str) -> dict:
     owner_id = _shop_id()
     current = read()["config"]
 
-    _set_metafield(owner_id, PREVIOUS_KEY, current)
-
     stamped = dict(config)
     stamped["updated_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     stamped["updated_by"] = updated_by
 
-    _set_metafield(owner_id, CONFIG_KEY, stamped)
+    # Both metafields in ONE mutation. Written as two, a failure on the second
+    # left config_previous already overwritten with the current document — the
+    # undo point destroyed by the write it was meant to protect. metafieldsSet
+    # takes a list, so there is no reason to pay that risk.
+    _set_metafields(
+        owner_id,
+        [(PREVIOUS_KEY, current), (CONFIG_KEY, stamped)],
+    )
     return stamped
 
 
 def undo() -> dict:
     """Restore config_previous into config."""
-    owner_id = _shop_id()
+    # Check before fetching the shop id: there is no point paying a round trip
+    # to discover there is nothing to restore.
     shop = graphql(READ_QUERY)["shop"]
     previous = shop.get("previous")
 
@@ -122,7 +128,7 @@ def undo() -> dict:
         raise NoPreviousConfig("there is no previous configuration to restore")
 
     restored = json.loads(previous["value"])
-    _set_metafield(owner_id, CONFIG_KEY, restored)
+    _set_metafields(_shop_id(), [(CONFIG_KEY, restored)])
     return restored
 
 
@@ -136,16 +142,27 @@ def published_block_ids() -> set[str]:
     published yet" rather than leaving it to be discovered on the storefront.
     """
     shop = graphql(PUBLISHED_QUERY)["shop"]
-    published = {key for key in PUBLISHED_BLOCK_KEYS if shop.get(key)}
+    # `is not None`, not truthiness: a metafield holding an empty list is
+    # present but publishes nothing, and counting it as published would defeat
+    # the console warning this feeds.
+    published = {key for key in PUBLISHED_BLOCK_KEYS if shop.get(key) is not None}
     published.add("recently_viewed")
     return published
 
 
+_cached_shop_id: str | None = None
+
+
 def _shop_id() -> str:
-    return graphql(SHOP_ID_QUERY)["shop"]["id"]
+    """The shop's GID. Cached for the process — it never changes."""
+    global _cached_shop_id
+    if _cached_shop_id is None:
+        _cached_shop_id = graphql(SHOP_ID_QUERY)["shop"]["id"]
+    return _cached_shop_id
 
 
-def _set_metafield(owner_id: str, key: str, document: dict) -> None:
+def _set_metafields(owner_id: str, documents: list[tuple[str, dict]]) -> None:
+    """Write one or more metafields atomically, as a single mutation."""
     result = graphql(
         SET_MUTATION,
         {
@@ -157,6 +174,7 @@ def _set_metafield(owner_id: str, key: str, document: dict) -> None:
                     "type": "json",
                     "value": json.dumps(document),
                 }
+                for key, document in documents
             ]
         },
     )
@@ -165,6 +183,5 @@ def _set_metafield(owner_id: str, key: str, document: dict) -> None:
     # so neither the status code nor shopify.graphql() catches this.
     errors = result["metafieldsSet"]["userErrors"]
     if errors:
-        raise MetafieldWriteError(
-            f"Shopify rejected the write to {NAMESPACE}.{key}: {errors}"
-        )
+        keys = ", ".join(f"{NAMESPACE}.{key}" for key, _ in documents)
+        raise MetafieldWriteError(f"Shopify rejected the write to {keys}: {errors}")

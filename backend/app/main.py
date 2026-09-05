@@ -41,8 +41,31 @@ def require_token(x_ymal_token: str) -> None:
     compare_digest rather than == so a wrong token takes the same time to
     reject regardless of how much of it was right.
     """
-    if not secrets.compare_digest(x_ymal_token, API_TOKEN):
+    # Compared as bytes: Starlette decodes headers as latin-1, and
+    # compare_digest refuses a str containing non-ASCII, which would turn a
+    # junk token into a 500 on an unauthenticated path instead of a 401.
+    if not secrets.compare_digest(
+        x_ymal_token.encode("utf-8", "surrogateescape"), API_TOKEN.encode("utf-8")
+    ):
         raise HTTPException(status_code=401, detail="Invalid or missing API token")
+
+
+def _split_stamps(stored: dict) -> dict:
+    """
+    Separate the server-owned stamps from the config the console may send back.
+
+    The stored document carries updated_at/updated_by, and config_schema
+    rejects both on the way in. Returning them INSIDE `config` meant the
+    console spread them into its next PUT, so every save after a page reload
+    failed with 422. They travel as siblings instead, which makes the document
+    the console holds exactly the document it is allowed to send.
+    """
+    config = dict(stored)
+    return {
+        "config": config,
+        "updated_at": config.pop("updated_at", None),
+        "updated_by": config.pop("updated_by", None),
+    }
 
 
 @app.get("/api/health")
@@ -53,7 +76,7 @@ def health() -> dict:
 @app.get("/api/config")
 def get_config() -> dict:
     try:
-        return config_store.read()
+        result = config_store.read()
     except Exception as exc:
         # Deliberately NOT an empty config. "We cannot tell you what is placed"
         # is a different answer from "nothing is placed", and the console's red
@@ -61,6 +84,8 @@ def get_config() -> dict:
         raise HTTPException(
             status_code=502, detail=f"Could not read the configuration: {exc}"
         )
+
+    return {**_split_stamps(result["config"]), "has_previous": result["has_previous"]}
 
 
 @app.put("/api/config")
@@ -100,7 +125,8 @@ def post_undo(x_ymal_token: str = Header(default="")) -> dict:
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Could not undo: {exc}")
 
-    return {"ok": True, "config": restored}
+    # Same split as GET: the restored document is a stored one, stamps and all.
+    return {"ok": True, **_split_stamps(restored)}
 
 
 @app.get("/api/blocks")

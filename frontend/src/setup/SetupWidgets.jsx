@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { PAGE_TEMPLATES } from '../lib/pageTemplates'
 import PageTemplateCard from './PageTemplateCard'
 import SetupPanel from './SetupPanel'
-import { getConfig, saveConfig } from './api'
+import { getConfig, saveConfig, undoConfig } from './api'
 import TokenPrompt from '../auth/TokenPrompt'
 import useBlockStatus from './useBlockStatus'
 
@@ -20,7 +20,9 @@ import useBlockStatus from './useBlockStatus'
 export default function SetupWidgets() {
   const [config, setConfig] = useState(null)
   const [editing, setEditing] = useState(null)
-  const [error, setError] = useState('')
+  const [loadError, setLoadError] = useState('')
+  const [saveError, setSaveError] = useState(null)
+  const [hasPrevious, setHasPrevious] = useState(false)
   const [saving, setSaving] = useState(false)
   const [needsToken, setNeedsToken] = useState(false)
   const [pending, setPending] = useState(null)
@@ -28,38 +30,75 @@ export default function SetupWidgets() {
 
   useEffect(() => {
     getConfig()
-      .then((data) => setConfig(data.config))
+      .then((data) => {
+        setConfig(data.config)
+        setHasPrevious(data.has_previous)
+      })
       .catch((err) => {
-        setError(err.message)
+        setLoadError(err.message)
         setConfig({ version: 1, enabled: true, placements: {} })
       })
   }, [])
 
   // Kept separate from `apply` so the token prompt can retry the same document
   // rather than asking the user to place the block again.
-  const save = (next) => {
+  //
+  // `revert` is the config as the shop last confirmed it. A save that fails
+  // rolls back to it: a console showing a placement the shop does not have is
+  // the same lie as a console showing an empty config it cannot read.
+  const save = (next, revert) => {
     setSaving(true)
+    setSaveError(null)
     return saveConfig(next)
-      .then(() => setNeedsToken(false))
+      .then(() => {
+        setNeedsToken(false)
+        setPending(null)
+      })
       .catch((err) => {
         if (err.status === 401) {
+          // Not a failure yet — the prompt will retry this same document.
           setNeedsToken(true)
-          setPending(next)
+          setPending({ next, revert })
         } else {
-          setError(err.message)
+          setConfig(revert)
+          setSaveError(err)
         }
       })
       .finally(() => setSaving(false))
   }
 
   const apply = (templateId, rows) => {
+    const revert = config
     const next = {
       ...config,
       placements: { ...config.placements, [templateId]: rows },
     }
     setConfig(next)
     setEditing(null)
-    save(next)
+    save(next, revert)
+  }
+
+  const cancelToken = () => {
+    // Abandoning the password abandons the change. Leaving it on screen would
+    // show a placement the shop never received.
+    if (pending) setConfig(pending.revert)
+    setNeedsToken(false)
+    setPending(null)
+  }
+
+  const undo = () => {
+    setSaving(true)
+    setSaveError(null)
+    undoConfig()
+      .then((data) => {
+        setConfig(data.config)
+        setHasPrevious(false)
+      })
+      .catch((err) => {
+        if (err.status === 401) setNeedsToken(true)
+        else setSaveError(err)
+      })
+      .finally(() => setSaving(false))
   }
 
   // Blocks placed and enabled somewhere, whose list the pipeline has not
@@ -94,15 +133,15 @@ export default function SetupWidgets() {
     <>
       {needsToken && (
         <TokenPrompt
-          onSubmit={() => save(pending)}
-          onCancel={() => setNeedsToken(false)}
+          onSubmit={() => pending && save(pending.next, pending.revert)}
+          onCancel={cancelToken}
         />
       )}
-      {error && (
+      {loadError && (
         <div className="note" style={{ marginBottom: 18, borderLeftColor: '#b85450' }}>
           <h3>Not connected to the backend</h3>
           <p>
-            <code>{error}</code>
+            <code>{loadError}</code>
           </p>
           <p>
             Showing an empty configuration. This is the console layout, not the
@@ -110,7 +149,37 @@ export default function SetupWidgets() {
           </p>
         </div>
       )}
+      {saveError && (
+        <div className="note" style={{ marginBottom: 18, borderLeftColor: '#b85450' }}>
+          <h3>Not saved</h3>
+          {/* 422 carries field-level errors. "slots must be between 2 and 12"
+              is worth far more than "Request failed (422)". */}
+          {saveError.errors?.length ? (
+            <ul>
+              {saveError.errors.map((e) => (
+                <li key={e.path}>
+                  <code>{e.path}</code> — {e.message}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>
+              <code>{saveError.message}</code>
+            </p>
+          )}
+          <p>The console has been rolled back to what the shop actually holds.</p>
+        </div>
+      )}
       {saving && <p className="card__sub">Saving…</p>}
+
+      {hasPrevious && !saving && (
+        <p className="card__sub" style={{ marginBottom: 18 }}>
+          <button type="button" onClick={undo}>
+            Undo last change
+          </button>{' '}
+          Restores the configuration this one replaced. One step only.
+        </p>
+      )}
 
       {unpublished.length > 0 && (
         <div className="note" style={{ marginBottom: 18 }}>

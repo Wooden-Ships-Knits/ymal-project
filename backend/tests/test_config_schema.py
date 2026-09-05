@@ -200,3 +200,13 @@ def test_every_error_carries_a_path_and_a_message():
         assert set(e) == {"path", "message"}
         assert isinstance(e["path"], str)
         assert e["message"]
+
+
+def test_exactly_four_blocks_on_one_template_is_accepted():
+    # The accept side of the limit. Only the 5-block rejection was covered.
+    ok = copy.deepcopy(VALID)
+    ok["placements"]["home"] = [
+        {"block": b, "heading": "H", "slots": 4, "enabled": True}
+        for b in ["trending", "top_selling", "new_arrivals", "recently_viewed"]
+    ]
+    assert config_schema.validate(ok) == []

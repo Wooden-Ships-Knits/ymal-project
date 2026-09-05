@@ -182,3 +182,84 @@ def test_a_shopify_failure_is_not_flattened_into_an_empty_config(client, monkeyp
 
     response = client.get("/api/config")
     assert response.status_code == 502
+
+
+def test_what_get_returns_can_be_sent_straight_back_to_put(client, monkeypatch):
+    """
+    The regression test for the bug that made this branch unusable on day two.
+
+    config_store stamps updated_at/updated_by into the stored document, and
+    config_schema rejects both on the way in. When GET handed them back inside
+    `config`, the console spread them into its next PUT and every save after a
+    page reload failed with 422. The suite was green because no test ever
+    completed the round trip.
+    """
+    stored = {
+        "version": 1,
+        "enabled": True,
+        "placements": {},
+        "updated_at": "2026-09-05T00:00:00Z",
+        "updated_by": "web-team",
+    }
+    monkeypatch.setattr(
+        config_store, "read", lambda: {"config": stored, "has_previous": True}
+    )
+
+    fetched = client.get("/api/config").json()
+
+    # The stamps travel as siblings, not inside the document.
+    assert fetched["updated_by"] == "web-team"
+    assert "updated_by" not in fetched["config"]
+
+    replayed = client.put(
+        "/api/config", json=fetched["config"], headers={"X-YMAL-Token": TOKEN}
+    )
+    assert replayed.status_code == 200
+
+
+def test_a_config_with_no_stamps_yet_reports_them_as_null(client):
+    fetched = client.get("/api/config").json()
+
+    assert fetched["updated_at"] is None
+    assert fetched["updated_by"] is None
+
+
+def test_a_non_ascii_token_is_refused_not_a_server_error(client):
+    # Starlette decodes headers as latin-1 and compare_digest refuses non-ASCII
+    # str, so an unguarded comparison turns junk into a 500 on an
+    # unauthenticated path.
+    # Sent as raw bytes, the way a real client puts them on the wire: httpx
+    # refuses to encode a non-ASCII str into a header at all.
+    response = client.put(
+        "/api/config",
+        json=VALID_CONFIG,
+        headers={"X-YMAL-Token": "café".encode("latin-1")},
+    )
+    assert response.status_code == 401
+
+
+def test_undo_also_strips_the_stamps_from_what_it_returns(client, monkeypatch):
+    # Undo returns a stored document, so it carries the same stamps GET does.
+    # Without the split the console would re-send them and hit 422 - the same
+    # bug through a second door.
+    monkeypatch.setattr(
+        config_store,
+        "undo",
+        lambda: {
+            "version": 1,
+            "enabled": True,
+            "placements": {},
+            "updated_at": "2026-09-04T00:00:00Z",
+            "updated_by": "web-team",
+        },
+    )
+
+    body = client.post("/api/config/undo", headers={"X-YMAL-Token": TOKEN}).json()
+
+    assert body["updated_by"] == "web-team"
+    assert "updated_by" not in body["config"]
+
+    replayed = client.put(
+        "/api/config", json=body["config"], headers={"X-YMAL-Token": TOKEN}
+    )
+    assert replayed.status_code == 200
