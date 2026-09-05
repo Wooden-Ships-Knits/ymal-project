@@ -46,23 +46,76 @@ ymal-project/
 
 ## Running it
 
+Three pieces run independently. Do the Setup below first.
+
+Comments are on their own lines on purpose: `zsh` does not treat `#` as a
+comment when you paste a command interactively, so a trailing `# note` becomes
+an argument and breaks the command.
+
+### The pipeline
+
+Fastest loop, no container build. Seconds per run.
+
 ```bash
-# the pipeline, directly - fastest loop, no container build
-cd backend && python -m scripts.fetch_products
-cd backend && python -m scripts.build_blocks
-
-# the console, in dev
-cd frontend && npm install && npm run dev      # localhost:5173
-
-# everything, in Docker (from a LOCAL clone, not the Drive folder)
-docker compose up web                          # console on 127.0.0.1:8083
-docker compose run --rm pipeline               # rebuild the block lists
-docker compose --profile api up                # once backend/app exists
+cd backend
+.venv/bin/python -m scripts.fetch_locations
+.venv/bin/python -m scripts.fetch_products
+.venv/bin/python -m scripts.build_blocks
 ```
 
+Outputs land in `backend/data/`. Read `active_products.csv` and the three files
+in `data/blocks/` — that is where you check whether the recommendations are
+what you want.
+
+### The console API
+
+Serves the console. Refuses to start without `YMAL_API_TOKEN` in `.env`.
+
+```bash
+cd backend
+.venv/bin/uvicorn app.main:app --reload
+```
+
+Runs on `localhost:8000`. See `backend/README.md` for the endpoints.
+
+### The console
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Runs on `localhost:5173`, proxying `/api` to the API above. Start the API
+first, or the console loads and says "Not connected to the backend" — which is
+deliberate, not a crash.
+
+### Tests
+
+```bash
+cd backend
+.venv/bin/python -m pytest
+```
+
+73 tests, no network. The eligibility rule, the config validator and the
+metafield store all run against known inputs or a stubbed GraphQL client.
+
+### Everything, in Docker
+
+From a LOCAL clone, not the Drive folder — Drive's sync and file locking make
+bind mounts unreliable.
+
+```bash
+docker compose up
+docker compose run --rm pipeline
+```
+
+`up` starts Postgres, the API and the console together; the console is on
+`127.0.0.1:8083`. The pipeline is profile-gated and runs on demand, so starting
+the console does not pull thousands of orders as a side effect.
+
 Docker is for the server. Keep running the pipeline directly while developing -
-`python -m scripts.<name>` takes seconds, and putting a container build in front
-of that only slows the loop.
+a container build in front of a six-second script only slows the loop.
 
 Frontend structure follows `wholesale-order-entry`: React 18 + Vite, no router,
 tabs are `useState` plus a `TABS` array, one folder per feature with its own
@@ -76,30 +129,50 @@ pipeline never touches it.
 
 ## Setup
 
-Requires Python 3.10 or newer.
+Requires Python 3.10 or newer and Node 18 or newer.
+
+Use a virtualenv. Installing into whatever `python3` happens to resolve to is
+not reliable - on at least one machine here it resolves to an unrelated venv.
 
 ```bash
-pip install -r backend/requirements.txt
+cd backend
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
 ```
 
-Create `.env` at the repository root (it is gitignored - never commit it):
+`.venv/` is gitignored. Docker ignores all of this and installs
+`requirements.txt` into the image directly.
+
+Create `.env` at the repository root (it is gitignored - never commit it).
+`.env.example` lists every variable:
 
 ```
 SHOPIFY_CLIENT_ID=...
 SHOPIFY_SECRET_KEY=...
+POSTGRES_PASSWORD=...
+YMAL_API_TOKEN=...
 ```
 
-The Shopify custom app needs these scopes for Phase 1:
+`YMAL_API_TOKEN` guards every write to the console API. Generate one with:
 
-- `read_products`
-- `read_inventory`
-- `read_locations`
+```bash
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+```
 
-Later phases additionally need `write_products` (to publish recommendations)
-and `read_orders` plus `read_all_orders`. **`read_all_orders` requires an
-approval request to Shopify** and without it order history is capped at 60
-days, which is not enough for a seasonal catalog. Submit that request early -
-it is the longest-lead item in the project.
+### Shopify scopes
+
+Phase 1 reads need `read_products`, `read_inventory` and `read_locations`.
+Writing the `ymal.config` metafield needs metafield write access.
+
+Two scope assumptions in the original plan turned out not to bind on this
+shop's credentials, both verified against the live shop rather than assumed:
+
+| Assumed | Measured |
+|---|---|
+| `read_all_orders` needs an approval request; without it history caps at 60 days | Not capped. Line items come back intact from 400 days ago (2026-09-04) |
+| Writing metafields needs a scope change first | Already granted. `PUT /api/config` returns 200 with no change made (2026-09-05) |
+
+Re-check both if the app's credentials are ever regenerated.
 
 ---
 
