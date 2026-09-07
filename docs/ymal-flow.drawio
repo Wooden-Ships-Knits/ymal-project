@@ -1,0 +1,641 @@
+<mxfile host="app.diagrams.net" agent="Claude Code" version="24.7.17" type="device">
+  <diagram id="p1" name="1. System Overview">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1820" pageHeight="1420" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="p1_1" parent="0" />
+        <mxCell id="p1_title" value="YMAL - Three layers: pipeline, storefront, console" style="text;html=1;align=left;verticalAlign=middle;fontSize=20;fontStyle=1;fontColor=#1A1A1A;" vertex="1" parent="p1_1">
+          <mxGeometry x="40" y="18" width="1200" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="p1_sub" value="In-house replacement for the Wiser AI app on the Wooden Ships store. The goal is Wiser&#x27;s WIDGET SET plus Wiser&#x27;s SETUP SCREEN: the web team picks which blocks appear on which page template, without engineering and without a deploy. State as of 2026-09-04." style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#5A5A5A;" vertex="1" parent="p1_1">
+          <mxGeometry x="40" y="56" width="1250" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="p1_lg0" value="BUILT - works today" style="rounded=1;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontSize=10;arcSize=30;fillColor=#D5E8D4;strokeColor=#82B366;" vertex="1" parent="p1_1">
+          <mxGeometry x="1420" y="20" width="185" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="p1_lg1" value="PLANNED - not built" style="rounded=1;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontSize=10;arcSize=30;fillColor=#DAE8FC;strokeColor=#6C8EBF;" vertex="1" parent="p1_1">
+          <mxGeometry x="1612" y="20" width="185" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="p1_lg2" value="BLOCKED - external" style="rounded=1;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontSize=10;arcSize=30;fillColor=#F8CECC;strokeColor=#B85450;" vertex="1" parent="p1_1">
+          <mxGeometry x="1420" y="50" width="185" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="p1_lg3" value="OPEN QUESTION" style="rounded=1;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontSize=10;arcSize=30;fillColor=#FFE6CC;strokeColor=#D79B00;" vertex="1" parent="p1_1">
+          <mxGeometry x="1612" y="50" width="185" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="p1_lg4" value="DATA ARTIFACT" style="rounded=1;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontSize=10;arcSize=30;fillColor=#FFF2CC;strokeColor=#D6B656;" vertex="1" parent="p1_1">
+          <mxGeometry x="1420" y="80" width="185" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="p1_lg5" value="SHOPIFY / EXTERNAL" style="rounded=1;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontSize=10;arcSize=30;fillColor=#E1D5E7;strokeColor=#9673A6;" vertex="1" parent="p1_1">
+          <mxGeometry x="1612" y="80" width="185" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="p1_cA" value="LAYER A  -  BACKEND PIPELINE  (nightly, Python)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#8C8C8C;dashed=1;verticalAlign=top;align=left;spacingLeft=14;spacingTop=8;fontSize=13;fontStyle=1;fontColor=#5A5A5A;arcSize=4;" vertex="1" parent="p1_1">
+          <mxGeometry x="50" y="120" width="1720" height="320" as="geometry" />
+        </mxCell>
+        <mxCell id="p1_a1" value="&lt;b&gt;FETCH&lt;/b&gt;   [PART BUILT]&lt;br&gt;Products: id, title, handle, type, onlineStoreUrl, inventory at &#x27;Bali To Produce&#x27;.&lt;br&gt;&lt;b&gt;To add:&lt;/b&gt; tags, publishedAt.&lt;br&gt;Orders: product id, quantity, created_at - 14-day and 90-day windows." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p1_1">
+          <mxGeometry x="80" y="165" width="400" height="250" as="geometry" />
+        </mxCell>
+        <mxCell id="p1_a2" value="&lt;b&gt;COMPUTE THE FIVE LISTS&lt;/b&gt;   [NOT BUILT]&lt;br&gt;Trending - 14d orders by quantity&lt;br&gt;Top Selling - 90d orders by quantity&lt;br&gt;New Arrivals - publishedAt within 30d&lt;br&gt;Featured - rarity-weighted tag overlap, per product&lt;br&gt;Recently Viewed - nothing to compute, it lives in the browser&lt;br&gt;&lt;br&gt;Trending and Top Selling are the same function with a different window." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p1_1">
+          <mxGeometry x="510" y="165" width="400" height="250" as="geometry" />
+        </mxCell>
+        <mxCell id="p1_a3" value="&lt;b&gt;ELIGIBILITY GATE&lt;/b&gt;   [BUILT]&lt;br&gt;ymal/eligibility.py - pure functions, no I/O.&lt;br&gt;At &#x27;Bali To Produce&#x27; AND no *SALE* AND in stock AND published AND not the anchor AND colorway dedupe.&lt;br&gt;&lt;br&gt;392 active -&gt; 254 eligible (64.8%).&lt;br&gt;&lt;b&gt;Filter first, rank second.&lt;/b&gt; Markdown sells fastest, so the gate cuts the top off a raw sales ranking." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p1_1">
+          <mxGeometry x="940" y="165" width="400" height="250" as="geometry" />
+        </mxCell>
+        <mxCell id="p1_a4" value="&lt;b&gt;PUBLISH&lt;/b&gt;   [NOT BUILT]&lt;br&gt;Three shop metafields hold the store-wide lists.&lt;br&gt;One product metafield per product holds Featured.&lt;br&gt;Store roughly 3x what is displayed.&lt;br&gt;&lt;br&gt;Nightly. Reuse whatever scheduler PPA already uses rather than inventing one." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p1_1">
+          <mxGeometry x="1370" y="165" width="370" height="250" as="geometry" />
+        </mxCell>
+        <mxCell id="p1_ea1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;strokeWidth=2;endArrow=blockThin;endFill=1;fontSize=10;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="p1_1" source="p1_a1" target="p1_a2">
+          <mxGeometry relative="1" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1_ea2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;strokeWidth=2;endArrow=blockThin;endFill=1;fontSize=10;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="p1_1" source="p1_a2" target="p1_a3">
+          <mxGeometry relative="1" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1_ea3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;strokeWidth=2;endArrow=blockThin;endFill=1;fontSize=10;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="p1_1" source="p1_a3" target="p1_a4">
+          <mxGeometry relative="1" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1_cfg" value="&lt;b&gt;THE CONTRACT  -  shop metafield  ymal.config&lt;/b&gt;   [NOT BUILT - design it first, everything on this page depends on it]&lt;br&gt;One JSON document: for each page template, which blocks appear, in what order, how many slots, what heading, on or off. Plus a global kill switch.&lt;br&gt;&lt;b&gt;The console writes it. Liquid reads it. The pipeline never touches it.&lt;/b&gt; That single fact is what lets the web team re-arrange the storefront with no deploy and no Liquid edit - which is the entire point of the Wiser screen being copied here." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D79B00;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p1_1">
+          <mxGeometry x="50" y="480" width="1720" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="p1_ecfg" value="block lists" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;strokeWidth=2;endArrow=blockThin;endFill=1;fontSize=10;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.25;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="p1_1" source="p1_a4" target="p1_cfg">
+          <mxGeometry relative="1" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1_cB" value="LAYER B  -  STOREFRONT  (Liquid + a little JS)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#8C8C8C;dashed=1;verticalAlign=top;align=left;spacingLeft=14;spacingTop=8;fontSize=13;fontStyle=1;fontColor=#5A5A5A;arcSize=4;" vertex="1" parent="p1_1">
+          <mxGeometry x="50" y="670" width="1120" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="p1_b1" value="&lt;b&gt;ONE SNIPPET, INSTALLED ONCE&lt;/b&gt;   [NOT BUILT]&lt;br&gt;snippets/ymal.liquid takes the page type, reads ymal.config, loops the blocks configured for that page, and renders each one from its metafield list.&lt;br&gt;&lt;br&gt;The theme is edited ONCE. After that every change is configuration.&lt;br&gt;&lt;br&gt;Re-checks product.available at render, so a list written last night cannot show something that sold out this morning." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p1_1">
+          <mxGeometry x="80" y="715" width="500" height="260" as="geometry" />
+        </mxCell>
+        <mxCell id="p1_b2" value="&lt;b&gt;RECENTLY VIEWED  -  browser only&lt;/b&gt;&lt;br&gt;localStorage, written on each product view. No API, no backend, no personal data leaving the device.&lt;br&gt;&lt;br&gt;&lt;b&gt;EVENTS&lt;/b&gt;&lt;br&gt;impression (IntersectionObserver), click (delegated), add-to-cart - each tagged with the block and the page template that produced it.&lt;br&gt;Without the block tag, the console has nothing to report." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p1_1">
+          <mxGeometry x="610" y="715" width="530" height="260" as="geometry" />
+        </mxCell>
+        <mxCell id="p1_cC" value="LAYER C  -  ADMIN CONSOLE  (React + Vite calling FastAPI)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#8C8C8C;dashed=1;verticalAlign=top;align=left;spacingLeft=14;spacingTop=8;fontSize=13;fontStyle=1;fontColor=#5A5A5A;arcSize=4;" vertex="1" parent="p1_1">
+          <mxGeometry x="1210" y="670" width="560" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="p1_c1" value="&lt;b&gt;SETUP WIDGETS&lt;/b&gt;   [NOT BUILT]&lt;br&gt;A card per page template - Product, Home, Cart, Collection, Search, 404, Blog, Account, Thank-you - each listing the blocks enabled there, with a Setup panel for order, slots and heading.&lt;br&gt;Writes ymal.config. Nothing else.&lt;br&gt;&lt;br&gt;&lt;b&gt;ANALYTICS&lt;/b&gt;&lt;br&gt;Per block and per page: impressions, clicks, CTR, add-to-carts, attributed orders and revenue.&lt;br&gt;&lt;br&gt;&lt;b&gt;EXCLUDE PRODUCTS&lt;/b&gt;&lt;br&gt;The merchandiser block list - which is where the Google Sheet was always heading (decision #9)." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p1_1">
+          <mxGeometry x="1240" y="715" width="500" height="260" as="geometry" />
+        </mxCell>
+        <mxCell id="p1_eb" value="reads config" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;strokeWidth=2;endArrow=blockThin;endFill=1;fontSize=10;labelBackgroundColor=#FFFFFF;exitX=0.35;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="p1_1" source="p1_cfg" target="p1_b1">
+          <mxGeometry relative="1" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1_ec" value="writes config" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9673A6;strokeWidth=2;dashed=1;endArrow=blockThin;endFill=1;fontSize=10;labelBackgroundColor=#FFFFFF;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="p1_1" source="p1_cfg" target="p1_c1">
+          <mxGeometry relative="1" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1_ev" value="&lt;b&gt;EVENT STORE + ATTRIBUTION&lt;/b&gt;   [NOT BUILT - the hardest part of this project]&lt;br&gt;Storefront events land on an endpoint we host, are stored, and are joined against orders to answer &#x27;what did this block earn&#x27;.&lt;br&gt;&lt;b&gt;Attribution is not incrementality.&lt;/b&gt; Matching a click to an order tells you what the block touched, not what it caused. The only honest answer to &#x27;how much do we profit&#x27; is a holdout - some sessions see no blocks - and that has to be designed in, not added later." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p1_1">
+          <mxGeometry x="50" y="1040" width="1720" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="p1_ev1" value="events" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;strokeWidth=2;endArrow=blockThin;endFill=1;fontSize=10;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.3;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="p1_1" source="p1_b2" target="p1_ev">
+          <mxGeometry relative="1" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1_ev2" value="reads" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9673A6;strokeWidth=2;dashed=1;endArrow=blockThin;endFill=1;fontSize=10;labelBackgroundColor=#FFFFFF;exitX=0.85;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="p1_1" source="p1_ev" target="p1_c1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1560" y="1020" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1_n1" value="&lt;b&gt;WHAT IS ACTUALLY BEING BUILT&lt;/b&gt;&lt;br&gt;Not a recommendation engine - a small internal Shopify app. A nightly pipeline, one theme snippet, and a console with an event store behind it.&lt;br&gt;The recommendation logic is the smallest part: four SQL-shaped queries and one tag score." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#B3B3B3;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=10;fontColor=#1A1A1A;arcSize=8;fontColor=#444444;" vertex="1" parent="p1_1">
+          <mxGeometry x="50" y="1230" width="560" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="p1_n2" value="&lt;b&gt;REUSE, DO NOT INVENT&lt;/b&gt;&lt;br&gt;&lt;b&gt;wholesale-order-entry&lt;/b&gt; is the closest sibling: React 18 + Vite, no router (tabs are useState plus a TABS array), a folder per feature with its own api.js, shared components/ and pure lib/, and its own Dockerfile and nginx.conf. Same team, same shape of problem, already deployed.&lt;br&gt;PPA answers the scheduling question for the nightly job." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p1_1">
+          <mxGeometry x="640" y="1230" width="560" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="p1_n3" value="&lt;b&gt;WHY THE CONFIG METAFIELD IS THE KEYSTONE&lt;/b&gt;&lt;br&gt;It decouples the three layers. The console can be rebuilt in any stack, the pipeline can change how a list is computed, and the theme never changes - as long as all three agree on that one JSON document.&lt;br&gt;Design it before writing any of them." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D79B00;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p1_1">
+          <mxGeometry x="1230" y="1230" width="540" height="170" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="p2" name="2. Block Specs (implementation)">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1840" pageHeight="1160" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="p2_1" parent="0" />
+        <mxCell id="p2_title" value="YMAL - Block specs  -  what each block actually queries, computes and stores" style="text;html=1;align=left;verticalAlign=middle;fontSize=20;fontStyle=1;fontColor=#1A1A1A;" vertex="1" parent="p2_1">
+          <mxGeometry x="40" y="18" width="1200" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_sub" value="Query shapes are illustrative, not copy-paste ready - field names to be confirmed against the 2026-01 schema before use." style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#5A5A5A;" vertex="1" parent="p2_1">
+          <mxGeometry x="40" y="56" width="1200" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_h0" value="New Arrivals" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=center;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;fontStyle=1;fontSize=13;verticalAlign=middle;" vertex="1" parent="p2_1">
+          <mxGeometry x="50" y="110" width="330" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_h1" value="Featured (tags)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=center;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;fontStyle=1;fontSize=13;verticalAlign=middle;" vertex="1" parent="p2_1">
+          <mxGeometry x="400" y="110" width="330" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_h2" value="Trending" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=center;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;fontStyle=1;fontSize=13;verticalAlign=middle;" vertex="1" parent="p2_1">
+          <mxGeometry x="750" y="110" width="330" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_h3" value="Top Selling" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;align=center;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;fontStyle=1;fontSize=13;verticalAlign=middle;" vertex="1" parent="p2_1">
+          <mxGeometry x="1100" y="110" width="330" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_h4" value="Recently Viewed" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=center;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;fontStyle=1;fontSize=13;verticalAlign=middle;" vertex="1" parent="p2_1">
+          <mxGeometry x="1450" y="110" width="330" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_c0r0" value="&lt;b&gt;QUERY&lt;/b&gt;&lt;br&gt;products(query:&lt;br&gt;&quot;status:active AND&lt;br&gt;published_at:&amp;gt;2026-08-05&quot;)&lt;br&gt;sortKey: PUBLISHED_AT, reverse: true&lt;br&gt;&lt;br&gt;The cutoff is computed at run time, not hardcoded." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p2_1">
+          <mxGeometry x="50" y="175" width="330" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_c0r1" value="&lt;b&gt;TRANSFORM&lt;/b&gt;&lt;br&gt;None beyond the gate.&lt;br&gt;&lt;br&gt;Take the first N eligible products in publishedAt order." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p2_1">
+          <mxGeometry x="50" y="415" width="330" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_c0r2" value="&lt;b&gt;STORAGE&lt;/b&gt;&lt;br&gt;Shop metafield&lt;br&gt;ymal.new_arrivals&lt;br&gt;(a single list, not one per product)&lt;br&gt;&lt;br&gt;Or skip storage entirely and do it in Liquid." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#B3B3B3;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=10;fontColor=#1A1A1A;arcSize=8;fontColor=#444444;" vertex="1" parent="p2_1">
+          <mxGeometry x="50" y="645" width="330" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_c0r3" value="&lt;b&gt;REFRESH + DEPTH&lt;/b&gt;&lt;br&gt;Nightly.&lt;br&gt;Store ~30, display 6-8." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#B3B3B3;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=10;fontColor=#1A1A1A;arcSize=8;fontColor=#444444;" vertex="1" parent="p2_1">
+          <mxGeometry x="50" y="805" width="330" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_c0r4" value="&lt;b&gt;OPEN&lt;/b&gt;&lt;br&gt;Is 30 days the right window for a seasonal knitwear catalog, or should it follow the drop calendar instead?&lt;br&gt;&lt;br&gt;Does &#x27;new&#x27; mean publishedAt, or the season code PPA already writes into the tags?" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D79B00;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p2_1">
+          <mxGeometry x="50" y="935" width="330" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_c1r0" value="&lt;b&gt;QUERY&lt;/b&gt;&lt;br&gt;The existing active-product query plus one field:&lt;br&gt;tags&lt;br&gt;&lt;br&gt;Everything else needed is already fetched." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p2_1">
+          <mxGeometry x="400" y="175" width="330" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_c1r1" value="&lt;b&gt;TRANSFORM&lt;/b&gt;&lt;br&gt;Build a tag index over eligible products.&lt;br&gt;score(a,b) = sum over shared tags of 1/log(1+df)&lt;br&gt;df = how many products carry that tag.&lt;br&gt;&lt;br&gt;Drop tags on &amp;gt;50% of the catalog. Exclude the anchor&#x27;s own style tag so colorways of the same style do not fill the block." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p2_1">
+          <mxGeometry x="400" y="415" width="330" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_c1r2" value="&lt;b&gt;STORAGE&lt;/b&gt;&lt;br&gt;Product metafield&lt;br&gt;ymal.featured&lt;br&gt;one list per product (~254 writes, metafieldsSet batched 25 per call)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#B3B3B3;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=10;fontColor=#1A1A1A;arcSize=8;fontColor=#444444;" vertex="1" parent="p2_1">
+          <mxGeometry x="400" y="645" width="330" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_c1r3" value="&lt;b&gt;REFRESH + DEPTH&lt;/b&gt;&lt;br&gt;Nightly, or weekly - tags only change when PPA rebuilds a page.&lt;br&gt;Store ~30, display 6." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#B3B3B3;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=10;fontColor=#1A1A1A;arcSize=8;fontColor=#444444;" vertex="1" parent="p2_1">
+          <mxGeometry x="400" y="805" width="330" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_c1r4" value="&lt;b&gt;OPEN&lt;/b&gt;&lt;br&gt;Is tag overlap alone enough, or does it need product type and price band as guards? Two products can share ten generic tags and still be a bad pair.&lt;br&gt;&lt;br&gt;Should the anchor&#x27;s own style be excluded outright, or just capped at one colorway?" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D79B00;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p2_1">
+          <mxGeometry x="400" y="935" width="330" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_c2r0" value="&lt;b&gt;QUERY&lt;/b&gt;&lt;br&gt;orders(query:&lt;br&gt;&quot;created_at:&amp;gt;=&amp;lt;today-14d&amp;gt;&quot;)&lt;br&gt;  lineItems { quantity&lt;br&gt;    product { id } }&lt;br&gt;&lt;br&gt;Plain cursor pagination is fine at this window size." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p2_1">
+          <mxGeometry x="750" y="175" width="330" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_c2r1" value="&lt;b&gt;TRANSFORM&lt;/b&gt;&lt;br&gt;Group line items by product id, sum quantity, sort descending.&lt;br&gt;&lt;br&gt;Then apply the gate, then truncate. Not the other way round." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p2_1">
+          <mxGeometry x="750" y="415" width="330" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_c2r2" value="&lt;b&gt;STORAGE&lt;/b&gt;&lt;br&gt;Shop metafield&lt;br&gt;ymal.trending&lt;br&gt;(a single list)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#B3B3B3;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=10;fontColor=#1A1A1A;arcSize=8;fontColor=#444444;" vertex="1" parent="p2_1">
+          <mxGeometry x="750" y="645" width="330" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_c2r3" value="&lt;b&gt;REFRESH + DEPTH&lt;/b&gt;&lt;br&gt;Nightly; hourly if it should feel live.&lt;br&gt;Store ~30, display 6-8." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#B3B3B3;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=10;fontColor=#1A1A1A;arcSize=8;fontColor=#444444;" vertex="1" parent="p2_1">
+          <mxGeometry x="750" y="805" width="330" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_c2r4" value="&lt;b&gt;OPEN&lt;/b&gt;&lt;br&gt;Quantity, orders, or revenue? Quantity favours multi-buys.&lt;br&gt;&lt;br&gt;Should it be RISING rather than raw volume, to stop it duplicating Top Selling? See page 1.&lt;br&gt;&lt;br&gt;Store-wide, or trending within the anchor&#x27;s product type?" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D79B00;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p2_1">
+          <mxGeometry x="750" y="935" width="330" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_c3r0" value="&lt;b&gt;QUERY&lt;/b&gt;&lt;br&gt;Identical to Trending, window 90 days.&lt;br&gt;&lt;br&gt;Use Bulk Operations at this size: submit, poll, download JSONL.&lt;br&gt;&lt;br&gt;&lt;b&gt;Will return no data past 60 days&lt;/b&gt; until read_all_orders is granted." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p2_1">
+          <mxGeometry x="1100" y="175" width="330" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_c3r1" value="&lt;b&gt;TRANSFORM&lt;/b&gt;&lt;br&gt;Identical to Trending.&lt;br&gt;&lt;br&gt;Literally the same function with a different window argument - do not write it twice." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p2_1">
+          <mxGeometry x="1100" y="415" width="330" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_c3r2" value="&lt;b&gt;STORAGE&lt;/b&gt;&lt;br&gt;Shop metafield&lt;br&gt;ymal.top_selling&lt;br&gt;(a single list)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#B3B3B3;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=10;fontColor=#1A1A1A;arcSize=8;fontColor=#444444;" vertex="1" parent="p2_1">
+          <mxGeometry x="1100" y="645" width="330" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_c3r3" value="&lt;b&gt;REFRESH + DEPTH&lt;/b&gt;&lt;br&gt;Nightly, or weekly - a 90-day ranking barely moves day to day.&lt;br&gt;Store ~30, display 6-8." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#B3B3B3;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=10;fontColor=#1A1A1A;arcSize=8;fontColor=#444444;" vertex="1" parent="p2_1">
+          <mxGeometry x="1100" y="805" width="330" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_c3r4" value="&lt;b&gt;OPEN&lt;/b&gt;&lt;br&gt;Which workaround: wait for approval, bank daily snapshots from now, or ship at 60 days and widen later?&lt;br&gt;&lt;br&gt;Banking snapshots also gives the long order history the collaborative idea would need if it ever returns." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D79B00;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p2_1">
+          <mxGeometry x="1100" y="935" width="330" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_c4r0" value="&lt;b&gt;QUERY&lt;/b&gt;&lt;br&gt;None. No API involved.&lt;br&gt;&lt;br&gt;Theme JS, on each product page:&lt;br&gt;push {handle, id, ts} into localStorage under one key." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p2_1">
+          <mxGeometry x="1450" y="175" width="330" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_c4r1" value="&lt;b&gt;TRANSFORM&lt;/b&gt;&lt;br&gt;Dedupe by product, newest first, cap at ~20 entries.&lt;br&gt;&lt;br&gt;Drop the anchor product from its own block." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p2_1">
+          <mxGeometry x="1450" y="415" width="330" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_c4r2" value="&lt;b&gt;STORAGE&lt;/b&gt;&lt;br&gt;Browser localStorage&lt;br&gt;key: ymal:viewed&lt;br&gt;&lt;br&gt;Nothing server-side. Nothing of ours to secure or expire." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#B3B3B3;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=10;fontColor=#1A1A1A;arcSize=8;fontColor=#444444;" vertex="1" parent="p2_1">
+          <mxGeometry x="1450" y="645" width="330" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_c4r3" value="&lt;b&gt;REFRESH + DEPTH&lt;/b&gt;&lt;br&gt;Live, per view.&lt;br&gt;Display 4-6, keep ~20." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#B3B3B3;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=10;fontColor=#1A1A1A;arcSize=8;fontColor=#444444;" vertex="1" parent="p2_1">
+          <mxGeometry x="1450" y="805" width="330" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="p2_c4r4" value="&lt;b&gt;OPEN&lt;/b&gt;&lt;br&gt;Render from stored handles via the theme, or re-fetch each product to get current price and stock?&lt;br&gt;&lt;br&gt;What if the shopper has viewed nothing - hide the block, or fall back to New Arrivals?" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D79B00;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p2_1">
+          <mxGeometry x="1450" y="935" width="330" height="200" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="p3" name="3. The Shared Eligibility Gate">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1620" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="p3_1" parent="0" />
+        <mxCell id="p3_title" value="YMAL - The eligibility gate  -  built, measured, and now shared by four blocks" style="text;html=1;align=left;verticalAlign=middle;fontSize=20;fontStyle=1;fontColor=#1A1A1A;" vertex="1" parent="p3_1">
+          <mxGeometry x="40" y="18" width="1200" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="p3_sub" value="docs/logic.md section 4.1, implemented as pure functions in backend/ymal/eligibility.py. Counts are the real output of the Phase 1 run (backend/data/phase1/summary.json, 2026-09-03)." style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#5A5A5A;" vertex="1" parent="p3_1">
+          <mxGeometry x="40" y="56" width="1200" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="p3_st" value="&lt;b&gt;ACTIVE PRODUCTS&lt;/b&gt;&lt;br&gt;status:active  -  392" style="rounded=1;arcSize=40;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontSize=12;fontStyle=1;fillColor=#E1D5E7;strokeColor=#9673A6;" vertex="1" parent="p3_1">
+          <mxGeometry x="80" y="130" width="300" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="p3_d1" value="Stocked at&lt;br&gt;&lt;b&gt;&#x27;Bali To Produce&#x27;&lt;/b&gt;?&lt;br&gt;(any variant has an inventory level there)" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=11;align=center;verticalAlign=middle;spacingLeft=4;spacingRight=4;" vertex="1" parent="p3_1">
+          <mxGeometry x="80" y="250" width="300" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="p3_d2" value="Title contains&lt;br&gt;&lt;b&gt;*SALE*&lt;/b&gt;?&lt;br&gt;(literal containment, case-insensitive)" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=11;align=center;verticalAlign=middle;spacingLeft=4;spacingRight=4;" vertex="1" parent="p3_1">
+          <mxGeometry x="80" y="440" width="300" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="p3_d3" value="Has onlineStoreUrl?&lt;br&gt;(EXCLUDE_UNPUBLISHED -&lt;br&gt;extra guard, not in the stated rule)" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=11;align=center;verticalAlign=middle;spacingLeft=4;spacingRight=4;" vertex="1" parent="p3_1">
+          <mxGeometry x="80" y="630" width="300" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="p3_elig" value="&lt;b&gt;ELIGIBLE (unfix)&lt;/b&gt;&lt;br&gt;254 of 392  -  64.8%" style="rounded=1;arcSize=40;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fontSize=12;fontStyle=1;fillColor=#D5E8D4;strokeColor=#82B366;" vertex="1" parent="p3_1">
+          <mxGeometry x="80" y="830" width="300" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="p3_x1" value="&lt;b&gt;reason: fixed_stock&lt;/b&gt;  -  126 products&lt;br&gt;(20 fixed only + 106 fixed AND sale)&lt;br&gt;Stock we cannot replenish. Recommending it burns finite inventory or sends the shopper to something unavailable." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p3_1">
+          <mxGeometry x="470" y="265" width="330" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="p3_x2" value="&lt;b&gt;reason: sale_marker&lt;/b&gt;  -  118 products&lt;br&gt;(12 sale only + 106 fixed AND sale)&lt;br&gt;Markdown. These blocks exist to sell at full price." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p3_1">
+          <mxGeometry x="470" y="455" width="330" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="p3_x3" value="&lt;b&gt;reason: not_published&lt;/b&gt;  -  0 observed&lt;br&gt;No online-store URL means the card links nowhere. Toggle EXCLUDE_UNPUBLISHED off for the literal two-condition rule." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D79B00;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p3_1">
+          <mxGeometry x="470" y="645" width="330" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="p3_x4" value="&lt;b&gt;classify() does not short-circuit&lt;/b&gt;&lt;br&gt;It returns every failing reason, so 106 products are recorded as &#x27;fixed_stock + sale_marker&#x27;. Honest reporting matters when diffing against the Sheet - a single reason would hide the overlap." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#B3B3B3;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=10;fontColor=#1A1A1A;arcSize=8;fontColor=#444444;" vertex="1" parent="p3_1">
+          <mxGeometry x="470" y="830" width="330" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="p3_e1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;strokeWidth=2;endArrow=blockThin;endFill=1;fontSize=10;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="p3_1" source="p3_st" target="p3_d1">
+          <mxGeometry relative="1" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p3_e2" value="yes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;strokeWidth=2;endArrow=blockThin;endFill=1;fontSize=10;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="p3_1" source="p3_d1" target="p3_d2">
+          <mxGeometry relative="1" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p3_e3" value="no" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;strokeWidth=2;endArrow=blockThin;endFill=1;fontSize=10;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="p3_1" source="p3_d2" target="p3_d3">
+          <mxGeometry relative="1" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p3_e4" value="yes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;strokeWidth=2;endArrow=blockThin;endFill=1;fontSize=10;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="p3_1" source="p3_d3" target="p3_elig">
+          <mxGeometry relative="1" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p3_e5" value="no" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;strokeWidth=2;endArrow=blockThin;endFill=1;fontSize=10;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="p3_1" source="p3_d1" target="p3_x1">
+          <mxGeometry relative="1" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p3_e6" value="yes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;strokeWidth=2;endArrow=blockThin;endFill=1;fontSize=10;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="p3_1" source="p3_d2" target="p3_x2">
+          <mxGeometry relative="1" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p3_e7" value="no" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;strokeWidth=2;endArrow=blockThin;endFill=1;fontSize=10;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="p3_1" source="p3_d3" target="p3_x3">
+          <mxGeometry relative="1" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p3_k1" value="&lt;b&gt;THE SIX REAL LOCATIONS&lt;/b&gt;  (all active)&lt;br&gt;- &lt;b&gt;Bali To Produce&lt;/b&gt;  -&gt; production, replenishable = &#x27;unfix&#x27;&lt;br&gt;- Bali Stock             -&gt; fixed stock, must NOT match&lt;br&gt;- NE-First Choice        -&gt; fixed stock, must NOT match&lt;br&gt;- Jillamy WBPA  -  NE-Sample  -  Yarn Warehouse&lt;br&gt;&lt;br&gt;This is why BALI_LOCATION_PATTERN is the full &#x27;bali to produce&#x27; and not just &#x27;bali&#x27;. A bare &#x27;bali&#x27; would sweep in Bali Stock and silently pass fixed stock as eligible.&lt;br&gt;&lt;br&gt;These names line up with PPA&#x27;s five production types - unfix, fixed, sample, sale_stock, o4 - so &#x27;unfix&#x27; has a real upstream definition, not just an inventory-location proxy." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p3_1">
+          <mxGeometry x="850" y="130" width="340" height="290" as="geometry" />
+        </mxCell>
+        <mxCell id="p3_k2" value="&lt;b&gt;MATCHING RULES&lt;/b&gt;&lt;br&gt;- *SALE* is matched by literal containment, NEVER regex. &#x27;*&#x27; is a regex metacharacter; a compiled &#x27;*SALE*&#x27; means something else entirely.&lt;br&gt;- Asterisk-delimited on purpose: &#x27;WHOLESALE&#x27; and &#x27;Salem&#x27; correctly do not match, which a bare-word check would have hit.&lt;br&gt;- Location matched case-insensitively as a substring." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p3_1">
+          <mxGeometry x="850" y="430" width="340" height="195" as="geometry" />
+        </mxCell>
+        <mxCell id="p3_k3" value="&lt;b&gt;WHICH BLOCKS THE GATE APPLIES TO&lt;/b&gt;&lt;br&gt;&lt;b&gt;Trending / Top Selling&lt;/b&gt; - hardest hit. They rank by units sold and markdown sells fastest, so the gate cuts the top of the raw list.&lt;br&gt;&lt;b&gt;Featured&lt;/b&gt; - full gate, plus colorway dedupe and dropping the anchor itself.&lt;br&gt;&lt;b&gt;New Arrivals&lt;/b&gt; - full gate, though a genuinely new product is rarely on *SALE* already.&lt;br&gt;&lt;b&gt;Recently Viewed&lt;/b&gt; - probably NOT the full gate. The shopper chose to look at these. Filtering to &#x27;still purchasable&#x27; is defensible; hiding a markdown item they just viewed is not. Open decision." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p3_1">
+          <mxGeometry x="850" y="635" width="340" height="250" as="geometry" />
+        </mxCell>
+        <mxCell id="p3_k4" value="&lt;b&gt;RANK AFTER FILTER&lt;/b&gt;&lt;br&gt;Every block filters first and ranks second. Ranking then truncating would let the gate hollow out a list that already looked full." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#B3B3B3;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=10;fontColor=#1A1A1A;arcSize=8;fontColor=#444444;" vertex="1" parent="p3_1">
+          <mxGeometry x="850" y="900" width="340" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="p3_v1" value="&lt;b&gt;VALIDATION - diff against the Google Sheet&lt;/b&gt;&lt;br&gt;Derive eligibility from the API, diff against the hand-built Sheet (keyed on product_id), read the result:&lt;br&gt;- lists match -&gt; rule validated&lt;br&gt;- API list LARGER -&gt; too permissive, something ineligible is leaking&lt;br&gt;- API list SMALLER -&gt; too strict, likely a location-name or marker-variant miss&lt;br&gt;- rows disagree individually -&gt; each mismatch names a specific broken assumption&lt;br&gt;&lt;br&gt;&lt;b&gt;This matters more after the reframe, not less.&lt;/b&gt; The gate is now the single shared component behind four blocks - one bug shows up in all of them at once." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p3_1">
+          <mxGeometry x="1240" y="130" width="340" height="300" as="geometry" />
+        </mxCell>
+        <mxCell id="p3_v2" value="&lt;b&gt;STILL TO VERIFY&lt;/b&gt;&lt;br&gt;- Case variants: *Sale* / *sale*?&lt;br&gt;- Spacing: &#x27;* SALE *&#x27; or &#x27;*SALE *&#x27;?&lt;br&gt;- Extended forms: *SALE 50%* / *FINAL SALE*? If so, match the opening &#x27;*SALE&#x27; rather than the closed token.&lt;br&gt;- Malformed markers - a missing closing asterisk evades an exact match and leaks markdown into every block.&lt;br&gt;- Is the title the ONLY sale marker, or is there a tag or compare_at_price to cross-check? PPA sets a &#x27;sale&#x27; flag upstream, which may be the more reliable signal.&lt;br&gt;- Products at Bali AND a fixed-stock warehouse - eligible or not?" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D79B00;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p3_1">
+          <mxGeometry x="1240" y="450" width="340" height="300" as="geometry" />
+        </mxCell>
+        <mxCell id="p3_v3" value="&lt;b&gt;CATALOG SIZE&lt;/b&gt;&lt;br&gt;254 eligible products.&lt;br&gt;&lt;br&gt;For store-wide blocks showing 6-8 items this is comfortable - the worry in the old plan was 254 products each needing a 30-deep pool of their own.&lt;br&gt;Only Featured still needs per-product depth, and it draws from the same 254." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#B3B3B3;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=10;fontColor=#1A1A1A;arcSize=8;fontColor=#444444;" vertex="1" parent="p3_1">
+          <mxGeometry x="1240" y="770" width="340" height="240" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="p4" name="4. Data, Windows and Storage">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1180" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="p4_1" parent="0" />
+        <mxCell id="p4_title" value="YMAL - What we fetch, what blocks it, and where the lists live" style="text;html=1;align=left;verticalAlign=middle;fontSize=20;fontStyle=1;fontColor=#1A1A1A;" vertex="1" parent="p4_1">
+          <mxGeometry x="40" y="18" width="1200" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="p4_sub" value="The order window is the only hard external constraint in the whole design. Everything else here is a choice we can make today." style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#5A5A5A;" vertex="1" parent="p4_1">
+          <mxGeometry x="40" y="56" width="1200" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="p4_f1" value="&lt;b&gt;WHAT WE ALREADY FETCH&lt;/b&gt;   [BUILT]&lt;br&gt;Per active product: id, title, handle, status, productType, vendor, onlineStoreUrl, totalInventory, and available quantity at &#x27;Bali To Produce&#x27; (joined in one pass via InventoryItem.inventoryLevel).&lt;br&gt;392 products, ~6 seconds, cost-aware pagination." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p4_1">
+          <mxGeometry x="60" y="130" width="520" height="190" as="geometry" />
+        </mxCell>
+        <mxCell id="p4_f2" value="&lt;b&gt;WHAT TO ADD - two fields and one extract&lt;/b&gt;&lt;br&gt;&lt;b&gt;tags&lt;/b&gt;  -&gt; Featured. Already generated deterministically by PPA&#x27;s tags_generator.py, so quality is far better than the docs assumed.&lt;br&gt;&lt;b&gt;publishedAt&lt;/b&gt;  -&gt; New Arrivals.&lt;br&gt;&lt;b&gt;order line items&lt;/b&gt;  -&gt; Trending and Top Selling.&lt;br&gt;&lt;br&gt;&lt;b&gt;Not needed:&lt;/b&gt; featuredImage and priceRangeV2. Publishing the lists as list.product_reference hands Liquid live product objects, so the theme reads current price, image and stock itself and our copy can never go stale. See page 6." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p4_1">
+          <mxGeometry x="60" y="340" width="520" height="250" as="geometry" />
+        </mxCell>
+        <mxCell id="p4_f3" value="&lt;b&gt;ORDER EXTRACT&lt;/b&gt;&lt;br&gt;Only three fields matter: product id, quantity, created_at.&lt;br&gt;&lt;br&gt;14 days: plain cursor pagination, cheap, no approval needed.&lt;br&gt;90 days: Bulk Operations - submit, poll, download JSONL - and blocked until the cap is lifted.&lt;br&gt;&lt;br&gt;One function, one window parameter. Trending and Top Selling are the same code." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p4_1">
+          <mxGeometry x="60" y="610" width="520" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="p4_f4" value="&lt;b&gt;NOT NEEDED FOR THIS GOAL&lt;/b&gt;&lt;br&gt;Customer records, sessions, Web Pixel view events, image files, collection membership, price history. None of the five blocks reads any of it. Do not fetch what nothing consumes." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#B3B3B3;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=10;fontColor=#1A1A1A;arcSize=8;fontColor=#444444;" vertex="1" parent="p4_1">
+          <mxGeometry x="60" y="860" width="520" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="p4_w1" value="&lt;b&gt;THE 60-DAY ORDER CAP&lt;/b&gt;  -  the one real blocker&lt;br&gt;Without read_all_orders approval, an app can only read orders from the last 60 days.&lt;br&gt;&lt;br&gt;&lt;b&gt;Trending (14 days): unaffected.&lt;/b&gt; Buildable today.&lt;br&gt;&lt;b&gt;Top Selling (90 days): blocked.&lt;/b&gt; Queries will simply return nothing older than 60 days - quietly, not as an error, which is the dangerous part. A 90-day ranking built on 60 days of data looks perfectly plausible and is wrong." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p4_1">
+          <mxGeometry x="610" y="130" width="520" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="p4_w2" value="&lt;b&gt;OPTION A - get the approval&lt;/b&gt;&lt;br&gt;Already in the parallel track. Shopify&#x27;s timeline, not ours. Correct long-term answer, unknown arrival date." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D79B00;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p4_1">
+          <mxGeometry x="610" y="370" width="520" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="p4_w3" value="&lt;b&gt;OPTION B - bank daily snapshots  (recommended)&lt;/b&gt;&lt;br&gt;Start a small daily job now that appends the last day&#x27;s order lines to our own store. In ~3 months the 90-day window fills itself and stays filled, independent of approval.&lt;br&gt;Costs almost nothing, starts paying immediately, and also rebuilds the long history the collaborative idea would need if it ever comes back.&lt;br&gt;Every day this is not running is a day of history that cannot be recovered later." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p4_1">
+          <mxGeometry x="610" y="500" width="520" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="p4_w4" value="&lt;b&gt;OPTION C - ship at 60 days&lt;/b&gt;&lt;br&gt;Run Top Selling on the widest window actually available and widen it when approval lands. Honest, shippable now, but the block&#x27;s definition silently changes later." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D79B00;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p4_1">
+          <mxGeometry x="610" y="720" width="520" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="p4_w5" value="&lt;b&gt;Do A and B together.&lt;/b&gt; B is cheap insurance against A being slow, and B is the only one of the three that cannot be started retroactively." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#B3B3B3;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=10;fontColor=#1A1A1A;arcSize=8;fontColor=#444444;" vertex="1" parent="p4_1">
+          <mxGeometry x="610" y="870" width="520" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="p4_s1" value="&lt;b&gt;WHERE EACH LIST LIVES&lt;/b&gt;&lt;br&gt;&lt;b&gt;Trending&lt;/b&gt;      -&gt; shop metafield  ymal.trending&lt;br&gt;&lt;b&gt;Top Selling&lt;/b&gt;   -&gt; shop metafield  ymal.top_selling&lt;br&gt;&lt;b&gt;New Arrivals&lt;/b&gt;  -&gt; shop metafield  ymal.new_arrivals&lt;br&gt;&lt;b&gt;Featured&lt;/b&gt;      -&gt; product metafield  ymal.featured  (one per product, ~254 writes, metafieldsSet batched 25 per call)&lt;br&gt;&lt;b&gt;Recently Viewed&lt;/b&gt; -&gt; the shopper&#x27;s localStorage. Nothing of ours.&lt;br&gt;&lt;br&gt;Three shop-level writes replace what the old design would have written 254 times. Liquid reads shop metafields directly, so no backend sits in the request path." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p4_1">
+          <mxGeometry x="1160" y="130" width="480" height="300" as="geometry" />
+        </mxCell>
+        <mxCell id="p4_s2" value="&lt;b&gt;REFRESH CADENCE&lt;/b&gt;&lt;br&gt;Trending      nightly (hourly if it should feel live)&lt;br&gt;Top Selling   nightly or weekly - a 90-day ranking barely moves&lt;br&gt;New Arrivals  nightly&lt;br&gt;Featured      nightly or weekly - tags only change when PPA rebuilds a page&lt;br&gt;Recently Viewed  live, in the browser&lt;br&gt;&lt;br&gt;Reuse whatever scheduler already runs the sibling automations rather than inventing one. Still an open question - PPA runs jobs via run_fetch.sh and launchd, which may be the answer." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p4_1">
+          <mxGeometry x="1160" y="450" width="480" height="260" as="geometry" />
+        </mxCell>
+        <mxCell id="p4_s3" value="&lt;b&gt;DEPTH RULE&lt;/b&gt;&lt;br&gt;Store roughly 3x what is displayed. A block showing 6 stores ~20-30.&lt;br&gt;&lt;br&gt;This is the one idea worth keeping from the old design: the gate, the anchor exclusion and colorway dedupe all remove items at render, and a list stored at exactly its display length arrives thin." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#B3B3B3;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=10;fontColor=#1A1A1A;arcSize=8;fontColor=#444444;" vertex="1" parent="p4_1">
+          <mxGeometry x="1160" y="730" width="480" height="190" as="geometry" />
+        </mxCell>
+        <mxCell id="p4_s4" value="&lt;b&gt;COST NOTES&lt;/b&gt;&lt;br&gt;Admin GraphQL is cost-based, not request-count based - watch extensions.cost.throttleStatus (already handled in ymal/shopify.py).&lt;br&gt;metafieldsSet takes 25 per call. Bulk operations are async: poll, then download. API version pinned to 2026-01." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#B3B3B3;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=10;fontColor=#1A1A1A;arcSize=8;fontColor=#444444;" vertex="1" parent="p4_1">
+          <mxGeometry x="1160" y="940" width="480" height="180" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="p5" name="5. Admin Console">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1820" pageHeight="1330" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="p5_1" parent="0" />
+        <mxCell id="p5_title" value="YMAL - The console the web team uses  (Wiser&#x27;s Setup Widgets screen, rebuilt)" style="text;html=1;align=left;verticalAlign=middle;fontSize=20;fontStyle=1;fontColor=#1A1A1A;" vertex="1" parent="p5_1">
+          <mxGeometry x="40" y="18" width="1200" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="p5_sub" value="One card per page template. Each card lists the blocks enabled there; Setup opens order, slots and heading. Every control writes one thing: the ymal.config metafield. Nothing here touches the theme or the pipeline." style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#5A5A5A;" vertex="1" parent="p5_1">
+          <mxGeometry x="40" y="56" width="1250" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="p5_nav" value="&lt;b&gt;SCREENS&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;Setup Widgets&lt;/b&gt;   v1&lt;br&gt;the grid on the right - which blocks on which page&lt;br&gt;&lt;br&gt;&lt;b&gt;Analytics&lt;/b&gt;   v1, after events exist&lt;br&gt;per block and per page: impressions, clicks, CTR, attributed revenue&lt;br&gt;&lt;br&gt;&lt;b&gt;Exclude Products&lt;/b&gt;   v2&lt;br&gt;the merchandiser block list. This is where the Google Sheet was always heading (decision #9) - and the console is a better home for it than a Sheet that drifts.&lt;br&gt;&lt;br&gt;&lt;b&gt;Customize Widgets&lt;/b&gt;   later&lt;br&gt;headings, card layout, carousel vs grid&lt;br&gt;&lt;br&gt;&lt;b&gt;Dashboard&lt;/b&gt;   later&lt;br&gt;the summary view. Skip until there is something to summarise.&lt;br&gt;&lt;br&gt;Wiser&#x27;s sidebar also carries search, filters, addons, cart drawer and plan management. None of that is this project." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p5_1">
+          <mxGeometry x="60" y="130" width="290" height="640" as="geometry" />
+        </mxCell>
+        <mxCell id="p5_pc0" value="&lt;b&gt;Product Page&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;v1  -  the like-for-like against Wiser&lt;/b&gt;&lt;br&gt;Featured (anchor = this product)&lt;br&gt;Recently Viewed&lt;br&gt;Trending&lt;br&gt;New Arrivals&lt;br&gt;Top Selling&lt;br&gt;&lt;br&gt;The only page where Featured has a natural anchor." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p5_1">
+          <mxGeometry x="380" y="130" width="330" height="210" as="geometry" />
+        </mxCell>
+        <mxCell id="p5_pc1" value="&lt;b&gt;Home Page&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;v1&lt;/b&gt;&lt;br&gt;Trending&lt;br&gt;New Arrivals&lt;br&gt;Top Selling&lt;br&gt;Recently Viewed&lt;br&gt;&lt;br&gt;No Featured - there is no anchor product on a homepage.&lt;br&gt;All store-wide lists, so this page costs nothing extra to serve." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p5_1">
+          <mxGeometry x="730" y="130" width="330" height="210" as="geometry" />
+        </mxCell>
+        <mxCell id="p5_pc2" value="&lt;b&gt;Cart Page / Drawer&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;v2  -  highest AOV impact&lt;/b&gt;&lt;br&gt;Recently Viewed&lt;br&gt;Trending&lt;br&gt;Top Selling&lt;br&gt;&lt;br&gt;Featured is possible here if the anchor is taken from the cart contents - a real design decision, not a free extension." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p5_1">
+          <mxGeometry x="1080" y="130" width="330" height="210" as="geometry" />
+        </mxCell>
+        <mxCell id="p5_pc3" value="&lt;b&gt;Collection Pages&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;v2&lt;/b&gt;&lt;br&gt;Trending&lt;br&gt;New Arrivals&lt;br&gt;Top Selling&lt;br&gt;Recently Viewed&lt;br&gt;&lt;br&gt;Worth considering: trending WITHIN the collection being viewed rather than store-wide. That needs a per-collection list, not the shared one." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p5_1">
+          <mxGeometry x="1430" y="130" width="330" height="210" as="geometry" />
+        </mxCell>
+        <mxCell id="p5_pc4" value="&lt;b&gt;Search Results&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;v3&lt;/b&gt;&lt;br&gt;Trending&lt;br&gt;New Arrivals&lt;br&gt;Recently Viewed&lt;br&gt;&lt;br&gt;Most valuable on a zero-results search, where the page is otherwise a dead end." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p5_1">
+          <mxGeometry x="380" y="360" width="330" height="210" as="geometry" />
+        </mxCell>
+        <mxCell id="p5_pc5" value="&lt;b&gt;404 Not Found&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;v3&lt;/b&gt;&lt;br&gt;Trending&lt;br&gt;New Arrivals&lt;br&gt;Top Selling&lt;br&gt;&lt;br&gt;Cheap to add once the snippet takes a page type - it is the same store-wide list as the homepage." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p5_1">
+          <mxGeometry x="730" y="360" width="330" height="210" as="geometry" />
+        </mxCell>
+        <mxCell id="p5_pc6" value="&lt;b&gt;Blog / Other Pages&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;v3&lt;/b&gt;&lt;br&gt;Trending&lt;br&gt;New Arrivals&lt;br&gt;&lt;br&gt;Only worth doing if the blog actually gets traffic. Check before building." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p5_1">
+          <mxGeometry x="1080" y="360" width="330" height="210" as="geometry" />
+        </mxCell>
+        <mxCell id="p5_pc7" value="&lt;b&gt;Account / Login&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;v3&lt;/b&gt;&lt;br&gt;Recently Viewed&lt;br&gt;Trending&lt;br&gt;&lt;br&gt;Recently Viewed is the natural fit - a returning shopper on their own account page." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p5_1">
+          <mxGeometry x="1430" y="360" width="330" height="210" as="geometry" />
+        </mxCell>
+        <mxCell id="p5_pc8" value="&lt;b&gt;Thank-you / Order Status&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;v3  -  verify feasibility FIRST&lt;/b&gt;&lt;br&gt;Featured (anchor = ordered items)&lt;br&gt;Recently Viewed&lt;br&gt;New Arrivals&lt;br&gt;&lt;br&gt;Shopify restricts what can be injected into the thank-you and order status pages, and the rules differ by plan and by checkout version. Confirm what this store can actually do before promising this card." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D79B00;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p5_1">
+          <mxGeometry x="380" y="590" width="330" height="210" as="geometry" />
+        </mxCell>
+        <mxCell id="p5_setup" value="&lt;b&gt;WHAT THE &#x27;SETUP&#x27; PANEL CONTAINS&lt;/b&gt;   (per page template)&lt;br&gt;- which blocks appear, and in what order (drag or a numbered list)&lt;br&gt;- slots per block (4 / 6 / 8)&lt;br&gt;- heading text per block - &#x27;You May Also Like&#x27;, &#x27;Trending Now&#x27;&lt;br&gt;- on / off per block, and a global kill switch for the whole page&lt;br&gt;- block-specific options where they exist: the Trending window, whether Featured excludes the anchor&#x27;s own style&lt;br&gt;&lt;br&gt;&lt;b&gt;Save writes ymal.config and nothing else.&lt;/b&gt; No deploy, no theme edit, no engineering." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p5_1">
+          <mxGeometry x="730" y="590" width="680" height="210" as="geometry" />
+        </mxCell>
+        <mxCell id="p5_stack" value="&lt;b&gt;STACK  -  DECIDED 2026-09-04&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;Copy wholesale-order-entry.&lt;/b&gt; It is already exactly this shape: a FastAPI backend, a React+Vite SPA, and an nginx container that serves the built bundle and reverse-proxies /api to the backend - all three in one docker-compose, deployed on the GCP VM.&lt;br&gt;&lt;br&gt;&lt;b&gt;Backend:&lt;/b&gt; FastAPI in backend/, importing the ymal package directly - so the console reuses the auth, the GraphQL client and the eligibility rule that already exist. It is the ONLY thing holding Shopify credentials.&lt;br&gt;&lt;br&gt;&lt;b&gt;Event store:&lt;/b&gt; Postgres in the same compose file, which wholesale-order-entry already runs. No new infrastructure decision.&lt;br&gt;&lt;br&gt;&lt;b&gt;Frontend:&lt;/b&gt; React 18 + Vite in frontend/src/, following wholesale-order-entry: no router, tabs are useState plus a TABS array, one folder per tab with its own api.js.&lt;br&gt;&lt;br&gt;&lt;b&gt;Rejected - Streamlit&lt;/b&gt; (PPA&#x27;s pattern): fastest, but it looks like a tool, and the look is part of the ask. PPA stays the reference for the nightly scheduler, not for the UI.&lt;br&gt;&lt;b&gt;Rejected for now - Shopify embedded app:&lt;/b&gt; would sit inside the Shopify admin and look native, but needs App Bridge, session-token auth, an app registration and a Node stack nobody here runs. Still possible later - the config contract means the console can be replaced without touching the pipeline or the theme.&lt;br&gt;&lt;br&gt;&lt;b&gt;Credentials never reach the browser.&lt;/b&gt; The JS page calls our API; our API talks to Shopify." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p5_1">
+          <mxGeometry x="1430" y="590" width="340" height="610" as="geometry" />
+        </mxCell>
+        <mxCell id="p5_acc" value="&lt;b&gt;ACCESS AND SAFETY&lt;/b&gt;&lt;br&gt;wholesale-order-entry gates its admin behind a login (src/admin/Login.jsx) and REQUIRES its secrets from .env rather than defaulting them - its compose uses ${POSTGRES_PASSWORD:?}, which fails loudly if unset. Copy that, not PPA&#x27;s plaintext default password.&lt;br&gt;A bad config blanks the storefront, so the console must validate before writing - unknown block name, slots out of range, duplicate blocks on one page - and keep the previous version so a mistake is one click to undo." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D79B00;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p5_1">
+          <mxGeometry x="60" y="810" width="660" height="240" as="geometry" />
+        </mxCell>
+        <mxCell id="p5_who" value="&lt;b&gt;WHO USES IT, AND WHAT THEY GET&lt;/b&gt;&lt;br&gt;The web admin team, who work in the Shopify admin and do not run Python. Today, changing a widget means asking engineering or editing Liquid.&lt;br&gt;&lt;br&gt;After this: they place blocks themselves, see what each one earns, and turn off the ones that do not. That is the whole reason Wiser&#x27;s screen looks the way it does - and the reason this project is worth more than five queries." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#B3B3B3;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=10;fontColor=#1A1A1A;arcSize=8;fontColor=#444444;" vertex="1" parent="p5_1">
+          <mxGeometry x="750" y="830" width="660" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="p5_v1s" value="&lt;b&gt;V1 SCOPE - resist the grid&lt;/b&gt;&lt;br&gt;Nine page templates is Wiser&#x27;s scope, not ours on day one. Product Page and Home Page cover almost all of the traffic and both are cheap. Ship those two, learn what the team actually changes, then widen.&lt;br&gt;The config model should still describe all nine from the start, so adding one later is configuration rather than a schema change." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#B3B3B3;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=10;fontColor=#1A1A1A;arcSize=8;fontColor=#444444;" vertex="1" parent="p5_1">
+          <mxGeometry x="60" y="1080" width="1350" height="170" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="p6" name="6. Config Model and Storefront Contract">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1760" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="p6_1" parent="0" />
+        <mxCell id="p6_title" value="YMAL - The contract between the console, the pipeline and the theme" style="text;html=1;align=left;verticalAlign=middle;fontSize=20;fontStyle=1;fontColor=#1A1A1A;" vertex="1" parent="p6_1">
+          <mxGeometry x="40" y="18" width="1200" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="p6_sub" value="Design this before writing any of the three layers. Shapes below are a proposal, not a decision - but something of this shape has to exist or the console cannot control the storefront." style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#5A5A5A;" vertex="1" parent="p6_1">
+          <mxGeometry x="40" y="56" width="1250" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="p6_json" value="&lt;b&gt;shop metafield  -  ymal.config  (type: json)&lt;/b&gt;&lt;br&gt;{&lt;br&gt;&amp;nbsp; &quot;version&quot;: 1,&lt;br&gt;&amp;nbsp; &quot;enabled&quot;: true,                    // global kill switch&lt;br&gt;&amp;nbsp; &quot;updated_at&quot;: &quot;2026-09-04T09:00:00Z&quot;,&lt;br&gt;&amp;nbsp; &quot;updated_by&quot;: &quot;web-team&quot;,&lt;br&gt;&amp;nbsp; &quot;placements&quot;: {&lt;br&gt;&amp;nbsp;&amp;nbsp; &quot;product&quot;: [&lt;br&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp; { &quot;block&quot;: &quot;featured&quot;,   &quot;heading&quot;: &quot;You May Also Like&quot;, &quot;slots&quot;: 6, &quot;enabled&quot;: true },&lt;br&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp; { &quot;block&quot;: &quot;trending&quot;,   &quot;heading&quot;: &quot;Trending Now&quot;,      &quot;slots&quot;: 6, &quot;enabled&quot;: true },&lt;br&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp; { &quot;block&quot;: &quot;recently_viewed&quot;, &quot;heading&quot;: &quot;Recently Viewed&quot;, &quot;slots&quot;: 4, &quot;enabled&quot;: true }&lt;br&gt;&amp;nbsp;&amp;nbsp; ],&lt;br&gt;&amp;nbsp;&amp;nbsp; &quot;home&quot;: [ ... ],&lt;br&gt;&amp;nbsp;&amp;nbsp; &quot;cart&quot;: [ ... ]&lt;br&gt;&amp;nbsp; }&lt;br&gt;}&lt;br&gt;&lt;br&gt;Order in the array IS the order on the page. A page template absent from &#x27;placements&#x27; renders nothing." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D79B00;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p6_1">
+          <mxGeometry x="60" y="130" width="600" height="400" as="geometry" />
+        </mxCell>
+        <mxCell id="p6_mf" value="&lt;b&gt;EVERY METAFIELD IN THE SYSTEM&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;shop / ymal.config&lt;/b&gt;  json&lt;br&gt;written by the console, read by Liquid&lt;br&gt;&lt;br&gt;&lt;b&gt;shop / ymal.trending&lt;/b&gt;  list.product_reference&lt;br&gt;&lt;b&gt;shop / ymal.top_selling&lt;/b&gt;  list.product_reference&lt;br&gt;&lt;b&gt;shop / ymal.new_arrivals&lt;/b&gt;  list.product_reference&lt;br&gt;written nightly by the pipeline, read by Liquid&lt;br&gt;&lt;br&gt;&lt;b&gt;product / ymal.featured&lt;/b&gt;  list.product_reference&lt;br&gt;one per product, ~254 writes, metafieldsSet batched 25 per call&lt;br&gt;&lt;br&gt;&lt;b&gt;Recently Viewed has no metafield&lt;/b&gt; - it is the browser&#x27;s localStorage.&lt;br&gt;&lt;br&gt;&lt;b&gt;Use list.product_reference, not our own JSON of product data.&lt;/b&gt; Liquid then receives live product objects - current title, price, image, availability - so a list written at 03:00 cannot render yesterday&#x27;s price. It also means we never fetch featuredImage or priceRangeV2 at all." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p6_1">
+          <mxGeometry x="700" y="130" width="480" height="400" as="geometry" />
+        </mxCell>
+        <mxCell id="p6_liquid" value="&lt;b&gt;THE THEME CONTRACT  -  edited once&lt;/b&gt;&lt;br&gt;&lt;br&gt;In each template, one line:&lt;br&gt;&amp;nbsp; {% render &#x27;ymal&#x27;, page_type: &#x27;product&#x27;, product: product %}&lt;br&gt;&amp;nbsp; {% render &#x27;ymal&#x27;, page_type: &#x27;home&#x27; %}&lt;br&gt;&lt;br&gt;The snippet then:&lt;br&gt;1. bails out if config.enabled is false&lt;br&gt;2. reads placements[page_type]&lt;br&gt;3. for each entry, resolves its list -&lt;br&gt;&amp;nbsp;&amp;nbsp; shop metafield for the store-wide blocks,&lt;br&gt;&amp;nbsp;&amp;nbsp; product metafield for featured,&lt;br&gt;&amp;nbsp;&amp;nbsp; client-side JS for recently_viewed&lt;br&gt;4. skips the anchor product and anything not item.available&lt;br&gt;5. renders the theme&#x27;s own product card, up to &#x27;slots&#x27;&lt;br&gt;6. renders nothing at all if a block comes back empty&lt;br&gt;&lt;br&gt;After this snippet is installed, the web team never edits Liquid again. That is the deliverable." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p6_1">
+          <mxGeometry x="1220" y="130" width="480" height="400" as="geometry" />
+        </mxCell>
+        <mxCell id="p6_val" value="&lt;b&gt;VALIDATION - the console must not be able to break the store&lt;/b&gt;&lt;br&gt;A malformed config silently blanks every block, and nobody will notice until traffic drops. Before writing, check: known block names only; slots within an allowed range; no duplicate block on one page; page template names from a fixed list; the JSON parses.&lt;br&gt;Keep the previous version alongside the current one so an undo is one click, not a restore." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p6_1">
+          <mxGeometry x="60" y="570" width="540" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="p6_ver" value="&lt;b&gt;VERSIONING&lt;/b&gt;&lt;br&gt;&#x27;version&#x27; exists so the snippet can refuse a config it does not understand rather than half-render one. The theme is the slowest of the three layers to change - it needs a preview and a publish - so the config format has to be able to move ahead of it safely." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#B3B3B3;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=10;fontColor=#1A1A1A;arcSize=8;fontColor=#444444;" vertex="1" parent="p6_1">
+          <mxGeometry x="640" y="570" width="540" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="p6_live" value="&lt;b&gt;WHAT STAYS LIVE AT RENDER&lt;/b&gt;&lt;br&gt;Stock and publication state are re-checked by Liquid on every request through item.available. The nightly list decides WHICH products are candidates; the theme decides whether each one may still be shown.&lt;br&gt;This is the split that Wiser got wrong, and it survives the reframe unchanged." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p6_1">
+          <mxGeometry x="1220" y="570" width="480" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="p6_q" value="&lt;b&gt;OPEN ON THE CONTRACT&lt;/b&gt;&lt;br&gt;- Does the config carry per-block options (Trending window, Featured excluding the anchor&#x27;s style), or do those stay in settings.py where only engineering can change them? Putting them in the console is more power and more ways to get it wrong.&lt;br&gt;- Does &#x27;slots&#x27; belong to the config or to the theme&#x27;s section settings? Online Store 2.0 sections already have a settings UI - some of this screen may already exist for free in the theme editor.&lt;br&gt;- One config for the whole store, or per market / per language? Wiser&#x27;s screen has a language selector; we have not asked whether this store needs one.&lt;br&gt;- Should the pipeline read the config too - for instance, to skip computing a block nobody has enabled anywhere?" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D79B00;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p6_1">
+          <mxGeometry x="60" y="830" width="1640" height="240" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="p7" name="7. Attribution and Analytics">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1780" pageHeight="1280" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="p7_1" parent="0" />
+        <mxCell id="p7_title" value="YMAL - &#x27;How much do we profit from this&#x27;  -  and what that number can honestly mean" style="text;html=1;align=left;verticalAlign=middle;fontSize=20;fontStyle=1;fontColor=#1A1A1A;" vertex="1" parent="p7_1">
+          <mxGeometry x="40" y="18" width="1250" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="p7_sub" value="This is the hardest part of the project and the reason tracking cannot be added later. Nothing here is built." style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#5A5A5A;" vertex="1" parent="p7_1">
+          <mxGeometry x="40" y="56" width="1250" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="p7_ev" value="&lt;b&gt;THE EVENTS&lt;/b&gt;   [NOT BUILT]&lt;br&gt;ymal_impression - block entered the viewport (IntersectionObserver, once per pageview)&lt;br&gt;ymal_click - a card was clicked (delegated from the container)&lt;br&gt;ymal_atc - add to cart on a product that came from a block&lt;br&gt;purchase - the order, with its line items&lt;br&gt;&lt;br&gt;&lt;b&gt;Every event carries:&lt;/b&gt; session id, page template, &lt;b&gt;block name&lt;/b&gt;, anchor product, target product, position in the list, timestamp, and whether the session was in the holdout.&lt;br&gt;&lt;br&gt;Without the block name on every event, the console has nothing to report and the whole screen is decorative." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p7_1">
+          <mxGeometry x="60" y="130" width="540" height="320" as="geometry" />
+        </mxCell>
+        <mxCell id="p7_where" value="&lt;b&gt;WHERE THEY LAND&lt;/b&gt;&lt;br&gt;&lt;b&gt;A - our own endpoint, Postgres behind it&lt;/b&gt;  (recommended)&lt;br&gt;wholesale-order-entry already runs Postgres, FastAPI and nginx in one compose file on the VM. Events become one more table. Full control, no sampling, and the Analytics tab queries it directly.&lt;br&gt;&lt;br&gt;&lt;b&gt;B - Shopify Web Pixel&lt;/b&gt;&lt;br&gt;Likely still needed for the purchase event, because the thank-you and order status pages are restricted. Verify what this store&#x27;s plan and checkout version allow.&lt;br&gt;&lt;br&gt;&lt;b&gt;C - GA4&lt;/b&gt;&lt;br&gt;Easy to send to, awkward to read back into a console, and sampled. Fine as a secondary destination if the store already uses it - not as the system of record." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p7_1">
+          <mxGeometry x="620" y="130" width="540" height="320" as="geometry" />
+        </mxCell>
+        <mxCell id="p7_model" value="&lt;b&gt;THE ATTRIBUTION MODEL&lt;/b&gt;&lt;br&gt;&lt;b&gt;Recommended for v1 - click-through within session:&lt;/b&gt; a shopper clicks a card for product P in block B, then buys P in the same session -&gt; credit B with that line&#x27;s revenue.&lt;br&gt;&lt;br&gt;Simple, explainable, and matches what recommendation apps generally report - which makes it roughly comparable to Wiser&#x27;s own number.&lt;br&gt;&lt;br&gt;&lt;b&gt;Wider alternative - assisted:&lt;/b&gt; the order contains a product seen in a block within N days. Larger number, weaker claim.&lt;br&gt;&lt;br&gt;Report it as &lt;b&gt;influenced revenue&lt;/b&gt;. Never label it incremental." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p7_1">
+          <mxGeometry x="1200" y="130" width="520" height="320" as="geometry" />
+        </mxCell>
+        <mxCell id="p7_truth" value="&lt;b&gt;THE UNCOMFORTABLE PART  -  attribution is not incrementality&lt;/b&gt;&lt;br&gt;A shopper who clicks a Trending card and buys that product might have bought it anyway. Attribution measures what the block TOUCHED, not what it CAUSED. Every recommendation vendor reports the first number and lets the reader hear the second - Wiser&#x27;s figure is almost certainly the same kind of number.&lt;br&gt;&lt;br&gt;&lt;b&gt;The only honest answer to &#x27;how much do we profit&#x27; is a holdout:&lt;/b&gt; a stable hash of the session id puts, say, 10% of sessions into a group that sees no blocks at all. Revenue per session, holdout versus the rest, is the actual lift.&lt;br&gt;&lt;br&gt;&lt;b&gt;It has to be designed in from the first widget.&lt;/b&gt; A holdout cannot be applied retroactively, and neither can the sessions it needed to record. This is the same mistake as not capturing Wiser&#x27;s baseline before uninstalling it - and we already know that one hurts." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p7_1">
+          <mxGeometry x="60" y="490" width="840" height="300" as="geometry" />
+        </mxCell>
+        <mxCell id="p7_metrics" value="&lt;b&gt;WHAT THE ANALYTICS SCREEN SHOWS&lt;/b&gt;&lt;br&gt;Per block, and per page template:&lt;br&gt;- impressions, clicks, CTR&lt;br&gt;- add-to-cart rate from the block&lt;br&gt;- attributed orders and attributed revenue&lt;br&gt;- revenue per 1,000 impressions - the number that actually ranks blocks against each other&lt;br&gt;- share of total store revenue&lt;br&gt;&lt;br&gt;Plus, once the holdout has run long enough: revenue per session, holdout versus exposed, with an honest confidence note rather than a single triumphant figure.&lt;br&gt;&lt;br&gt;This is what lets the web team switch a block off. A block that costs page space and returns nothing should be visible as such." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p7_1">
+          <mxGeometry x="940" y="490" width="780" height="300" as="geometry" />
+        </mxCell>
+        <mxCell id="p7_profit" value="&lt;b&gt;PROFIT, NOT JUST REVENUE&lt;/b&gt;&lt;br&gt;&#x27;How much we profit&#x27; needs cost, and Shopify carries unit cost on InventoryItem. If PPA populates it - worth checking, since PPA writes prices and inventory already - then gross margin per attributed line is computable and the console can report margin rather than revenue.&lt;br&gt;If it is not populated, say revenue and do not imply margin." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D79B00;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p7_1">
+          <mxGeometry x="60" y="830" width="540" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="p7_vswiser" value="&lt;b&gt;COMPARING AGAINST WISER&lt;/b&gt;&lt;br&gt;To claim we match or beat Wiser, both numbers have to be the same kind of number. Capture Wiser&#x27;s per-widget performance AND its methodology while it is still installed.&lt;br&gt;Running both side by side on split traffic remains the cleanest read - and it is only possible while Wiser is still there." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p7_1">
+          <mxGeometry x="620" y="830" width="540" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="p7_privacy" value="&lt;b&gt;PRIVACY AND VOLUME&lt;/b&gt;&lt;br&gt;Session id only - no customer id, no email, nothing that identifies a person. Recently Viewed never leaves the browser at all.&lt;br&gt;Volume at one store&#x27;s traffic is small: a few events per pageview, retained for a bounded window. This is not a data warehouse." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#B3B3B3;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=10;fontColor=#1A1A1A;arcSize=8;fontColor=#444444;" vertex="1" parent="p7_1">
+          <mxGeometry x="1200" y="830" width="520" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="p7_order" value="&lt;b&gt;WHY THIS SHIPS EARLY, NOT LAST&lt;/b&gt;&lt;br&gt;Decision #5 said tracking ships with the first widget because it is training data. That reasoning is gone with the ML plan - but a stronger one replaced it: with five blocks competing for the same page, the only way to know which deserve their space is per-block measurement. And the holdout that makes the number honest has to exist before the first block goes live, not after." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#B3B3B3;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=10;fontColor=#1A1A1A;arcSize=8;fontColor=#444444;" vertex="1" parent="p7_1">
+          <mxGeometry x="60" y="1090" width="1660" height="150" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="p8" name="8. Build Order and Code Map">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1470" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="p8_1" parent="0" />
+        <mxCell id="p8_title" value="YMAL - Build order  -  ten steps, each shipping something visible" style="text;html=1;align=left;verticalAlign=middle;fontSize=20;fontStyle=1;fontColor=#1A1A1A;" vertex="1" parent="p8_1">
+          <mxGeometry x="40" y="18" width="1200" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="p8_sub" value="Ordered so the mechanism is proven before the logic, the web team gets control early, and the one blocked block is last." style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#5A5A5A;" vertex="1" parent="p8_1">
+          <mxGeometry x="40" y="56" width="1250" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="p8_s0" value="&lt;b&gt;STEP 1  -  Design the config contract&lt;/b&gt;&lt;br&gt;The ymal.config JSON, the metafield list, and what the snippet does with them. A document, not code.&lt;br&gt;&lt;b&gt;Everything else depends on it&lt;/b&gt; - console, theme and pipeline all have to agree first." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D79B00;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p8_1">
+          <mxGeometry x="60" y="130" width="540" height="145" as="geometry" />
+        </mxCell>
+        <mxCell id="p8_s1" value="&lt;b&gt;STEP 2  -  Recently Viewed + event skeleton&lt;/b&gt;&lt;br&gt;Theme JS and localStorage, plus the event endpoint taking its first events.&lt;br&gt;&lt;b&gt;Proves&lt;/b&gt; the theme backup / preview / kill-switch process and starts collecting data from day one - on the block where a mistake costs nothing." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p8_1">
+          <mxGeometry x="60" y="295" width="540" height="145" as="geometry" />
+        </mxCell>
+        <mxCell id="p8_s2" value="&lt;b&gt;STEP 3  -  Add tags and publishedAt&lt;/b&gt;&lt;br&gt;One query change in ymal/catalog.py.&lt;br&gt;&lt;b&gt;Unblocks&lt;/b&gt; New Arrivals and Featured together. Then count tag frequency across the 254 eligible products before trusting Featured." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p8_1">
+          <mxGeometry x="60" y="460" width="540" height="145" as="geometry" />
+        </mxCell>
+        <mxCell id="p8_s3" value="&lt;b&gt;STEP 4  -  New Arrivals -&gt; shop metafield&lt;/b&gt;&lt;br&gt;A date filter over the eligible list, published as list.product_reference.&lt;br&gt;&lt;b&gt;Proves&lt;/b&gt; the publish path end to end on the simplest logic in the project." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p8_1">
+          <mxGeometry x="60" y="625" width="540" height="145" as="geometry" />
+        </mxCell>
+        <mxCell id="p8_s4" value="&lt;b&gt;STEP 5  -  The universal snippet&lt;/b&gt;&lt;br&gt;snippets/ymal.liquid reads config, renders whatever is placed.&lt;br&gt;&lt;b&gt;The theme is edited once, here.&lt;/b&gt; Everything after this is configuration." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p8_1">
+          <mxGeometry x="60" y="790" width="540" height="145" as="geometry" />
+        </mxCell>
+        <mxCell id="p8_s5" value="&lt;b&gt;STEP 6  -  Console v1 - Setup Widgets&lt;/b&gt;&lt;br&gt;FastAPI + JavaScript, Docker on the existing VM. The page-template grid, the Setup panel, validation, and version-with-undo.&lt;br&gt;&lt;b&gt;The web team can now place blocks without us&lt;/b&gt; - the point of the whole project." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p8_1">
+          <mxGeometry x="640" y="130" width="540" height="145" as="geometry" />
+        </mxCell>
+        <mxCell id="p8_s6" value="&lt;b&gt;STEP 7  -  Trending + snapshot banking&lt;/b&gt;&lt;br&gt;14-day order extract, group and sum, gate, publish.&lt;br&gt;In the same step, start appending daily order lines to our own store - the only thing here that cannot be started retroactively." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p8_1">
+          <mxGeometry x="640" y="295" width="540" height="145" as="geometry" />
+        </mxCell>
+        <mxCell id="p8_s7" value="&lt;b&gt;STEP 8  -  Featured&lt;/b&gt;&lt;br&gt;Tag index over eligible products, rarity-weighted overlap, per-product metafield.&lt;br&gt;&lt;b&gt;The only block with real logic&lt;/b&gt;, so it comes after the plumbing is known to work." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p8_1">
+          <mxGeometry x="640" y="460" width="540" height="145" as="geometry" />
+        </mxCell>
+        <mxCell id="p8_s8" value="&lt;b&gt;STEP 9  -  Attribution + Analytics screen&lt;/b&gt;&lt;br&gt;Join events to orders, add the holdout, build the console screen that reports per-block revenue.&lt;br&gt;The holdout must be switched on with the FIRST block, even though the screen that reads it comes later." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p8_1">
+          <mxGeometry x="640" y="625" width="540" height="145" as="geometry" />
+        </mxCell>
+        <mxCell id="p8_s9" value="&lt;b&gt;STEP 10  -  Top Selling&lt;/b&gt;&lt;br&gt;Same code as Trending, 90-day window. Ships when read_all_orders lands or the banked snapshots cover 90 days, whichever is first." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p8_1">
+          <mxGeometry x="640" y="790" width="540" height="145" as="geometry" />
+        </mxCell>
+        <mxCell id="p8_es0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;strokeWidth=2;endArrow=blockThin;endFill=1;fontSize=10;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="p8_1" source="p8_s0" target="p8_s1">
+          <mxGeometry relative="1" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p8_es1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;strokeWidth=2;endArrow=blockThin;endFill=1;fontSize=10;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="p8_1" source="p8_s1" target="p8_s2">
+          <mxGeometry relative="1" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p8_es2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;strokeWidth=2;endArrow=blockThin;endFill=1;fontSize=10;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="p8_1" source="p8_s2" target="p8_s3">
+          <mxGeometry relative="1" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p8_es3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;strokeWidth=2;endArrow=blockThin;endFill=1;fontSize=10;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="p8_1" source="p8_s3" target="p8_s4">
+          <mxGeometry relative="1" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p8_es5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;strokeWidth=2;endArrow=blockThin;endFill=1;fontSize=10;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="p8_1" source="p8_s5" target="p8_s6">
+          <mxGeometry relative="1" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p8_es6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;strokeWidth=2;endArrow=blockThin;endFill=1;fontSize=10;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="p8_1" source="p8_s6" target="p8_s7">
+          <mxGeometry relative="1" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p8_es7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;strokeWidth=2;endArrow=blockThin;endFill=1;fontSize=10;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="p8_1" source="p8_s7" target="p8_s8">
+          <mxGeometry relative="1" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p8_es8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;strokeWidth=2;endArrow=blockThin;endFill=1;fontSize=10;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="p8_1" source="p8_s8" target="p8_s9">
+          <mxGeometry relative="1" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p8_es4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;strokeWidth=2;endArrow=blockThin;endFill=1;fontSize=10;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="p8_1" source="p8_s4" target="p8_s5">
+          <mxGeometry relative="1" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p8_ex" value="&lt;b&gt;WHAT EXISTS TODAY&lt;/b&gt;   [BUILT]&lt;br&gt;ymal/auth.py - token exchange, cached&lt;br&gt;ymal/shopify.py - GraphQL client that raises on GraphQL errors (they arrive with HTTP 200) and backs off before the cost throttle&lt;br&gt;ymal/catalog.py - locations, active products, per-location stock joined in one pass (~11 min to ~6 s)&lt;br&gt;ymal/eligibility.py - the gate, pure functions, no I/O&lt;br&gt;ymal/settings.py - every tunable in one file&lt;br&gt;data/phase1/ - the 392-row base table, 254 eligible&lt;br&gt;&lt;br&gt;One layer of three, partially. Everything on this page&#x27;s left column is still to write." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p8_1">
+          <mxGeometry x="1220" y="130" width="520" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="p8_add" value="&lt;b&gt;WHAT TO ADD&lt;/b&gt;   [not written]&lt;br&gt;&lt;b&gt;backend&lt;/b&gt;&lt;br&gt;ymal/orders.py - windowed order-line extract&lt;br&gt;ymal/blocks/ - new_arrivals, trending, featured&lt;br&gt;ymal/publish.py - shop and product metafield writes&lt;br&gt;ymal/config.py - read and validate ymal.config&lt;br&gt;scripts/build_blocks.py - one entry point, one report&lt;br&gt;app/ - the FastAPI the console calls, laid out like wholesale-order-entry&#x27;s backend/app (routers, schemas, services, db)&lt;br&gt;&lt;br&gt;&lt;b&gt;frontend/src/ - the console&lt;/b&gt;&lt;br&gt;React + Vite. App.jsx holds the tab state; setup/, analytics/ and exclude/ hold a tab each with their own api.js&lt;br&gt;&lt;br&gt;&lt;b&gt;frontend/storefront/&lt;/b&gt;&lt;br&gt;snippets/ymal.liquid, the localStorage script, the event sender" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p8_1">
+          <mxGeometry x="1220" y="480" width="520" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="p8_scale" value="&lt;b&gt;HONEST NOTE ON SCALE&lt;/b&gt;&lt;br&gt;This is no longer &#x27;fetch some products and rank them&#x27;. It is a small internal Shopify app: a nightly pipeline, a theme integration, a configuration console, an event pipeline and an attribution model.&lt;br&gt;The recommendation logic remains the smallest part of it - four queries and one tag score. Most of the work is the plumbing that lets the web team drive it and see what it earns." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#B3B3B3;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=10;fontColor=#1A1A1A;arcSize=8;fontColor=#444444;" vertex="1" parent="p8_1">
+          <mxGeometry x="1220" y="830" width="520" height="250" as="geometry" />
+        </mxCell>
+        <mxCell id="p8_deploy" value="&lt;b&gt;DEPLOYMENT - Docker, decided 2026-09-04&lt;/b&gt;&lt;br&gt;One docker-compose, copied from wholesale-order-entry:&lt;br&gt;- &lt;b&gt;db&lt;/b&gt; Postgres 16, the event store&lt;br&gt;- &lt;b&gt;backend&lt;/b&gt; FastAPI, the only holder of Shopify credentials&lt;br&gt;- &lt;b&gt;nginx&lt;/b&gt; multi-stage: builds the SPA, serves dist/, proxies /api&lt;br&gt;- &lt;b&gt;pipeline&lt;/b&gt; the nightly job on a schedule (PPA&#x27;s two-services-from-one-image pattern)&lt;br&gt;&lt;br&gt;&lt;b&gt;Do not require Docker to develop the pipeline.&lt;/b&gt; python -m scripts.NAME runs in seconds; a container build in front of that only slows the loop. PPA keeps both paths working - do the same.&lt;br&gt;&lt;br&gt;&lt;b&gt;Do not bind-mount the Google Drive path.&lt;/b&gt; This repo sits on a shared drive, where sync and file locking make Docker mounts unreliable. Clone from GitHub onto the VM&#x27;s local disk." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p8_1">
+          <mxGeometry x="1220" y="1100" width="520" height="340" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="p9" name="9. Decisions and Open Questions">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1180" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="p9_1" parent="0" />
+        <mxCell id="p9_title" value="YMAL - What is settled, what is blocked, what needs deciding" style="text;html=1;align=left;verticalAlign=middle;fontSize=20;fontStyle=1;fontColor=#1A1A1A;" vertex="1" parent="p9_1">
+          <mxGeometry x="40" y="18" width="1150" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="p9_sub" value="The nine decisions in docs/memory.md section 4 were made for a single-widget ML recommender. Re-read against a five-block widget set with a console, they do not all survive intact." style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#5A5A5A;" vertex="1" parent="p9_1">
+          <mxGeometry x="40" y="56" width="1250" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="p9_h1" value="DECISIONS, RE-READ" style="text;html=1;align=left;verticalAlign=middle;fontSize=13;fontStyle=1;fontColor=#2D6A2D;" vertex="1" parent="p9_1">
+          <mxGeometry x="60" y="110" width="400" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="p9_c1" value="&lt;b&gt;1. Build our own app&lt;/b&gt;  -  STANDS, and is now literally true: this is an app, not a script.&lt;br&gt;&lt;br&gt;&lt;b&gt;2. Rules on live state&lt;/b&gt;  -  STANDS. Liquid re-checks availability at render.&lt;br&gt;&lt;br&gt;&lt;b&gt;3. App Proxy backend&lt;/b&gt;  -  SUPERSEDED. Lists live in metafields and Liquid reads them, so nothing sits in the request path. We do need hosting - but for the console and the event endpoint, not for serving the widget.&lt;br&gt;&lt;br&gt;&lt;b&gt;4. 30-deep pool per product&lt;/b&gt;  -  SUPERSEDED for four blocks, survives for Featured. The principle - store ~3x what you display - holds everywhere.&lt;br&gt;&lt;br&gt;&lt;b&gt;5. Tracking ships with the first widget&lt;/b&gt;  -  STANDS, for a new reason. Not training data any more; it is how the web team learns which of five blocks earns its space.&lt;br&gt;&lt;br&gt;&lt;b&gt;6. Eligible = Bali AND no *SALE*&lt;/b&gt;  -  STANDS, promoted to the shared gate behind every block.&lt;br&gt;&lt;br&gt;&lt;b&gt;7-9. The Google Sheet&lt;/b&gt;  -  PARTLY SUPERSEDED. Still the validation set. But the merchandiser override list should live in the console&#x27;s Exclude Products screen, not a Sheet that drifts." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p9_1">
+          <mxGeometry x="60" y="145" width="400" height="680" as="geometry" />
+        </mxCell>
+        <mxCell id="p9_h2" value="BLOCKED OR TIME-SENSITIVE" style="text;html=1;align=left;verticalAlign=middle;fontSize=13;fontStyle=1;fontColor=#A03028;" vertex="1" parent="p9_1">
+          <mxGeometry x="500" y="110" width="400" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="p9_c2a" value="&lt;b&gt;read_all_orders&lt;/b&gt;&lt;br&gt;Now blocks exactly one block - Top Selling at 90 days. Trending at 14 days is unaffected." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p9_1">
+          <mxGeometry x="500" y="145" width="400" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="p9_c2b" value="&lt;b&gt;Order history cannot be backfilled&lt;/b&gt;&lt;br&gt;Every day the daily snapshot is not running is a day gone for good, approval or not." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p9_1">
+          <mxGeometry x="500" y="275" width="400" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="p9_c2c" value="&lt;b&gt;The holdout cannot be applied retroactively&lt;/b&gt;&lt;br&gt;If the first block ships without it, the honest lift number is unavailable forever - the same mistake as losing the Wiser baseline." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p9_1">
+          <mxGeometry x="500" y="405" width="400" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="p9_c2d" value="&lt;b&gt;Wiser&#x27;s baseline AND its methodology&lt;/b&gt;&lt;br&gt;Capture per-widget performance while Wiser is installed, and how it calculates the number. Two figures computed differently cannot be compared." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p9_1">
+          <mxGeometry x="500" y="555" width="400" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="p9_c2e" value="&lt;b&gt;The Sheet diff&lt;/b&gt;&lt;br&gt;Still Phase 1&#x27;s unmet exit criterion. The gate now sits behind every block, so validating it once pays five times." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p9_1">
+          <mxGeometry x="500" y="715" width="400" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="p9_h3" value="NEEDS A DECISION FROM US" style="text;html=1;align=left;verticalAlign=middle;fontSize=13;fontStyle=1;fontColor=#B07000;" vertex="1" parent="p9_1">
+          <mxGeometry x="940" y="110" width="400" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="p9_c3" value="&lt;b&gt;Which service runs the nightly job?&lt;/b&gt; A fourth compose service on a schedule, or the VM&#x27;s cron calling into the container. PPA runs a loop script; wholesale-order-entry has no equivalent to copy.&lt;br&gt;&lt;br&gt;&lt;b&gt;Trending: raw volume or rising?&lt;/b&gt; Raw 14-day and 90-day rankings return nearly the same products, and two blocks showing one list looks broken. Changes the query, so decide before building.&lt;br&gt;&lt;br&gt;&lt;b&gt;Which page templates in v1&lt;/b&gt; - Product and Home cover most traffic; Wiser&#x27;s nine is not a target.&lt;br&gt;&lt;br&gt;&lt;b&gt;Does the purchase event need a Web Pixel?&lt;/b&gt; The thank-you page is restricted, so the order half of attribution may not be reachable from the theme alone.&lt;br&gt;&lt;br&gt;&lt;b&gt;Holdout size&lt;/b&gt; - 10% of sessions seeing nothing is the usual trade between honesty and lost revenue.&lt;br&gt;&lt;br&gt;&lt;b&gt;Does the gate apply to Recently Viewed?&lt;/b&gt; The shopper chose to look at those products.&lt;br&gt;&lt;br&gt;&lt;b&gt;Config depth&lt;/b&gt; - do per-block options live in the console or stay in settings.py?&lt;br&gt;&lt;br&gt;&lt;b&gt;Ranking metric&lt;/b&gt; - units, orders or revenue?" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D79B00;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p9_1">
+          <mxGeometry x="940" y="145" width="400" height="680" as="geometry" />
+        </mxCell>
+        <mxCell id="p9_h4" value="NEEDS DATA BEFORE IT IS SAFE" style="text;html=1;align=left;verticalAlign=middle;fontSize=13;fontStyle=1;fontColor=#B07000;" vertex="1" parent="p9_1">
+          <mxGeometry x="1380" y="110" width="400" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="p9_c4" value="&lt;b&gt;Tag discrimination.&lt;/b&gt; PPA puts &#x27;sweater, sweaters, sweatshirt, outfit, outfits, casual&#x27; on every product. Count tag frequency across the 254 eligible products before building Featured - if most tags are near-universal, overlap ranks close to random.&lt;br&gt;&lt;br&gt;&lt;b&gt;Is unit cost populated?&lt;/b&gt; Shopify carries it on InventoryItem. If PPA fills it, the console can report margin; if not, say revenue and do not imply profit.&lt;br&gt;&lt;br&gt;&lt;b&gt;Order volume in 14 days.&lt;/b&gt; If a fortnight yields too few line items to rank meaningfully, Trending needs a wider window or a different metric.&lt;br&gt;&lt;br&gt;&lt;b&gt;New Arrivals volume.&lt;/b&gt; How many products were published in the last 30 days? Under a slot count means the window is wrong for this catalog.&lt;br&gt;&lt;br&gt;&lt;b&gt;Thank-you page feasibility.&lt;/b&gt; What this store&#x27;s plan and checkout version actually allow - verify before promising that card.&lt;br&gt;&lt;br&gt;&lt;b&gt;Sale marker coverage.&lt;/b&gt; 118 titles matched *SALE*. Cross-check against PPA&#x27;s own sale flag, which is set upstream and is likely more reliable than a string in a title." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D79B00;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p9_1">
+          <mxGeometry x="1380" y="145" width="400" height="680" as="geometry" />
+        </mxCell>
+        <mxCell id="p9_nxt" value="&lt;b&gt;NEXT ACTIONS  -  in order&lt;/b&gt;&lt;br&gt;&lt;b&gt;Settled:&lt;/b&gt; the five blocks - the console stack (React + Vite on wholesale-order-entry&#x27;s pattern) - Docker for deployment - the config contract, written up in docs/config-contract.md.&lt;br&gt;&lt;br&gt;1. &lt;b&gt;Add tags and publishedAt, then count tag frequency&lt;/b&gt; across the 254 eligible products - the one measurement that says whether Featured works at all, and it unblocks New Arrivals in the same change.&lt;br&gt;2. &lt;b&gt;Verify the shop-level metafield in Liquid&lt;/b&gt; - five minutes, and section 2 of the config contract rests on it.&lt;br&gt;3. &lt;b&gt;Decide Trending: volume or rising&lt;/b&gt; - it changes the query.&lt;br&gt;4. &lt;b&gt;Start banking daily order snapshots&lt;/b&gt; - the only item that gets permanently worse by waiting.&lt;br&gt;5. Ship Recently Viewed with the event skeleton and the holdout switch in place. No backend, no dependencies, and it makes every later number honest." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=6;spacingBottom=6;fontSize=11;fontColor=#1A1A1A;arcSize=8;" vertex="1" parent="p9_1">
+          <mxGeometry x="60" y="855" width="1720" height="200" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

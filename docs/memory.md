@@ -46,6 +46,654 @@ recommendation logic.
 
 ## 3. Checkpoint log
 
+### 2026-09-04 — Checkpoint 19: Docker verified running
+
+`docker compose up -d --build` **works**. Built and started in ~7 seconds, from
+the Google Drive folder — the Drive-mount worry in checkpoint 12 did not
+materialise for builds (bind mounts are still the risk, and there are none).
+
+| Check | Result |
+|---|---|
+| `db` | healthy, `pg_isready` accepting connections |
+| `web` | up, `127.0.0.1:8083` |
+| `GET /` | **200**, serves the built SPA |
+| `GET /api/config` | **502** — correct: no api container yet |
+
+The 502 rather than a boot failure confirms the nginx fix from checkpoint 18:
+resolving the upstream through a variable lets the container start even when
+`api` does not exist. A literal `proxy_pass http://api:8000` would have refused
+to boot.
+
+**One design flaw fixed first.** `pipeline` was in the default service set, so
+`docker compose up -d` would have started it as a side effect of launching the
+console — pulling thousands of orders every time. It is a one-shot task, not a
+service, so it is now profile-gated like `api`:
+
+```
+docker compose up -d --build       # db + web only
+docker compose run --rm pipeline   # rebuild the lists, explicitly
+docker compose --profile api up    # once backend/app exists
+```
+
+**First run inside Docker starts with an empty data volume.** `build_blocks`
+reads `data/phase1/active_products.json`, which lives in the `ymal_data` volume,
+not the local `backend/data/`. Run `fetch_products` in the container first or it
+exits with that instruction.
+
+**Next step:** `backend/app` (FastAPI) + `ymal/publish.py` — they un-gate the
+`api` service and turn the 502 into a real config.
+
+---
+
+### 2026-09-04 — Checkpoint 18: Docker actually written
+
+Checkpoint 12 recorded the decision to use Docker; checkpoint 17 then scaffolded
+the frontend without it, and `frontend/README.md` listed a `Dockerfile` and
+`nginx.conf` that did not exist. Now written:
+
+```
+docker-compose.yml     db (Postgres 16) · pipeline · api (profiled) · web
+backend/Dockerfile     python:3.12-slim, defaults to build_blocks
+frontend/Dockerfile    node build -> nginx serve, two stages
+frontend/nginx.conf    serves the SPA, proxies /api
+```
+
+`docker compose config` validates. **The images have not been built** — Docker
+Desktop is not running on this machine, so `docker compose build` could not run.
+The Dockerfiles follow `wholesale-order-entry`'s working pattern but are
+unverified.
+
+**Two traps found while writing it, both worth remembering:**
+
+1. **nginx resolves `proxy_pass` hostnames at startup.** With a literal
+   `proxy_pass http://api:8000;` the web container refuses to boot — "host not
+   found in upstream" — whenever `api` is not running. Resolving through a
+   variable (`resolver 127.0.0.11; set $upstream ...; proxy_pass $upstream;`)
+   defers the lookup to request time, so the console loads and honestly reports
+   "not connected" rather than failing to start.
+2. **`depends_on` a profiled service implicitly enables that profile.** `web`
+   depending on `api` would have dragged in an api container that cannot start
+   until `backend/app` exists. Dropped the dependency; the lazy resolver makes
+   it unnecessary.
+
+The `api` service is profile-gated for the same reason — it would crash-loop on
+every `docker compose up` until the FastAPI app exists.
+
+`POSTGRES_PASSWORD` has no default and uses `:?`, so compose fails loudly if it
+is unset rather than shipping a password that is public in the repo — the
+opposite of PPA's plaintext default.
+
+**Next step:** `backend/app` (FastAPI) plus `ymal/publish.py`, which together
+un-gate the `api` service and put something real behind the console.
+
+---
+
+### 2026-09-04 — Checkpoint 17: console scaffolded, every tab exists
+
+`frontend/` is now a working React 18 + Vite app. `npm run build` passes —
+55 modules, 160 kB. 21 `.jsx` files, one component per tab in the Wiser sidebar.
+
+**Structure follows `wholesale-order-entry`:** no router, tabs are `useState`
+plus a `SCREENS` map in `App.jsx`, a folder per feature holding its screens and
+its own `api.js`, shared pieces in `components/`, pure data in `lib/`.
+
+**Every sidebar item from the screenshot exists**, each carrying a `status` in
+`lib/nav.js` that the UI shows:
+
+| Status | Tabs |
+|---|---|
+| `planned` | Setup Widgets, Recommendations, Analytics, Exclude Products, Flush Cache |
+| `later` | Dashboard, Customize Widgets, Translations |
+| `n/a` | Intelli Search, Product Addons, Cart Drawer, My Plan |
+
+The `n/a` ones stay in the nav, greyed, each explaining what it was and why we
+do not replace it. They were separate Wiser products bundled into one app —
+**Intelli Search matters most: if the storefront relies on Wiser's search today,
+that needs its own decision before Wiser is uninstalled.**
+
+**Two mappings worth keeping.** Wiser's "Flush Cache" becomes *rebuild the block
+lists now* — the web team should not have to wait for tonight's run after a
+launch. Wiser's "Cart Drawer" is not a screen for us at all: the theme has its
+own drawer, so it is just another placement in Setup Widgets.
+
+**No fake data anywhere.** Unbuilt screens render an honest `Placeholder`
+explaining what is missing, and the Analytics table renders empty rather than
+with sample numbers — a mock that looks real ends up quoted in a meeting.
+
+**Correction made while committing:** I "fixed" `.gitignore` to un-ignore
+`.env.example` when `!.env.example` was already there. Reverted. `git check-ignore -v`
+exits 0 and prints the pattern even when the match is a *negation*, so it is not
+a test of whether a file is ignored — `git status --porcelain` is.
+
+**Next step:** the publish step, which is now the only thing between working
+lists and a real widget.
+
+---
+
+### 2026-09-04 — Checkpoint 16: read_all_orders was never a blocker; three blocks build
+
+**Correction, and it undoes a lot of earlier planning.** The 60-day order cap
+does **not** apply to these credentials. Measured 2026-09-04: order counts and
+full line-item data come back from 100, 200 and **400 days ago**. The app
+already has full order access.
+
+Everything written in checkpoints 7-15 about `read_all_orders` being a blocker,
+Top Selling being gated, and daily order snapshots being urgent was **wrong for
+this shop**. The parallel-track approval request is unnecessary, and so is the
+snapshot-banking workaround.
+
+`ORDER_HISTORY_CAP_DAYS` is now `None` in settings, with the measurement
+recorded next to it. `window_is_reachable()` stays — credentials change, and
+Shopify's truncation is silent, so the guard is cheap insurance.
+
+**All three store-wide blocks now build.**
+
+| Block | Definition | Result |
+|---|---|---|
+| `trending` | rising: (now + 2) / (before + 2), 14d vs prior 14d | 30 styles |
+| `top_selling` | volume over 90 days | 30 styles, from 8,530 orders |
+| `new_arrivals` | published in the last 30 days | **27 styles — under the 30 depth** |
+
+**They are genuinely different lists**, which was the worry that drove the
+rising decision:
+
+```
+trending    x top_selling : 2/10 overlap
+trending    x new_arrivals: 5/10 overlap
+top_selling x new_arrivals: 0/10 overlap
+```
+
+Trending and New Arrivals overlapping 5/10 is expected and fine — a new product
+selling at all is rising by definition. Worth watching only if the two are
+placed adjacently on the same page.
+
+**New Arrivals returns 27, below the stored depth of 30.** Not a bug — the
+catalog published 27 eligible styles in 30 days. It means the block cannot go
+deeper than the drop calendar allows, so a widget showing 8 has thin headroom
+after the gate and dedupe. Widen `NEW_ARRIVALS_WINDOW_DAYS` if it renders short.
+
+**Written:** `ymal/blocks/top_selling.py`, `ymal/blocks/new_arrivals.py`, and
+`scripts/build_blocks.py` — one entry point for all three, replacing
+`build_trending.py`. It takes optional block names as arguments.
+
+**Still nothing is written to Shopify.** Every script is read-only; the blocks
+land as JSON in `backend/data/blocks/`. Publishing is deliberately a separate
+step so a bad run can be read before it reaches a storefront.
+
+**Next step:** the publish step — `ymal/publish.py` writing the three lists to
+shop metafields, plus the five-minute Liquid check that `list.product_reference`
+resolves at shop level.
+
+---
+
+### 2026-09-04 — Checkpoint 15: Trending built, defined as RISING
+
+**Decision: Trending means rising, not raw volume.** Confirmed with data — the
+two top-tens overlap on only **2 of 10 products**, so the block genuinely says
+something Top Selling will not.
+
+```
+score = (units_now + k) / (units_before + k)      k = TRENDING_SMOOTHING = 2.0
+```
+
+Two equal windows back to back (14 days vs the 14 before), a floor of
+`TRENDING_MIN_UNITS = 3` in the current window to keep noise out, and ties
+broken by absolute volume.
+
+**Written:** `ymal/orders.py` (windowed line-item extract, one function and one
+window argument — Trending and Top Selling are the same code),
+`ymal/blocks/trending.py` (pure ranking, no I/O), `scripts/build_trending.py`.
+Output → `backend/data/blocks/trending.json`.
+
+**`read_orders` works.** 1,648 orders in the last 14 days, 1,311 in the previous
+14. No approval needed at this window; only Top Selling's 90 days is blocked.
+
+**Query cost was far lower than assumed.** Measured live: 100 orders × 20 line
+items costs 119 requested / 38 actual against a 20,000 bucket restoring at
+1000/s. Paging at 100 rather than 20 cuts ~3,000 orders from 150 round-trips to
+30. Largest real order had 5 line items, so 20 is ample headroom.
+
+**Colorway dedupe moved into the build, and it matters.** Before it, the top 15
+held RIHANNA twice, PERSONALIZED NUMBER JERSEY three times and CHANDELIER twice
+— a trending style trends in every colour at once. Deduping at build time rather
+than render is deliberate: colorway grouping is slow-changing and identical for
+every shopper, so only live-state checks (stock, publication) belong at render.
+
+**A second gate leak, found by running it.** `Front & Back Placement Add-on`
+(product 7785812426800) is a customisation service with a blank `productType`.
+It sold **97 units in a fortnight** and would have topped a raw-volume Trending
+list. Every real garment here carries a type — Crewneck, Cardigan, V-Neck,
+Hoodie, Cowlneck, Mock Neck — so `REQUIRE_PRODUCT_TYPE = True` is a more general
+guard than naming each offender.
+
+**Eligible: 253 → 252.**
+
+**Worth watching:** `TRENDING_MIN_UNITS = 3` lets products with 4-5 units reach
+the stored list. They sit below rank 10 and rarely display, but raise the floor
+if thin movers start showing up in the widget.
+
+**Next step:** New Arrivals — `publishedAt` is already fetched, and it is the
+simplest block in the set.
+
+---
+
+### 2026-09-04 — Checkpoint 14: gift-card guard added, Recently Viewed written
+
+**Gift-card guard.** `EXCLUDED_PRODUCT_TYPE_PREFIXES = ("giftcard",)` in
+settings, `is_excluded_type()` in `eligibility.py`, new exclusion reason
+`excluded_type`. Matched on `productType` normalised to lowercase alphanumerics
+and compared as a **prefix**, so "Gift Card" / "Gift Cards" / "gift-cards" all
+match — exact matching would have leaked on the next spelling, which this shop's
+data makes likely (`V-Neck` / `V-neck` / `Vneck` all occur).
+
+Eligible count: **254 → 253.** The GIFT CARD now reports
+`reason_if_not = "excluded_type"`.
+
+**Recently Viewed written** — `frontend/storefront/`, ready to install:
+
+```
+assets/ymal-recently-viewed.js       record + render
+snippets/ymal-recently-viewed.liquid the container
+templates/product.ymal-card.liquid   card-only alternate product template
+install.md                           steps + what to check
+```
+
+**The technique worth remembering: `?view=` alternate templates.** Cards are not
+built in JavaScript. The script fetches `/products/<handle>?view=ymal-card`,
+which returns the theme's own card markup with `{% layout none %}`. Three things
+fall out of that:
+
+1. The block uses the theme's real product card, so it looks native and stays
+   that way when the theme changes.
+2. Price, image and availability are read live at fetch time — a handle stored
+   three weeks ago cannot render a stale price.
+3. The sold-out check lives in Liquid, where the live product object is. An
+   unavailable product renders as an empty string and the script skips it.
+
+**Only `{handle, id, ts}` is stored**, twenty deep, and it never leaves the
+device. Every `localStorage` access is wrapped in try/catch — some privacy modes
+throw rather than returning null, and a browser that refuses storage simply
+never unhides the block.
+
+The script calls `window.ymalTrack()` only if it exists, so this block can ship
+before the events module and starts reporting the moment that lands.
+
+**Still to do before install:** point `product.ymal-card.liquid` at the theme's
+own card snippet — it ships with placeholder markup and must not go live that
+way.
+
+**Next step:** decide Trending volume vs rising, then build Trending.
+
+---
+
+### 2026-09-04 — Checkpoint 13: tags measured — Featured needs no ML
+
+Added `tags` and `publishedAt` to the product query and ran the numbers on the
+real catalog (`scripts/analyze_tags.py`). **Featured does not need machine
+learning, and the measurement says why.**
+
+| Measure | Value |
+|---|---|
+| Eligible products | 254 (of 421 active — catalog grew 29 since yesterday, all ineligible) |
+| Distinct tags | 834 |
+| Tags per product | median 40, max 83 |
+| Tags on >50% of products | 22 — the noise |
+| Tags on exactly one product | 287 — nothing to share with |
+| **Tags carrying real signal** | **525** |
+
+**Inverse weighting kills the noise for free.** `weight = log(N / df)`, so
+`sweatshirt` (253 of 254 products) scores 0.00 and drops out on its own. No
+stop-list to maintain as the catalog changes. Scoring is cosine similarity over
+weighted tag vectors — 254 × 254 pairs, arithmetic, not a model.
+
+Worked example, anchor `FLAG V COTTON`: AMERICANA V COTTON (0.75), FLAG
+ROLLNECK COTTON (0.72), CHUNKY FLAG V COTTON (0.63), LOBSTER ROLL CREW COTTON
+(0.56). A coherent Americana-cotton cluster, from counting.
+
+**Three findings that matter more than the scoring:**
+
+1. **Colorway dedupe is the whole game.** 124 distinct titles across 254
+   eligible products — **51% of the catalog is a repeat colorway**, and one
+   style has 11. Without dedupe, Featured returns the same sweater five times;
+   the un-deduped top 5 for `CHARLOTTE CREW COTTON` was five CHARLOTTE CREW
+   COTTONs. Dedupe by title (or PPA's style tag, which is `tags[0]`).
+2. **A GIFT CARD passes the eligibility gate.** `product_id 10208889354`,
+   `productType = "Gift Cards"`. It is at Bali To Produce, has no `*SALE*`
+   marker and is published, so the rule admits it. Needs a product-type guard.
+3. **Product types are not clean:** `V-Neck` (23), `V-neck` (16), `Vneck` (4) —
+   three spellings of one type. Normalize before using type as a scoring guard.
+
+**Where ML would genuinely help, later:** learning-to-rank on click data (needs
+months of tracking), and image embeddings for visual similarity (real value for
+a fashion catalog). Both improve a working system; neither replaces one.
+
+**Honest limit of tag similarity:** PPA derives tags from the style name, so tag
+similarity is close to style-name similarity. It cannot know that a cardigan
+pairs with a particular dress — that is co-purchase data, not a model.
+
+**Next step:** decide Trending volume vs rising; add the product-type guard to
+the gate.
+
+---
+
+### 2026-09-04 — Checkpoint 12: Docker decided, anchor audited for drift
+
+**Docker, decided.** One `docker-compose`, copied from `wholesale-order-entry`,
+which already runs this exact shape on the GCP VM:
+
+| Service | Job |
+|---|---|
+| `db` | Postgres 16 — the event store |
+| `backend` | FastAPI — the only holder of Shopify credentials |
+| `nginx` | multi-stage: builds the SPA, serves `dist/`, reverse-proxies `/api` |
+| `pipeline` | the nightly job on a schedule (PPA's two-services-from-one-image pattern) |
+
+Two caveats recorded on the diagram:
+
+- **Do not require Docker to develop the pipeline.** `python -m scripts.<name>`
+  runs in seconds; a container build in front of that only slows the loop. PPA
+  keeps both paths working and so should we.
+- **Do not bind-mount the Google Drive path.** This repo sits on a shared drive,
+  where sync and file locking make Docker mounts unreliable. Clone from GitHub
+  onto the VM's local disk — PPA already works around this with
+  `IM_COLLECTION_BASE`.
+
+**Audited the anchor diagram for drift** rather than assuming it was current.
+Four things had gone stale and are fixed:
+
+1. Page 9 still listed the console framework as undecided.
+2. Page 9 still listed hosting and the event store as open — both settled by
+   reusing `wholesale-order-entry`'s compose.
+3. Page 9's next-actions still said "design the config contract", which is
+   written (`docs/config-contract.md`).
+4. Page 8's "what to add" had no FastAPI folder. Added `backend/app/`, laid out
+   like `wholesale-order-entry/backend/app` (routers, schemas, services, db).
+
+Also corrected the access note on page 5: copy `wholesale-order-entry`'s pattern
+of *requiring* secrets from `.env` (`${POSTGRES_PASSWORD:?}` fails loudly if
+unset), not PPA's plaintext default.
+
+**Still genuinely open:** Trending as volume or rising; which page templates ship
+in v1; holdout size; whether the gate applies to Recently Viewed; which service
+runs the nightly job; whether the purchase event needs a Web Pixel.
+
+**Next step:** add `tags` and `publishedAt` to the product query and count tag
+frequency across the 254 eligible products — the one measurement that says
+whether Featured works at all.
+
+---
+
+### 2026-09-04 — Checkpoint 11: frontend/ restored, hierarchy follows wholesale-order-entry
+
+**Reverted checkpoint 10's rename.** `theme/` is `frontend/` again and `console/`
+is gone. Two top-level folders, `backend/` and `frontend/`, and they stay that
+way.
+
+**Both JavaScript surfaces live in `frontend/`:**
+
+```
+frontend/
+├── src/          the console (React + Vite) — one folder per tab
+└── storefront/   Liquid snippet + the JS that runs on wooden-ships.com
+```
+
+**Structure copied from `wholesale-order-entry`**, the closest sibling project —
+same team, same shape, already deployed:
+
+- React 18 + Vite, **no router**. Tabs are `useState` plus a `TABS` array and a
+  conditional render, exactly as `frontend/src/admin/AdminApp.jsx` does it there.
+- A folder per feature holding its screens **and its own `api.js`**
+  (`setup/`, `analytics/`, `exclude/`).
+- Shared pieces in `components/`, pure helpers in `lib/`.
+- `Dockerfile` + `nginx.conf` inside `frontend/`, serving the built static files.
+- Only `VITE_API_BASE` in its `.env` — never a Shopify credential.
+
+Adding a tab is one folder, one `TABS` entry, one conditional render.
+
+**Naming lesson worth keeping:** "frontend" was used as both a layer label in a
+table and a directory name within a few messages, which made an approved rename
+look like a contradiction. When a word names both a concept and a path, say
+which one is meant.
+
+**Next step:** the five-minute Liquid test — confirm a shop-level
+`list.product_reference` metafield resolves to product objects in Liquid the way
+a product-level one does. Section 2 of the config contract rests on it.
+
+---
+
+### 2026-09-04 — Checkpoint 10: repo split, config contract written
+
+**Repo split.** `frontend/` meant one thing when there was one frontend; there
+are now two:
+
+```
+theme/     Liquid + storefront JS   — what the shopper sees
+console/   FastAPI + JavaScript     — what the web team uses
+```
+
+`git mv frontend theme`, both READMEs rewritten, `console/` created. Root README
+layout and docs table updated.
+
+**`docs/config-contract.md` written** — the keystone document. Contents: every
+metafield in the system; the `ymal.config` schema with a worked example; the
+five-block registry with a which-block-on-which-page matrix; the ten validation
+rules; versioning and one-click undo; what the Liquid snippet does; the console's
+API surface; and what deliberately stays in `settings.py` rather than becoming a
+console knob.
+
+**Two design points worth remembering:**
+
+1. **Publish lists as `list.product_reference`.** Liquid then gets live product
+   objects, so a list written at 03:00 cannot render yesterday's price — and the
+   pipeline never needs `featuredImage` or `priceRangeV2`. **Verify early** that
+   a *shop-level* reference list resolves to product objects in Liquid the way a
+   product-level one does; the design rests on it and it is a five-minute test.
+2. **The console validates and rejects rather than repairs.** A malformed config
+   silently blanks every block and nobody notices until traffic drops.
+
+**Still nothing committed** — the whole reframe (checkpoints 6-10) is sitting in
+the working tree on `feat/dev-environment`.
+
+**Next step:** run the five-minute Liquid metafield test, then either start the
+console API or add `tags` + `publishedAt` to the product query.
+
+---
+
+### 2026-09-04 — Checkpoint 9: console stack decided
+
+**No Streamlit.** The console is a real web page: **JavaScript frontend, FastAPI
+backend, deployed exactly the way PPA's console is** — Docker on the existing VM,
+behind the host nginx, password-gated.
+
+- The FastAPI layer lives in this repo and imports the `ymal` package directly,
+  so the console reuses `auth.py`, `shopify.py` and `eligibility.py` rather than
+  reimplementing them.
+- **Shopify credentials never reach the browser.** The JS page calls our API; our
+  API talks to Shopify.
+- Roughly four screens, so React-with-a-build and plain-JS-no-build are both
+  viable. Not yet decided, and not blocking.
+
+**Shopify embedded app rejected for now, not forever.** It would sit inside the
+Shopify admin and look native, but it needs App Bridge, session-token auth inside
+an iframe, an app registration and a Node stack nobody on the team runs — weeks,
+not days. Because the console's only job is writing the `ymal.config` metafield,
+it can be replaced later without touching the pipeline or the theme.
+
+**Repo split needed.** `frontend/` currently describes only the storefront widget.
+There are now two frontends:
+
+```
+theme/     Liquid snippets + storefront JS (what shoppers see)
+console/   the admin app (what the web team uses)
+```
+
+**Recently Viewed needs no tracking pipeline.** The browser remembers it itself:
+a few lines of JS append `{handle, id, ts}` to `localStorage` on each product
+page, and the block reads that list back and renders from it. It never leaves the
+device, needs no login, and works for logged-out shoppers. Per-browser by nature —
+a different phone is a different list — and empty in a fresh or private browser,
+where the block must hide itself. This is almost certainly how Wiser does it too.
+
+**Next step:** design the config contract (`ymal.config`), then split the repo
+into `theme/` and `console/`.
+
+---
+
+### 2026-09-04 — Checkpoint 8: the real deliverable is an admin console
+
+User shared a screenshot of **Wiser's "Active Widgets" screen** and named the two
+halves of the project explicitly:
+
+> **Backend** — handles the logic and fetches the data.
+> **Frontend** — an interface like the screenshot, where the web team can adjust
+> placement and see how much we profit.
+
+**This is three deliverables, not two.** A nightly pipeline, a storefront
+integration, and an internal console with an event store behind it. The
+recommendation logic is the smallest part of the work.
+
+**The keystone is a config contract**, not the UI. One shop metafield
+(`ymal.config`) holds, per page template, which blocks appear in what order with
+how many slots. The console writes it, Liquid reads it, the pipeline never
+touches it. That single fact is what lets the web team re-arrange the storefront
+with no deploy and no Liquid edit — which is the actual point of Wiser's screen.
+**Design it before writing any of the three layers.**
+
+**Publish the lists as `list.product_reference`, not our own JSON.** Liquid then
+receives live product objects, so a list written at 03:00 cannot render
+yesterday's price — and we never need to fetch `featuredImage` or
+`priceRangeV2` at all.
+
+**Console stack — open, and it decides the next several weeks.** PPA already
+runs a Streamlit app in Docker behind the VM's nginx, password-gated, with a
+companion hourly fetch service (`PPA/webapp/`, `docker-compose.yml`,
+`deploy/ppa.nginx.conf`). Reusing that answers auth, deploy and scheduling on day
+one, but will not look like the screenshot. A Shopify embedded app (Remix +
+Polaris) would, at the cost of a new stack and weeks instead of days.
+Recommended: Streamlit now, embedded app later if the look matters — the config
+metafield means the console can be swapped without touching the other layers.
+*(If reusing PPA's pattern: do not inherit its plaintext default password, which
+its own compose file flags as needing changing.)*
+
+**Attribution is the hardest part, and it is honest-number-hard, not
+code-hard.** Matching a click to an order measures what a block *touched*, not
+what it *caused*. The only truthful answer to "how much do we profit" is a
+**holdout** — a stable hash of session id keeps ~10% of sessions block-free — and
+it cannot be applied retroactively. It must be switched on with the first block
+that ships, exactly like the Wiser baseline we already know we must not lose.
+Also: "profit" needs cost. Shopify carries `unitCost` on InventoryItem — check
+whether PPA populates it, or report revenue and do not imply margin.
+
+**Decision #3 (App Proxy) is now superseded**: lists live in metafields and
+Liquid reads them, so nothing sits in the request path. We still need hosting,
+but for the console and the event endpoint. **Decisions #7-9 partly superseded**:
+the merchandiser override list belongs in the console's Exclude Products screen,
+not a Sheet that drifts.
+
+**`docs/ymal-flow.drawio` rebuilt to 9 pages**, adding Admin Console, Config
+Model / Storefront Contract, and Attribution.
+
+**Next step:** pick the console stack, then design the config contract. Both are
+decisions, not code, and everything else waits on them.
+
+---
+
+### 2026-09-04 — Checkpoint 7: goal reframed — a widget SET, not one recommender
+
+**The goal changed.** Not "build a smarter You May Also Like" but "match Wiser's
+set of blocks". Five blocks:
+
+| Block | Rule | Scope |
+|---|---|---|
+| Trending | order line items, last **14 days**, ranked by quantity | store-wide |
+| Top Selling | same code, **90-day** window | store-wide |
+| New Arrivals | `publishedAt` within the last 30 days | store-wide |
+| Featured | other products sharing tags with the current product page | per product |
+| Recently Viewed | the shopper's own last N views | per visitor |
+
+**What this does to the architecture.** Three of the five are ONE list for the
+whole store, not a list per product. That removes the 30-deep per-product pool,
+the ~254 metafield writes, the `metafieldsSet` batching problem, and most of the
+argument for an App Proxy backend. Only Featured needs per-product storage;
+Recently Viewed needs no backend at all. There is no ranking
+model here to train: Trending is a sort.
+
+**Decision #4 (30-deep pool) is superseded** for four of five blocks; the
+principle behind it — store roughly 3x what you display — still holds.
+**Decision #3 (App Proxy) is weakened**: Liquid can read a shop metafield
+directly, so nothing needs to sit in the request path. **Decision #6 (the
+eligibility rule) is promoted** — it is now the single shared gate behind four
+blocks, so validating it once pays four times.
+
+**Three findings from the sibling projects:**
+
+1. `PPA/` is Product Page Automation, and `Setup/tags_generator.py` **generates
+   the tags deterministically** from the style name — composition, ply, sleeve,
+   type, pattern, features, neck. The "tag quality is unaudited" risk in
+   `caveats.md` is largely dead.
+2. **`tags[0]` is the style itself**, so every colorway of one style carries the
+   same tag. That is the colorway-dedupe key, already in the data.
+3. But every product also gets `sweater, sweaters, sweatshirt, outfit, outfits,
+   casual` — near-universal tags with no discriminating power. Tag similarity
+   must weight by rarity or those swamp every score. **Measure tag frequency
+   across the 254 eligible products before building Featured.**
+
+**Two problems found while planning, both needing a decision before code:**
+
+- **The 60-day order cap bites Top Selling, not Trending.** 14 days sits inside
+  the window every app gets; 90 days does not. Recommended: request approval AND
+  start banking daily order snapshots now — the snapshot is the only option that
+  cannot be started retroactively.
+- **Trending and Top Selling will return nearly the same products.** A 14-day
+  bestseller is usually a 90-day bestseller. Either dedupe across blocks at
+  render, or redefine Trending as *rising* — this period's units versus the
+  previous period.
+
+**`docs/ymal-flow.drawio` rewritten** around the five blocks (6 pages). The
+previous ML-architecture version is not in git history; it is regenerable if the
+goal ever widens back.
+
+**Next step:** settle the Trending/Top Selling overlap question, start the daily
+order snapshot, then add `tags` and `publishedAt` to the product query and count
+tag frequency.
+
+---
+
+### 2026-09-04 — Checkpoint 6: anchor diagram created
+
+`docs/ymal-flow.drawio` — six pages covering the whole project, built from the
+docs plus the Phase 1 output rather than from a fresh guess:
+
+1. **System Overview** — the two-clock architecture (nightly relevance / serve-time
+   eligibility), with the boundary drawn explicitly and the tracking feedback loop
+   back into relevance.
+2. **Phase Plan** — the eight phases, their exit criteria, and the parallel track
+   (`read_all_orders`, Wiser baseline, the Sheet) wired to the phases it gates.
+3. **Eligibility Rule** — the rule as built, as a decision flow, carrying the real
+   numbers: 392 active, 254 eligible (64.8%), 126 fixed_stock, 118 sale_marker.
+4. **Serve-Time Flow** — one pageview end to end, plus the degraded path and the
+   five-level fallback chain.
+5. **Code Map** — every module that exists, what it does, and the ones still to
+   be written.
+6. **Decisions** — the nine locked decisions, the external blockers, and every
+   open question, sorted by who has to answer it.
+
+**Kept as uncompressed XML on purpose.** The file is meant to be pasted back
+into an LLM prompt as project context, so it has to stay readable and greppable
+rather than base64-compressed the way draw.io saves by default. Colour is a
+status legend, not decoration: green is built, blue is planned, red is blocked,
+amber is an open question.
+
+**Stale doc corrected while doing this:** the root README still said
+`BALI_LOCATION_PATTERN` "currently defaults to the guess `bali`". It has been
+`"bali to produce"` since the location names were confirmed.
+
+**Next step:** unchanged — diff the 254-row API list against the hand-built
+Sheet, which closes Phase 1 and three of the five open assumptions in
+`caveats.md` §5.
+
+---
+
 ### 2026-09-03 — Checkpoint 5: monorepo + Phase 1 backend written
 
 **Monorepo created:** `backend/` (Python) + `frontend/` (JS, placeholder until

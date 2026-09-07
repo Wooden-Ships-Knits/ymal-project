@@ -1,0 +1,42 @@
+{%- comment -%}
+  YMAL — card-only product template.
+
+  An alternate product template, fetched by the block scripts as
+  /products/<handle>?view=ymal-card. It returns one card's markup and nothing
+  else: no layout, no header, no footer.
+
+  Why this rather than building cards in JavaScript:
+
+  - it reuses the THEME's own product card, so the block looks native and stays
+    that way when the theme changes
+  - price, image and availability are read live at fetch time, so a handle
+    stored three weeks ago cannot render a stale price
+  - the sold-out decision lives in Liquid, where the live product object is —
+    an unavailable product renders as an empty string, and the script skips it
+
+  Replace the placeholder markup below with a render of the theme's real card
+  snippet. Find it first: most themes have something like
+  snippets/card-product.liquid or snippets/product-card.liquid.
+
+    {%- render 'card-product', card_product: product -%}
+{%- endcomment -%}
+
+{% layout none %}
+
+{%- if product.available -%}
+  {%- comment -%} PLACEHOLDER — swap for the theme's own card snippet. {%- endcomment -%}
+  <a class="ymal__link" href="{{ product.url }}">
+    {%- if product.featured_image -%}
+      <img
+        class="ymal__image"
+        src="{{ product.featured_image | image_url: width: 400 }}"
+        alt="{{ product.featured_image.alt | escape }}"
+        width="400"
+        height="{{ 400 | divided_by: product.featured_image.aspect_ratio | round }}"
+        loading="lazy"
+      >
+    {%- endif -%}
+    <span class="ymal__name">{{ product.title | escape }}</span>
+    <span class="ymal__price">{{ product.price | money }}</span>
+  </a>
+{%- endif -%}

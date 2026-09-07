@@ -1,2 +1,10 @@
 requests>=2.31.0
 python-dotenv>=1.0.0
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+
+# Test-only. Kept here rather than in a separate requirements-dev.txt: the
+# image builds from this file, and a test suite that is not installed in the
+# container is a test suite nobody runs in CI later.
+pytest>=8.0.0
+httpx>=0.27.0

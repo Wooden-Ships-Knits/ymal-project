@@ -1,0 +1,11 @@
+data/
+# The local dev virtualenv. Hundreds of MB of host-platform binaries that
+# would be copied into the image and shadow the ones pip installs there.
+.venv/
+venv/
+.pytest_cache/
+__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example

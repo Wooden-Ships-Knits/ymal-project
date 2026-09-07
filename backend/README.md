@@ -12,10 +12,17 @@ backend/
 │   ├── auth.py           client_credentials -> access token
 │   ├── shopify.py        GraphQL client, pagination, throttle backoff
 │   ├── eligibility.py    the rule — pure functions, no I/O
-│   └── catalog.py        catalog reads (locations, products, inventory)
+│   ├── catalog.py        catalog reads (locations, products, inventory)
+│   ├── registry.py       the five blocks, the nine page templates
+│   ├── config_schema.py  config validation — pure functions, no I/O
+│   └── config_store.py   read/write the ymal.config shop metafield
+├── app/                  the console's API (FastAPI)
+│   └── main.py           routes and the write-token guard
 ├── scripts/              runnable entry points
 │   ├── fetch_locations.py
-│   └── fetch_products.py
+│   ├── fetch_products.py
+│   └── build_blocks.py
+├── tests/                pytest — run from backend/
 ├── data/                 outputs (gitignored)
 └── requirements.txt
 ```
@@ -26,18 +33,57 @@ goes in `ymal/`, things you run go in `scripts/`. The split keeps
 
 ## Setup
 
+Use a virtualenv. On this machine `python3` resolves to an unrelated venv, so
+installing into "the system Python" is not reliable:
+
 ```bash
-pip install -r backend/requirements.txt
+cd backend
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
 ```
+
+`.venv/` is gitignored. The Docker image ignores all of this and installs
+`requirements.txt` directly.
 
 Credentials come from `.env` at the repo root:
 
 ```
 SHOPIFY_CLIENT_ID=...
 SHOPIFY_SECRET_KEY=...
+YMAL_API_TOKEN=...
 ```
 
-Required scopes: `read_products`, `read_inventory`, `read_locations`.
+Required scopes: `read_products`, `read_inventory`, `read_locations`. Writing
+the config metafield additionally needs write access to metafields — **not yet
+granted**, so `PUT /api/config` fails until it is.
+
+## Tests
+
+```bash
+cd backend && .venv/bin/python -m pytest
+```
+
+No network: the eligibility rule, the config validator and the metafield store
+all run against known inputs or a stubbed GraphQL client.
+
+## The console API
+
+```bash
+cd backend && .venv/bin/uvicorn app.main:app --reload   # localhost:8000
+```
+
+Refuses to start without `YMAL_API_TOKEN` in `.env` rather than running open.
+Reads need no token; writes send it as `X-YMAL-Token`.
+
+| Endpoint | Does |
+|---|---|
+| `GET /api/config` | the stored config, plus `updated_at` / `updated_by` as siblings |
+| `PUT /api/config` | validates, then writes, keeping the old one as the undo point |
+| `POST /api/config/undo` | restores the previous config. One step, not a stack |
+| `GET /api/blocks` | the five blocks, each with `list_published` |
+| `GET /api/page-templates` | the nine templates, `live` marking the v1 two |
+
+The contract these implement is `docs/config-contract.md`.
 
 ## Phase 1
 

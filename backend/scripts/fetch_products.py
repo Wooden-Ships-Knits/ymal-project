@@ -23,7 +23,9 @@ from collections import Counter
 
 from ymal import settings
 from ymal.catalog import (
+    count_products,
     fetch_active_products,
+    fetch_active_products_with_stock,
     fetch_stock_by_product,
     find_bali_locations,
     numeric_id,
@@ -40,6 +42,8 @@ FIELDNAMES = [
     "bali_available",
     "published",
     "total_inventory",
+    "published_at",
+    "tags",
     "eligible",
     "reason_if_not",
 ]
@@ -55,6 +59,7 @@ def build_rows(products: list[dict], bali_stock: dict[str, int]) -> list[dict]:
             at_bali=at_bali,
             bali_quantity=bali_stock.get(gid, 0),
             published=bool(product.get("onlineStoreUrl")),
+            product_type=product.get("productType") or "",
         )
         rows.append({
             "product_id": numeric_id(gid),
@@ -66,6 +71,9 @@ def build_rows(products: list[dict], bali_stock: dict[str, int]) -> list[dict]:
             "bali_available": bali_stock.get(gid, 0),
             "published": bool(product.get("onlineStoreUrl")),
             "total_inventory": product.get("totalInventory"),
+            "published_at": product.get("publishedAt") or "",
+            # Joined for the CSV; the JSON keeps the list (see write_outputs).
+            "tags": ", ".join(product.get("tags") or []),
             "eligible": eligible,
             "reason_if_not": " + ".join(reasons),
         })
@@ -102,16 +110,42 @@ def main() -> None:
         )
 
     print(f"  matched: {[loc['name'] for loc in bali_locations]}")
-    if len(bali_locations) > 1:
+
+    if settings.SKIP_SALE_MARKED_IN_QUERY:
+        skipped = count_products(f"status:active AND title:{settings.SALE_MARKER}")
+        print(
+            f"  SKIP_SALE_MARKED_IN_QUERY is on: {skipped} sale-marked active "
+            "product(s) are excluded from the query below and won't appear "
+            "in the CSV/JSON - only counted here."
+        )
+
+    if len(bali_locations) == 1:
+        # Single location: join products to stock in one pass instead of
+        # separately paging the location's whole inventory.
+        print("Fetching active products with Bali inventory...")
+        products, bali_stock, truncated_ids = fetch_active_products_with_stock(
+            bali_locations[0]["id"]
+        )
+        print(f"  {len(products)} active product(s), {len(bali_stock)} of them stocked at Bali")
+        if truncated_ids:
+            print(
+                f"  WARNING: {len(truncated_ids)} product(s) hit "
+                f"VARIANTS_PAGE_SIZE ({settings.VARIANTS_PAGE_SIZE}) exactly - "
+                "their variant count may be truncated, which can misclassify "
+                "at_bali. Raise VARIANTS_PAGE_SIZE in settings.py. IDs: "
+                f"{truncated_ids}"
+            )
+    else:
+        # 0 or >1 matches: fall back to the general path, which can combine
+        # stock across multiple locations.
         print("  WARNING: more than one match - confirm all are production locations")
+        print("Fetching Bali inventory...")
+        bali_stock = fetch_stock_by_product([loc["id"] for loc in bali_locations])
+        print(f"  {len(bali_stock)} product(s) stocked at Bali")
 
-    print("Fetching Bali inventory...")
-    bali_stock = fetch_stock_by_product([loc["id"] for loc in bali_locations])
-    print(f"  {len(bali_stock)} product(s) stocked at Bali")
-
-    print("Fetching active products...")
-    products = fetch_active_products()
-    print(f"  {len(products)} active product(s)")
+        print("Fetching active products...")
+        products = fetch_active_products()
+        print(f"  {len(products)} active product(s)")
 
     if not products:
         raise SystemExit("No active products returned — check scopes and credentials.")
@@ -136,6 +170,10 @@ def main() -> None:
             "sale_marker": settings.SALE_MARKER,
             "sale_marker_case_sensitive": settings.SALE_MARKER_CASE_SENSITIVE,
             "exclude_unpublished": settings.EXCLUDE_UNPUBLISHED,
+            "excluded_product_type_prefixes": list(
+                settings.EXCLUDED_PRODUCT_TYPE_PREFIXES
+            ),
+            "require_product_type": settings.REQUIRE_PRODUCT_TYPE,
         },
     }
 

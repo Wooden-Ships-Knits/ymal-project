@@ -1,0 +1,87 @@
+# YMAL — one compose for the whole project.
+#
+# Modelled on wholesale-order-entry, which already runs this shape on the VM:
+# Postgres, a FastAPI backend, and an nginx container that serves the built SPA
+# and reverse-proxies /api to the backend.
+#
+# IMPORTANT: run this from a LOCAL clone, not from the Google Drive folder this
+# repo currently lives in. Drive's sync and file locking make bind mounts
+# unreliable. On the VM: git clone, then docker compose up.
+#
+#   docker compose up web                  # the console (build + serve)
+#   docker compose run --rm pipeline       # rebuild the block lists now
+#   docker compose up                     # console + api together
+#
+# Secrets come from .env at the repo root and are never baked into an image.
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ymal}
+      POSTGRES_USER: ${POSTGRES_USER:-ymal}
+      # No default on purpose: `:?` fails loudly if it is unset, rather than
+      # shipping a password that is public in this file.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ymal} -d ${POSTGRES_DB:-ymal}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  # The nightly pipeline: fetch products and orders, build the block lists.
+  # Not a long-running service - `docker compose run --rm pipeline` on demand,
+  # and on a schedule once the host cron or a scheduler service calls it.
+  pipeline:
+    build: ./backend
+    env_file: .env
+    volumes:
+      # Block lists and the Phase 1 product table. A named volume rather than a
+      # bind mount, so this works the same on the VM as on a laptop.
+      - ymal_data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+    # Profile-gated so `docker compose up` does not start it. This is a
+    # one-shot task, not a service: it runs, does the work, and exits. Left in
+    # the default set it would fire on every `up -d` and pull thousands of
+    # orders as a side effect of starting the console.
+    #   docker compose run --rm pipeline
+    profiles: ["pipeline"]
+    restart: "no"
+
+  # The console's API. No longer profile-gated: backend/app exists, so this
+  # starts with `docker compose up` alongside the console.
+  api:
+    build: ./backend
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-ymal}:${POSTGRES_PASSWORD:?}@db:5432/${POSTGRES_DB:-ymal}
+    volumes:
+      - ymal_data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # The console itself: builds the SPA and serves it, proxying /api to `api`.
+  web:
+    build: ./frontend
+    ports:
+      # Host loopback only - the VM's own nginx terminates TLS and proxies to
+      # this, exactly as PPA does. Nothing here is exposed to the internet
+      # directly.
+      - "127.0.0.1:8083:80"
+    # Deliberately no depends_on: api. A dependency on a profiled service
+    # implicitly enables that profile, which would drag in an api that cannot
+    # start yet. nginx resolves the upstream lazily (see nginx.conf), so the
+    # console loads and reports "not connected" instead of failing to boot.
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  ymal_data:

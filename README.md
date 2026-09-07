@@ -33,42 +33,165 @@ See `docs/flow.md` for the full picture.
 
 ```
 ymal-project/
-├── backend/          Python data pipeline
+├── backend/          Python — the pipeline, plus the FastAPI the console calls
 │   ├── ymal/         importable package (settings, auth, shopify, eligibility, catalog)
 │   ├── scripts/      runnable entry points
 │   └── data/         outputs (gitignored)
-├── frontend/         storefront widget - not started, begins at Phase 6
-└── docs/             PRD, strategy, flow, logic, caveats, SOP, memory
+├── frontend/         JavaScript — both of the things shoppers and staff see
+│   ├── src/          the console (React + Vite), one folder per tab
+│   └── storefront/   the Liquid snippet + the JS that runs on the live store
+├── docs/             PRD, strategy, flow, logic, caveats, config contract, SOP, memory
+└── docker-compose.yml
 ```
+
+## Running it
+
+### The whole thing, in one command
+
+```bash
+docker compose up -d --build
+```
+
+Builds both images and starts Postgres, the API and the console together. The
+console is on **http://127.0.0.1:8083** and talks to Shopify through nginx.
+Needs only `.env` at the repository root - see Setup below. Verified working
+2026-09-05, including from the Google Drive folder: the warning further down
+about Drive is specifically about bind mounts, and this uses named volumes.
+
+```bash
+docker compose logs -f api
+docker compose down
+docker compose run --rm pipeline
+```
+
+That is the right way to check the whole system works, and it is how the VM
+runs it. Everything below is the inner development loop, where a container
+build in front of a six-second script only slows you down.
+
+---
+
+### Piece by piece, for development
+
+Do the Setup below first.
+
+Comments are on their own lines on purpose: `zsh` does not treat `#` as a
+comment when you paste a command interactively, so a trailing `# note` becomes
+an argument and breaks the command.
+
+### The pipeline
+
+Fastest loop, no container build. Seconds per run.
+
+```bash
+cd backend
+.venv/bin/python -m scripts.fetch_locations
+.venv/bin/python -m scripts.fetch_products
+.venv/bin/python -m scripts.build_blocks
+```
+
+Outputs land in `backend/data/`. Read `active_products.csv` and the three files
+in `data/blocks/` — that is where you check whether the recommendations are
+what you want.
+
+### The console API
+
+Serves the console. Refuses to start without `YMAL_API_TOKEN` in `.env`.
+
+```bash
+cd backend
+.venv/bin/uvicorn app.main:app --reload
+```
+
+Runs on `localhost:8000`. See `backend/README.md` for the endpoints.
+
+### The console
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Runs on `localhost:5173`, proxying `/api` to the API above. Start the API
+first, or the console loads and says "Not connected to the backend" — which is
+deliberate, not a crash.
+
+### Tests
+
+```bash
+cd backend
+.venv/bin/python -m pytest
+```
+
+73 tests, no network. The eligibility rule, the config validator and the
+metafield store all run against known inputs or a stubbed GraphQL client.
+
+### Note on the pipeline in Docker
+
+The pipeline is profile-gated, so `docker compose up` does not start it -
+otherwise every `up` would pull thousands of orders as a side effect of
+starting the console. Run it on demand:
+
+```bash
+docker compose run --rm pipeline
+```
+
+Frontend structure follows `wholesale-order-entry`: React 18 + Vite, no router,
+tabs are `useState` plus a `TABS` array, one folder per feature with its own
+`api.js`.
+
+The three layers are joined by one settings document — see
+`docs/config-contract.md`. The console writes it, the storefront reads it, the
+pipeline never touches it.
 
 ---
 
 ## Setup
 
-Requires Python 3.10 or newer.
+Requires Python 3.10 or newer and Node 18 or newer.
+
+Use a virtualenv. Installing into whatever `python3` happens to resolve to is
+not reliable - on at least one machine here it resolves to an unrelated venv.
 
 ```bash
-pip install -r backend/requirements.txt
+cd backend
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
 ```
 
-Create `.env` at the repository root (it is gitignored - never commit it):
+`.venv/` is gitignored. Docker ignores all of this and installs
+`requirements.txt` into the image directly.
+
+Create `.env` at the repository root (it is gitignored - never commit it).
+`.env.example` lists every variable:
 
 ```
 SHOPIFY_CLIENT_ID=...
 SHOPIFY_SECRET_KEY=...
+POSTGRES_PASSWORD=...
+YMAL_API_TOKEN=...
 ```
 
-The Shopify custom app needs these scopes for Phase 1:
+`YMAL_API_TOKEN` guards every write to the console API. Generate one with:
 
-- `read_products`
-- `read_inventory`
-- `read_locations`
+```bash
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+```
 
-Later phases additionally need `write_products` (to publish recommendations)
-and `read_orders` plus `read_all_orders`. **`read_all_orders` requires an
-approval request to Shopify** and without it order history is capped at 60
-days, which is not enough for a seasonal catalog. Submit that request early -
-it is the longest-lead item in the project.
+### Shopify scopes
+
+Phase 1 reads need `read_products`, `read_inventory` and `read_locations`.
+Writing the `ymal.config` metafield needs metafield write access.
+
+Two scope assumptions in the original plan turned out not to bind on this
+shop's credentials, both verified against the live shop rather than assumed:
+
+| Assumed | Measured |
+|---|---|
+| `read_all_orders` needs an approval request; without it history caps at 60 days | Not capped. Line items come back intact from 400 days ago (2026-09-04) |
+| Writing metafields needs a scope change first | Already granted. `PUT /api/config` returns 200 with no change made (2026-09-05) |
+
+Re-check both if the app's credentials are ever regenerated.
 
 ---
 
@@ -107,8 +230,10 @@ python -m scripts.fetch_locations
 ```
 
 This lists every location on the shop and reports which ones match
-`BALI_LOCATION_PATTERN` in `ymal/settings.py`. That pattern currently defaults
-to the guess `"bali"`. Update it to the exact name before continuing.
+`BALI_LOCATION_PATTERN` in `ymal/settings.py`. That pattern is set to
+`"bali to produce"`, confirmed against the live shop on 2026-09-03 — the full
+name, not just `"bali"`, because `Bali Stock` is a separate fixed-stock
+location that must not match. Re-run this step if the locations change.
 
 **Step 2 — produce the eligible-product list.**
 
@@ -178,10 +303,32 @@ Full detail, including exit criteria per phase, is in `docs/strategy.md`.
 | `docs/frontend.md` | Widget integration, placements, tracking |
 | `docs/caveats.md` | Unverified assumptions, platform limits, risks |
 | `docs/memory.md` | Checkpoint log and locked decisions |
+| `docs/config-contract.md` | **The contract between console, theme and pipeline** |
 | `docs/github_SOP.md` | Branching and commit workflow |
+| `docs/ymal-flow.drawio` | Anchor diagram — the whole project on six pages |
 
 New to the project? Read `docs/memory.md` first — the stable facts plus the
 top two checkpoints are enough to pick up the work cold.
+
+**`docs/ymal-flow.drawio` is the anchor.** Open it in draw.io (or the VS Code
+Draw.io extension). Six pages:
+
+| Page | Answers |
+|---|---|
+| 1. System Overview | The three layers — pipeline, storefront, console — and the config metafield that joins them |
+| 2. Block Specs | What each of the five blocks queries, computes and stores |
+| 3. The Shared Eligibility Gate | The rule as built, with the real counts, and which blocks it applies to |
+| 4. Data, Windows and Storage | What we fetch, the 60-day order cap, where each list lives |
+| 5. Admin Console | The Wiser Setup Widgets screen rebuilt: page-template cards, what Setup contains, stack options |
+| 6. Config Model and Storefront Contract | The `ymal.config` schema, every metafield, and what the Liquid snippet does |
+| 7. Attribution and Analytics | Events, the attribution model, and why a holdout is the only honest profit number |
+| 8. Build Order and Code Map | Ten build steps, what exists, what is still to write |
+| 9. Decisions | Locked decisions re-read after the reframe, blockers, open questions |
+
+It is stored as uncompressed XML on purpose: it stays greppable, and a page can
+be pasted straight into an LLM prompt as project context. When asking an LLM to
+work on this project, give it the relevant page plus `docs/memory.md` section 2
+and the top of section 3.
 
 ---
 
