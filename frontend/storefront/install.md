@@ -94,8 +94,21 @@ The Wiser blocks on this store are full-bleed carousels, four across. To match:
 |---|---|
 | Layout | Carousel with arrows |
 | Full width | ticked |
-| Columns on desktop | 4 |
+| Card width | 236px |
+| Gap between columns | 20px |
 | Heading size | 40px, Light, Centre |
+
+Those numbers are read off the app block's own rendered markup, not guessed.
+
+The **Choose Option** button on each card is not ours - it comes from the
+theme's `product-block`, which draws it when Theme settings -> quick buy style
+is set to "button". If the button is missing from YMAL cards it is missing from
+the theme's own product grids too, and the fix is that setting rather than
+anything here.
+
+What is deliberately NOT copied: the app's CSS class names. Reusing them would
+match for free, but that styling ships with the app and disappears the day it
+is uninstalled - which is the plan at Phase 7.
 
 The arrows only appear when the row actually overflows - a block showing four
 of four products needs none, and a dead arrow reads as broken. The row scrolls

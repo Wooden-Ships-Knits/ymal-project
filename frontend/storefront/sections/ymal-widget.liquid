@@ -147,7 +147,12 @@
   }
   #shopify-section-{{ section.id }} .ymal__grid {
     display: grid;
-    grid-template-columns: repeat({{ section.settings.columns }}, minmax(0, 1fr));
+    {%- if section.settings.card_width > 0 -%}
+      grid-template-columns: repeat(auto-fill, {{ section.settings.card_width }}px);
+      justify-content: center;
+    {%- else -%}
+      grid-template-columns: repeat({{ section.settings.columns }}, minmax(0, 1fr));
+    {%- endif -%}
     gap: {{ section.settings.row_gap }}px {{ section.settings.column_gap }}px;
   }
 
@@ -168,7 +173,16 @@
     display: none;
   }
   #shopify-section-{{ section.id }} .ymal--carousel .ymal__card {
-    flex: 0 0 calc((100% - ({{ section.settings.columns | minus: 1 }} * {{ section.settings.column_gap }}px)) / {{ section.settings.columns }});
+    {%- if section.settings.card_width > 0 -%}
+      /* Fixed card width, the way the app blocks on this store size theirs
+         (236px with a 20px gap). Cards stay the same size whatever the screen,
+         and more of them come into view rather than each one growing. */
+      flex: 0 0 {{ section.settings.card_width }}px;
+    {%- else -%}
+      /* Auto: exactly `columns` cards fill the row, each one growing with the
+         screen. */
+      flex: 0 0 calc((100% - ({{ section.settings.columns | minus: 1 }} * {{ section.settings.column_gap }}px)) / {{ section.settings.columns }});
+    {%- endif -%}
     scroll-snap-align: start;
   }
 
@@ -509,12 +523,23 @@
     },
     {
       "type": "range",
+      "id": "card_width",
+      "label": "Card width",
+      "min": 0,
+      "max": 400,
+      "step": 4,
+      "default": 0,
+      "unit": "px",
+      "info": "0 means cards stretch to fill the columns. The app blocks on this store use 236."
+    },
+    {
+      "type": "range",
       "id": "column_gap",
       "label": "Gap between columns",
       "min": 0,
       "max": 60,
       "step": 2,
-      "default": 24,
+      "default": 20,
       "unit": "px"
     },
     {
