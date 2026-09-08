@@ -226,3 +226,28 @@ SEASONLESS_IGNORES_SEASON = True
 # same number for the same reason - the gate, the anchor exclusion and the
 # colorway dedupe all remove items at render.
 POOL_DEPTH = STORED_LIST_DEPTH
+
+# ------------------------------------------------------------------
+# Co-purchase  (Phase 4)
+# ------------------------------------------------------------------
+# A full seasonal cycle, so autumn pairs are learned from last autumn too.
+# Season is a hard filter at render, so stale cross-season pairs are removed
+# anyway rather than needing a shorter window.
+COPURCHASE_WINDOW_DAYS = 365
+
+# The baskets query asks for product ids and nothing else - no createdAt, no
+# quantity, no order id. Measured live 2026-09-08: at 250 orders x 20 line
+# items it costs 145 requested / 46 actual against a 20,000 bucket, and a
+# 250-order page returns in ~0.6s versus ~1.16s for a 100-order page. Paging at
+# Shopify's connection maximum is both cheaper per order and faster per
+# request, so the win is fewer round trips rather than fewer fields.
+BASKETS_PAGE_SIZE = 250
+
+# A pair must appear in at least this many baskets to score. Below it, lift is
+# dominated by coincidence - two products bought together once say nothing.
+COPURCHASE_MIN_PAIRS = 3
+
+# How much co-purchase may move a product within its content pool. Reranking
+# only: content similarity decides who is in the 30, this decides the order.
+# At 0.5 a maximally co-purchased pair can lift a candidate by 50%.
+COPURCHASE_RERANK_WEIGHT = 0.5

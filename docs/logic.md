@@ -20,7 +20,10 @@ Season is a hard filter rather than a signal.
 Price is deliberately excluded - the catalog spans $137-$159, so it
 distinguishes nothing. See `caveats.md` section 6.
 
-Collaborative signals (co-purchase) arrive in Phase 4.
+**Collaborative signal (Phase 4, built 2026-09-08).** Co-purchase from a year
+of orders, counted at style level and scored by lift rather than raw counts -
+bestsellers appear in every basket, so raw co-occurrence would just rediscover
+the top sellers.
 
 ---
 
@@ -47,6 +50,11 @@ anchor's pool, which is all ranking needs - it is not a probability.
 
 Then the hard rules: same season, never the anchor's own style, one product per
 `style_key`, and eligible products only. Top 30 are stored.
+
+Co-purchase **reranks only** - it reorders the 30 without changing who is in
+them, so a co-purchase pair can never break the rules above. A candidate with
+no co-purchase history keeps its content order, which is the cold-start path
+and the permanent one for a product launched today.
 
 ---
 
@@ -112,4 +120,22 @@ TBD
 
 _How we know the logic is good, and how we compare against Wiser._
 
-TBD
+**Offline (Phase 4).** Hold out the most recent 10% of baskets, learn
+co-purchase from the rest, and measure hit rate at k=6 - the widget slot count.
+Held out by recency rather than at random, because the real task is predicting
+what will be bought together next from what was bought before; a random split
+leaks the future into the training set.
+
+Measured 2026-09-08 on 12,023 multi-item orders:
+
+| Ranking | Hit rate at 6 |
+|---|---|
+| Content only | 0.1651 |
+| Content + co-purchase | **0.2944** |
+
+Reranking beats content alone by 78% relative, so Phase 4's exit criterion is
+met. `scripts/build_copurchase.py` re-runs this and refuses to endorse the
+result if it ever stops beating content alone.
+
+**Online (Phase 7).** The A/B test against Wiser. A holdout is the only honest
+profit number - see the drawio page 7.
