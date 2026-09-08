@@ -75,16 +75,20 @@
 
   {%- assign has_cards = ymal_cards | strip -%}
   {%- if has_cards != blank -%}
-    <div class="section ymal ymal--{{ block_id }}"
+    {%- comment -%}
+      No theme wrapper classes. `.section` and `.container` mean different
+      things in different themes - in this one they pushed the whole block to
+      the right - so the section brings its own layout and inherits only type
+      and colour.
+    {%- endcomment -%}
+    <div class="ymal ymal--{{ block_id }}"
       data-ymal-block="{{ block_id }}"
       data-ymal-page="{{ section.settings.page_type | escape }}"
     >
-      <div class="container">
-        {%- if section.settings.heading != blank -%}
-          <h2 class="ymal__title h3">{{ section.settings.heading | escape }}</h2>
-        {%- endif -%}
-        <div class="ymal__grid">{{ ymal_cards }}</div>
-      </div>
+      {%- if section.settings.heading != blank -%}
+        <h2 class="ymal__title">{{ section.settings.heading | escape }}</h2>
+      {%- endif -%}
+      <div class="ymal__grid">{{ ymal_cards }}</div>
     </div>
   {%- endif -%}
 {%- endif -%}
@@ -95,15 +99,29 @@
 
   Scoped to this section's id: a page can carry more than one YMAL block, and
   they must not restyle each other or anything else on the page.
+
+  The heading sets size, weight, alignment and spacing but NOT colour or
+  family - those inherit, so the block follows the theme's typography settings
+  and keeps following them when someone changes the palette.
 {%- endcomment -%}
 <style>
+  #shopify-section-{{ section.id }} .ymal {
+    padding-block: {{ section.settings.padding_top }}px {{ section.settings.padding_bottom }}px;
+    padding-inline: {{ section.settings.padding_inline }}px;
+    max-width: {{ section.settings.max_width }}px;
+    margin-inline: auto;
+  }
+  #shopify-section-{{ section.id }} .ymal__title {
+    font-size: {{ section.settings.heading_size }}px;
+    font-weight: {{ section.settings.heading_weight }};
+    text-align: {{ section.settings.heading_align }};
+    margin: 0 0 {{ section.settings.heading_gap }}px;
+    line-height: 1.15;
+  }
   #shopify-section-{{ section.id }} .ymal__grid {
     display: grid;
     grid-template-columns: repeat({{ section.settings.columns }}, minmax(0, 1fr));
-    gap: 2rem 1.5rem;
-  }
-  #shopify-section-{{ section.id }} .ymal__title {
-    margin-bottom: 1.5rem;
+    gap: {{ section.settings.row_gap }}px {{ section.settings.column_gap }}px;
   }
   @media (max-width: 1024px) {
     #shopify-section-{{ section.id }} .ymal__grid {
@@ -113,17 +131,18 @@
   @media (max-width: 768px) {
     #shopify-section-{{ section.id }} .ymal__grid {
       /* One scrolling row on a phone rather than a tall stack the shopper has
-         to scroll past. Matches how the theme's own product rows behave. */
+         to scroll past. */
       display: flex;
       overflow-x: auto;
       scroll-snap-type: x mandatory;
       -webkit-overflow-scrolling: touch;
-      margin-inline: -1rem;
-      padding-inline: 1rem;
     }
     #shopify-section-{{ section.id }} .ymal__card {
       flex: 0 0 62%;
       scroll-snap-align: start;
+    }
+    #shopify-section-{{ section.id }} .ymal__title {
+      font-size: {{ section.settings.heading_size | times: 0.7 | round }}px;
     }
   }
 </style>
@@ -135,17 +154,36 @@
   "class": "ymal-section",
   "settings": [
     {
+      "type": "header",
+      "content": "Content"
+    },
+    {
       "type": "select",
       "id": "block",
       "label": "Block",
       "default": "featured",
       "info": "Featured needs a product to be about, so it only works on a product page.",
       "options": [
-        { "value": "featured", "label": "Featured Products" },
-        { "value": "trending", "label": "Trending Products" },
-        { "value": "top_selling", "label": "Top Selling" },
-        { "value": "new_arrivals", "label": "New Arrivals" },
-        { "value": "recently_viewed", "label": "Recently Viewed" }
+        {
+          "value": "featured",
+          "label": "Featured Products"
+        },
+        {
+          "value": "trending",
+          "label": "Trending Products"
+        },
+        {
+          "value": "top_selling",
+          "label": "Top Selling"
+        },
+        {
+          "value": "new_arrivals",
+          "label": "New Arrivals"
+        },
+        {
+          "value": "recently_viewed",
+          "label": "Recently Viewed"
+        }
       ]
     },
     {
@@ -181,20 +219,179 @@
       "default": "product",
       "info": "Used for tracking, so Analytics can group by page.",
       "options": [
-        { "value": "product", "label": "Product" },
-        { "value": "home", "label": "Home" },
-        { "value": "cart", "label": "Cart" },
-        { "value": "collection", "label": "Collection" },
-        { "value": "search", "label": "Search" },
-        { "value": "not_found", "label": "404" },
-        { "value": "blog", "label": "Blog" },
-        { "value": "account", "label": "Account" },
-        { "value": "thank_you", "label": "Thank you" }
+        {
+          "value": "product",
+          "label": "Product"
+        },
+        {
+          "value": "home",
+          "label": "Home"
+        },
+        {
+          "value": "cart",
+          "label": "Cart"
+        },
+        {
+          "value": "collection",
+          "label": "Collection"
+        },
+        {
+          "value": "search",
+          "label": "Search"
+        },
+        {
+          "value": "not_found",
+          "label": "404"
+        },
+        {
+          "value": "blog",
+          "label": "Blog"
+        },
+        {
+          "value": "account",
+          "label": "Account"
+        },
+        {
+          "value": "thank_you",
+          "label": "Thank you"
+        }
       ]
+    },
+    {
+      "type": "header",
+      "content": "Heading"
+    },
+    {
+      "type": "range",
+      "id": "heading_size",
+      "label": "Heading size",
+      "min": 16,
+      "max": 64,
+      "step": 2,
+      "default": 40,
+      "unit": "px",
+      "info": "Colour and typeface follow your theme settings."
+    },
+    {
+      "type": "select",
+      "id": "heading_weight",
+      "label": "Heading weight",
+      "default": "300",
+      "options": [
+        {
+          "value": "300",
+          "label": "Light"
+        },
+        {
+          "value": "400",
+          "label": "Regular"
+        },
+        {
+          "value": "600",
+          "label": "Bold"
+        }
+      ]
+    },
+    {
+      "type": "select",
+      "id": "heading_align",
+      "label": "Heading alignment",
+      "default": "center",
+      "options": [
+        {
+          "value": "left",
+          "label": "Left"
+        },
+        {
+          "value": "center",
+          "label": "Centre"
+        },
+        {
+          "value": "right",
+          "label": "Right"
+        }
+      ]
+    },
+    {
+      "type": "range",
+      "id": "heading_gap",
+      "label": "Space below heading",
+      "min": 0,
+      "max": 80,
+      "step": 4,
+      "default": 32,
+      "unit": "px"
+    },
+    {
+      "type": "header",
+      "content": "Layout"
+    },
+    {
+      "type": "range",
+      "id": "max_width",
+      "label": "Maximum width",
+      "min": 800,
+      "max": 2000,
+      "step": 40,
+      "default": 1400,
+      "unit": "px",
+      "info": "Match your theme's other sections."
+    },
+    {
+      "type": "range",
+      "id": "padding_inline",
+      "label": "Side padding",
+      "min": 0,
+      "max": 80,
+      "step": 4,
+      "default": 20,
+      "unit": "px"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "Padding top",
+      "min": 0,
+      "max": 120,
+      "step": 4,
+      "default": 48,
+      "unit": "px"
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "Padding bottom",
+      "min": 0,
+      "max": 120,
+      "step": 4,
+      "default": 48,
+      "unit": "px"
+    },
+    {
+      "type": "range",
+      "id": "column_gap",
+      "label": "Gap between columns",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "default": 24,
+      "unit": "px"
+    },
+    {
+      "type": "range",
+      "id": "row_gap",
+      "label": "Gap between rows",
+      "min": 0,
+      "max": 80,
+      "step": 4,
+      "default": 40,
+      "unit": "px"
     }
   ],
   "presets": [
-    { "name": "YMAL Recommendations" }
+    {
+      "name": "YMAL Recommendations"
+    }
   ]
 }
 {% endschema %}
