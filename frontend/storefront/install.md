@@ -64,6 +64,8 @@ Recommendations**. Then set:
 | Heading | The web team's words |
 | Products to show | 2-12. Fewer may appear once the gate has run |
 | Columns on desktop | 2-6. Phones always show one scrolling row |
+| Layout | Carousel with arrows, or a grid that wraps |
+| Full width | Edge to edge, matching the app blocks already on this store |
 | Page type | Used for tracking, so Analytics can group by page |
 
 Add the section more than once for more than one block on a page.
@@ -83,6 +85,21 @@ Add the section more than once for more than one block on a page.
 5. **Recently Viewed:** open a product page, see nothing (one view, and it is
    the anchor); open a second, the first appears; open a third, two appear.
 6. **Private window:** Recently Viewed should be absent, not empty.
+
+## Matching the existing app blocks
+
+The Wiser blocks on this store are full-bleed carousels, four across. To match:
+
+| Setting | Value |
+|---|---|
+| Layout | Carousel with arrows |
+| Full width | ticked |
+| Columns on desktop | 4 |
+| Heading size | 40px, Light, Centre |
+
+The arrows only appear when the row actually overflows - a block showing four
+of four products needs none, and a dead arrow reads as broken. The row scrolls
+by swipe and trackpad regardless, so it still works if the script never runs.
 
 ## The kill switch
 

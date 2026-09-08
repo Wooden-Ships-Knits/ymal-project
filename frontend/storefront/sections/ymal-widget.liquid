@@ -81,14 +81,34 @@
       the right - so the section brings its own layout and inherits only type
       and colour.
     {%- endcomment -%}
-    <div class="ymal ymal--{{ block_id }}"
+    <div class="ymal ymal--{{ block_id }} ymal--{{ section.settings.layout }}"
       data-ymal-block="{{ block_id }}"
       data-ymal-page="{{ section.settings.page_type | escape }}"
     >
       {%- if section.settings.heading != blank -%}
         <h2 class="ymal__title">{{ section.settings.heading | escape }}</h2>
       {%- endif -%}
-      <div class="ymal__grid">{{ ymal_cards }}</div>
+
+      <div class="ymal__viewport">
+        <div class="ymal__grid">{{ ymal_cards }}</div>
+
+        {%- if section.settings.layout == 'carousel' -%}
+          {%- comment -%}
+            Arrows are added by JS only if the row actually overflows - a block
+            that fits needs no arrows, and drawing dead ones looks broken. The
+            row scrolls natively either way, so this degrades to a swipeable
+            strip if the script never runs.
+          {%- endcomment -%}
+          <button class="ymal__arrow ymal__arrow--prev" type="button"
+                  aria-label="Previous products" hidden>
+            {%- render 'icon-chevron-left', stroke_width: 1.3 -%}
+          </button>
+          <button class="ymal__arrow ymal__arrow--next" type="button"
+                  aria-label="Next products" hidden>
+            {%- render 'icon-chevron-right', stroke_width: 1.3 -%}
+          </button>
+        {%- endif -%}
+      </div>
     </div>
   {%- endif -%}
 {%- endif -%}
@@ -107,9 +127,13 @@
 <style>
   #shopify-section-{{ section.id }} .ymal {
     padding-block: {{ section.settings.padding_top }}px {{ section.settings.padding_bottom }}px;
-    padding-inline: {{ section.settings.padding_inline }}px;
-    max-width: {{ section.settings.max_width }}px;
-    margin-inline: auto;
+    {%- if section.settings.full_width -%}
+      padding-inline: 0;
+    {%- else -%}
+      padding-inline: {{ section.settings.padding_inline }}px;
+      max-width: {{ section.settings.max_width }}px;
+      margin-inline: auto;
+    {%- endif -%}
   }
   #shopify-section-{{ section.id }} .ymal__title {
     font-size: {{ section.settings.heading_size }}px;
@@ -118,20 +142,72 @@
     margin: 0 0 {{ section.settings.heading_gap }}px;
     line-height: 1.15;
   }
+  #shopify-section-{{ section.id }} .ymal__viewport {
+    position: relative;
+  }
   #shopify-section-{{ section.id }} .ymal__grid {
     display: grid;
     grid-template-columns: repeat({{ section.settings.columns }}, minmax(0, 1fr));
     gap: {{ section.settings.row_gap }}px {{ section.settings.column_gap }}px;
   }
+
+  {%- comment -%}
+    Carousel: one scrolling row of fixed-fraction cards, rather than a grid
+    that wraps. Uses native scrolling with snap points, so it works by swipe,
+    trackpad, keyboard and arrows alike, and needs no library.
+  {%- endcomment -%}
+  #shopify-section-{{ section.id }} .ymal--carousel .ymal__grid {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  #shopify-section-{{ section.id }} .ymal--carousel .ymal__grid::-webkit-scrollbar {
+    display: none;
+  }
+  #shopify-section-{{ section.id }} .ymal--carousel .ymal__card {
+    flex: 0 0 calc((100% - ({{ section.settings.columns | minus: 1 }} * {{ section.settings.column_gap }}px)) / {{ section.settings.columns }});
+    scroll-snap-align: start;
+  }
+
+  #shopify-section-{{ section.id }} .ymal__arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 0;
+    cursor: pointer;
+    background: rgba(255, 255, 255, .85);
+    color: inherit;
+  }
+  #shopify-section-{{ section.id }} .ymal__arrow:hover {
+    background: #fff;
+  }
+  #shopify-section-{{ section.id }} .ymal__arrow:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+  #shopify-section-{{ section.id }} .ymal__arrow--prev { left: 0; }
+  #shopify-section-{{ section.id }} .ymal__arrow--next { right: 0; }
+  #shopify-section-{{ section.id }} .ymal__arrow[hidden] { display: none; }
+
   @media (max-width: 1024px) {
-    #shopify-section-{{ section.id }} .ymal__grid {
+    #shopify-section-{{ section.id }} .ymal--grid .ymal__grid {
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
   }
   @media (max-width: 768px) {
+    /* One scrolling row on a phone whichever layout is chosen - a tall stack
+       is just something to scroll past. */
     #shopify-section-{{ section.id }} .ymal__grid {
-      /* One scrolling row on a phone rather than a tall stack the shopper has
-         to scroll past. */
       display: flex;
       overflow-x: auto;
       scroll-snap-type: x mandatory;
@@ -144,8 +220,48 @@
     #shopify-section-{{ section.id }} .ymal__title {
       font-size: {{ section.settings.heading_size | times: 0.7 | round }}px;
     }
+    #shopify-section-{{ section.id }} .ymal__arrow { display: none; }
   }
 </style>
+
+{%- if section.settings.layout == 'carousel' -%}
+<script>
+  (function () {
+    var root = document.getElementById("shopify-section-{{ section.id }}");
+    if (!root) return;
+    var row = root.querySelector(".ymal__grid");
+    var prev = root.querySelector(".ymal__arrow--prev");
+    var next = root.querySelector(".ymal__arrow--next");
+    if (!row || !prev || !next) return;
+
+    function step() {
+      var card = row.querySelector(".ymal__card");
+      return card ? card.getBoundingClientRect().width + {{ section.settings.column_gap }} : row.clientWidth;
+    }
+
+    function sync() {
+      // Arrows appear only when there is somewhere to go. A row that fits
+      // needs none, and a dead arrow reads as broken.
+      var overflows = row.scrollWidth > row.clientWidth + 4;
+      prev.hidden = !overflows || row.scrollLeft <= 4;
+      next.hidden = !overflows || row.scrollLeft >= row.scrollWidth - row.clientWidth - 4;
+    }
+
+    prev.addEventListener("click", function () {
+      row.scrollBy({ left: -step(), behavior: "smooth" });
+    });
+    next.addEventListener("click", function () {
+      row.scrollBy({ left: step(), behavior: "smooth" });
+    });
+
+    row.addEventListener("scroll", sync, { passive: true });
+    window.addEventListener("resize", sync);
+    // Images load late and change scrollWidth, so re-check once they have.
+    window.addEventListener("load", sync);
+    sync();
+  })();
+</script>
+{%- endif -%}
 
 {% schema %}
 {
@@ -325,6 +441,30 @@
     {
       "type": "header",
       "content": "Layout"
+    },
+    {
+      "type": "select",
+      "id": "layout",
+      "label": "Layout",
+      "default": "carousel",
+      "info": "Carousel matches the app blocks already on this store.",
+      "options": [
+        {
+          "value": "carousel",
+          "label": "Carousel with arrows"
+        },
+        {
+          "value": "grid",
+          "label": "Grid that wraps"
+        }
+      ]
+    },
+    {
+      "type": "checkbox",
+      "id": "full_width",
+      "label": "Full width",
+      "default": true,
+      "info": "Edge to edge, ignoring maximum width and side padding."
     },
     {
       "type": "range",
