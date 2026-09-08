@@ -307,9 +307,20 @@ No deploy. No theme edit. No engineer. That is the deliverable.
 ## 12. Open
 
 - Do per-block options (§10) ever move into the console, and if so which?
-- Does `slots` belong here, or in the theme's own section settings? Online Store
-  2.0 sections already have a settings UI — part of this screen may exist for
-  free in the theme editor. Worth checking before building it twice.
+- ~~Does `slots` belong here, or in the theme's own section settings?~~
+  **Settled 2026-09-08: the theme editor wins.** The web team already places
+  Wiser blocks that way and asked for the same workflow, so YMAL ships as a
+  theme section (`sections/ymal-widget.liquid`) with block, heading, slots and
+  page type as section settings. Wiser's appear under Apps because it is an
+  installed app shipping theme app extensions; ours appear under Sections,
+  which is the same drag with no app to host.
+
+  **Consequence: the console's Setup Widgets screen is redundant** and section
+  3's `placements` document is no longer the source of truth for placement.
+  The metafields in section 2 are unaffected - the theme still reads the same
+  published lists. Retire or repurpose Setup Widgets before the web team is
+  told to use it, or they will have two places to set the same thing and no
+  way to know which one won.
 - One config for the whole store, or per market / per language? Wiser's screen
   has a language selector; nobody has said whether this store needs one.
 - Should the pipeline read the config too — for instance, to skip computing a
