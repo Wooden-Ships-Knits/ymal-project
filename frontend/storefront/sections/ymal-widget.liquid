@@ -145,6 +145,24 @@
   #shopify-section-{{ section.id }} .ymal__viewport {
     position: relative;
   }
+
+  {%- comment -%}
+    Two defaults that break a card lifted out of the theme's own grid:
+
+    `product-block` is a custom element, and an unknown element defaults to
+    display:inline - which runs the title and price together on one line and
+    lets the text flow out of the card.
+
+    A flex or grid item defaults to min-width:auto, so a long product title
+    pushes the card wider than its track instead of wrapping.
+  {%- endcomment -%}
+  #shopify-section-{{ section.id }} .ymal__card {
+    min-width: 0;
+  }
+  #shopify-section-{{ section.id }} .ymal__card product-block {
+    display: block;
+    width: 100%;
+  }
   #shopify-section-{{ section.id }} .ymal__grid {
     display: grid;
     {%- if section.settings.card_width > 0 -%}
