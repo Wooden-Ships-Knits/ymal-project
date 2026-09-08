@@ -12,6 +12,9 @@
 #   docker compose run --rm pipeline       # rebuild the block lists now
 #   docker compose up                     # console + api together
 #
+# The console's host port defaults to 8083 and is overridable with
+# YMAL_WEB_PORT in .env, since one VM may run several of these stacks.
+#
 # Secrets come from .env at the repo root and are never baked into an image.
 
 services:
@@ -75,7 +78,13 @@ services:
       # Host loopback only - the VM's own nginx terminates TLS and proxies to
       # this, exactly as PPA does. Nothing here is exposed to the internet
       # directly.
-      - "127.0.0.1:8083:80"
+      #
+      # The port is overridable because this VM runs more than one of these
+      # stacks and they cannot share a host port. wholesale-order-entry, which
+      # this compose file was modelled on, already holds 8083 there - set
+      # YMAL_WEB_PORT in .env to move this one. Remember to point the VM's
+      # nginx at whatever you choose.
+      - "127.0.0.1:${YMAL_WEB_PORT:-8083}:80"
     # Deliberately no depends_on: api. A dependency on a profiled service
     # implicitly enables that profile, which would drag in an api that cannot
     # start yet. nginx resolves the upstream lazily (see nginx.conf), so the

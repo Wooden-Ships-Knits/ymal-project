@@ -5,14 +5,17 @@
   /products/<handle>?view=ymal-card. It returns one card's markup and nothing
   else: no layout, no header, no footer.
 
-  Why this rather than building cards in JavaScript:
+  THIS FILE IS THE ELIGIBILITY GATE. Every block renders through it, so the
+  rule is enforced in exactly one place. An ineligible product renders as an
+  empty string and the calling script skips it.
+
+  Why the gate is here rather than in JavaScript:
 
   - it reuses the THEME's own product card, so the block looks native and stays
     that way when the theme changes
   - price, image and availability are read live at fetch time, so a handle
     stored three weeks ago cannot render a stale price
-  - the sold-out decision lives in Liquid, where the live product object is —
-    an unavailable product renders as an empty string, and the script skips it
+  - the decision needs the live product object, which only Liquid has
 
   Replace the placeholder markup below with a render of the theme's real card
   snippet. Find it first: most themes have something like
@@ -23,7 +26,46 @@
 
 {% layout none %}
 
-{%- if product.available -%}
+{%- comment -%}
+  The rule (docs/logic.md §4.1), as the storefront can see it.
+
+  1. available      purchasable right now. Liquid knows this directly.
+  2. not *SALE*     markdown. Liquid can read the title, so this is checked
+                    here as well as in the metafield - it costs nothing and
+                    holds even if the metafield is stale.
+  3. eligible       stocked at Bali To Produce, so replenishable rather than
+                    fixed. Liquid CANNOT compute this: it sees store-wide
+                    inventory totals but never inventory by location. The
+                    pipeline publishes it to product.metafields.ymal.eligible
+                    (scripts/publish_eligibility.py).
+
+  FAILS CLOSED. A product with no ymal.eligible metafield is not shown. A
+  missing metafield means the pipeline has never classified it, and "we have
+  not checked" must not render as "fine to show" - that is precisely the Wiser
+  failure this project exists to fix. The visible cost is an empty block until
+  the publish job has run, which is a problem someone notices.
+{%- endcomment -%}
+
+{%- comment -%}
+  `.value`, not the metafield object. `product.metafields.ymal.eligible` is an
+  object that EXISTS even when it holds false, so testing it directly is truthy
+  for an ineligible product - it would fail open, which is the opposite of what
+  this gate is for. `.value` is the boolean, and nil when the metafield is
+  absent, which is falsy. That is the fail-closed behaviour.
+{%- endcomment -%}
+{%- assign ymal_eligible = product.metafields.ymal.eligible.value -%}
+
+{%- comment -%}
+  Liquid has no boolean operators inside a condition, so the *SALE* test cannot
+  be inlined - `contains ... == false` is not valid Liquid. Compute it first.
+{%- endcomment -%}
+{%- assign ymal_is_sale = false -%}
+{%- if product.title contains '*SALE*' -%}
+  {%- assign ymal_is_sale = true -%}
+{%- endif -%}
+
+{%- if product.available and ymal_eligible and ymal_is_sale == false -%}
+
   {%- comment -%} PLACEHOLDER — swap for the theme's own card snippet. {%- endcomment -%}
   <a class="ymal__link" href="{{ product.url }}">
     {%- if product.featured_image -%}

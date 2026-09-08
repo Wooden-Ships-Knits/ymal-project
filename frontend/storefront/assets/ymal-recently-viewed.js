@@ -19,6 +19,17 @@
   var MAX_STORED = 20;      // deep enough to survive filtering, cheap to keep
   var CARD_VIEW = 'ymal-card';
 
+  // How many candidates to fetch per slot. The card template is the
+  // eligibility gate, so a stored handle may render nothing - fixed stock,
+  // *SALE*, sold out, unpublished. Fetching exactly `slots` and filtering
+  // afterwards makes the block thin out for precisely the shoppers who browse
+  // most, which is why the list stores 20 in the first place.
+  //
+  // 3x is the compromise: on this catalog roughly 60% of active products are
+  // eligible, so three candidates per slot fills it in almost every case
+  // without fetching all 20 every time.
+  var OVERFETCH = 3;
+
   // localStorage throws in some privacy modes rather than returning null, so
   // every access is guarded. A browser that refuses storage simply never shows
   // the block.
@@ -72,9 +83,12 @@
     var slots = parseInt(section.getAttribute('data-ymal-slots'), 10) || 4;
     var pageType = section.getAttribute('data-ymal-page') || '';
 
+    // Take more candidates than slots, because the card template gates on
+    // eligibility and many will render nothing. Trim to `slots` AFTER
+    // filtering, not before.
     var handles = read()
       .filter(function (p) { return String(p.id) !== String(anchor); })
-      .slice(0, slots)
+      .slice(0, slots * OVERFETCH)
       .map(function (p) { return p.handle; });
 
     if (!handles.length) return;
@@ -83,9 +97,12 @@
       var shown = [];
 
       cards.forEach(function (html, i) {
-        // An empty card means the theme chose not to render it — sold out,
-        // unpublished, gone. That check belongs in Liquid, not here.
+        // An empty card means the theme chose not to render it — ineligible,
+        // sold out, unpublished, gone. That decision belongs in Liquid, where
+        // the live product object is, and this script does not second-guess it.
         if (!html) return;
+        if (shown.length >= slots) return;
+
         var li = document.createElement('li');
         li.className = 'ymal__card';
         li.setAttribute('data-ymal-handle', handles[i]);
