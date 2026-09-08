@@ -13,7 +13,14 @@
 
 _What data do we use to decide two products are related?_
 
-TBD
+**Content signals (Phase 3, built 2026-09-08).** Four facets, from the Phase 2
+feature table: motif/pattern, fabric/weight, colour family, and silhouette.
+Season is a hard filter rather than a signal.
+
+Price is deliberately excluded - the catalog spans $137-$159, so it
+distinguishes nothing. See `caveats.md` section 6.
+
+Collaborative signals (co-purchase) arrive in Phase 4.
 
 ---
 
@@ -21,7 +28,13 @@ TBD
 
 _How each signal produces a score._
 
-TBD
+Each tag-based facet scores as an IDF-weighted Jaccard overlap between the
+anchor's tags and the candidate's, within that facet. Rarer tags count for
+more, so `football` says more about similarity than `cotton`.
+
+Silhouette is binary: same normalised product type or not.
+
+Implemented in `backend/ymal/similarity.py`, weights in `settings.py`.
 
 ---
 
@@ -29,7 +42,11 @@ TBD
 
 _How multiple signals combine into one ranked list._
 
-TBD
+A weighted sum of the four facet scores. The total is comparable within one
+anchor's pool, which is all ranking needs - it is not a probability.
+
+Then the hard rules: same season, never the anchor's own style, one product per
+`style_key`, and eligible products only. Top 30 are stored.
 
 ---
 

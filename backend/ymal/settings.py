@@ -174,3 +174,55 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = BACKEND_ROOT.parent
 DATA_DIR = BACKEND_ROOT / "data"
 PHASE1_DIR = DATA_DIR / "phase1"
+
+# ------------------------------------------------------------------
+# Content similarity  (Phase 3, docs/logic.md sections 1-3)
+# ------------------------------------------------------------------
+# What makes two products "related", agreed with the web team 2026-09-08.
+# All four facets matter; season is a hard filter rather than a score.
+# Recorded in caveats.md section 6 so the criteria can be revisited.
+#
+# A tag joins a facet if it CONTAINS one of these keywords, matched on the
+# normalised (lowercased, de-pluralised) tag. Substring rather than exact
+# because this catalog writes "chunky blend", "chunky tag" and "chunky-vo" for
+# the same idea.
+SIMILARITY_FACETS = {
+    "motif": (
+        "graphic", "stripe", "football", "word", "solid", "inset",
+        "fair isle", "print", "floral", "heart", "star", "flag", "skull",
+    ),
+    "fabric": (
+        "cotton", "wool", "chunky", "lightweight", "blend", "cashmere",
+        "linen", "jersey",
+    ),
+    "colour": (
+        "neutral", "dark", "white", "black", "grassy", "blue", "red",
+        "green", "pink", "brown", "grey", "gray", "bright",
+    ),
+}
+
+# How much each facet contributes. Silhouette is not tag-based - it comes from
+# product_type_normalised - so it is scored separately but weighted here.
+# They need not sum to 1; scores are comparable within one anchor's pool, which
+# is all ranking needs.
+SIMILARITY_WEIGHTS = {
+    "motif": 3.0,       # the most visible thing a shopper matches on
+    "fabric": 2.0,      # chunky next to lightweight looks wrong
+    "colour": 1.5,
+    "silhouette": 1.5,  # crew with crew, v-neck with v-neck
+}
+
+# Hard rule: a recommendation must be in the same season as the anchor.
+# Decided 2026-09-08. Halves the candidate pool (152 autumn / 102 spring), so
+# revisit if pools come out thin.
+REQUIRE_SAME_SEASON = True
+
+# Products with no season tag (4 of 258 on 2026-09-08) would match nothing
+# under the rule above. They fall back to ignoring season rather than shipping
+# an empty pool.
+SEASONLESS_IGNORES_SEASON = True
+
+# How deep to store. STORED_LIST_DEPTH above is the general rule; pools use the
+# same number for the same reason - the gate, the anchor exclusion and the
+# colorway dedupe all remove items at render.
+POOL_DEPTH = STORED_LIST_DEPTH

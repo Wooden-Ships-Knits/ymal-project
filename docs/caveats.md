@@ -158,3 +158,51 @@ are provisional until this number exists.
 Three of the five clear the moment the Sheet exists. The order-history question
 is on Shopify's timeline, not ours — which is why the approval request should
 go in first, not last.
+
+---
+
+## 6. Similarity criteria — what makes two products "related"
+
+**Agreed 2026-09-08 with the web team.** Recorded here so the criteria can be
+changed later without re-deriving why they were chosen.
+
+All four facets count, weighted. The weights live in
+`backend/ymal/settings.py` as `SIMILARITY_WEIGHTS` and can be retuned without
+touching the scoring code.
+
+| Facet | Weight | Source |
+|---|---|---|
+| Motif / pattern | 3.0 | tags: graphic, stripe, football, word, solid, inset, fair isle |
+| Fabric / weight | 2.0 | tags: cotton, wool, chunky, lightweight, blend |
+| Colour family | 1.5 | tags: neutral, dark, white, black, grassy |
+| Silhouette | 1.5 | `product_type_normalised`, not tags |
+
+Motif is weighted highest because it is the most visible thing a shopper
+matches on. Rarer tags count for more than common ones (IDF), so `football`
+(18% of the catalog) says far more about similarity than `cotton-vo` (54%).
+
+**Season is a hard filter, not a score.** A recommendation must be in the same
+season as the anchor. This halves the candidate pool — 152 autumn, 102 spring —
+so revisit it if pools ever come out thin. Set `REQUIRE_SAME_SEASON = False` to
+lift it.
+
+The 4 products with no season tag ignore the rule rather than ship an empty
+pool (`SEASONLESS_IGNORES_SEASON`).
+
+### What is deliberately NOT a signal
+
+- **Price.** Measured 2026-09-08: every eligible product is $137-$159, a 16%
+  spread clustered on a handful of values. Price cannot distinguish anything on
+  this catalog. Revisit if the range ever widens.
+- **Sales velocity.** That is Trending and Top Selling, which are their own
+  blocks. Folding popularity into similarity would make every pool converge on
+  the same bestsellers.
+
+### To change the criteria
+
+1. Edit `SIMILARITY_FACETS` or `SIMILARITY_WEIGHTS` in `backend/ymal/settings.py`
+2. `cd backend && python -m scripts.build_pools --show "SOME PRODUCT TITLE"`
+3. Read the pool and decide whether it looks better
+
+Nothing is published to Shopify by that script, so retuning is free.
+
