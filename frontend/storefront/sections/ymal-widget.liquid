@@ -64,7 +64,19 @@
       {%- comment -%} Never recommend the product being viewed. {%- endcomment -%}
       {%- if product != blank and item.id == product.id -%}{%- continue -%}{%- endif -%}
 
-      {%- capture card -%}{%- render 'ymal-card', product: item, grid: section.settings.columns -%}{%- endcapture -%}
+      {%- comment -%}
+        `grid` is an image-resolution hint, not a layout instruction. With a
+        fixed card width, how many fit across the screen is what matters for
+        sharpness - not the column count, which only applies when the width is
+        automatic. Roughly 1600px of viewport divided by the card width.
+      {%- endcomment -%}
+      {%- if section.settings.card_width > 0 -%}
+        {%- assign image_cols = 1600 | divided_by: section.settings.card_width -%}
+        {%- assign image_cols = image_cols | at_least: 1 | at_most: 6 -%}
+      {%- else -%}
+        {%- assign image_cols = section.settings.columns -%}
+      {%- endif -%}
+      {%- capture card -%}{%- render 'ymal-card', product: item, grid: image_cols -%}{%- endcapture -%}
       {%- assign trimmed = card | strip -%}
       {%- unless trimmed == blank -%}
         <div class="ymal__card">{{ card }}</div>
@@ -618,8 +630,8 @@
       "id": "card_width",
       "label": "Card width",
       "min": 0,
-      "max": 400,
-      "step": 4,
+      "max": 800,
+      "step": 10,
       "default": 0,
       "unit": "px",
       "info": "0 means cards stretch to fill the columns. The app blocks on this store use 236."

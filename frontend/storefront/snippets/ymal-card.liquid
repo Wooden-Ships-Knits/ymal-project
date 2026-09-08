@@ -5,7 +5,12 @@
   ineligible product renders as nothing at all, and the caller skips the gap.
 
   Usage:
-    {%- render 'ymal-card', product: some_product -%}
+    {%- render 'ymal-card', product: some_product, grid: 4 -%}
+
+  `grid` is how many of these cards fit across the screen. It only sets the
+  resolution asked of Shopify's image CDN - wider cards need a bigger source
+  or they look soft - and never the displayed size, which is CSS. Optional,
+  defaults to 4.
 
   ---------------------------------------------------------------------------
   Why this builds its own card instead of rendering the theme's product-block
@@ -58,10 +63,11 @@
     <a class="ymal-card__link" href="{{ product.url }}">
       <div class="ymal-card__media">
         {%- if product.featured_media -%}
+          {%- assign ymal_grid = grid | default: 4 -%}
           {%- render 'image' with product.featured_media.preview_image,
                 loading: 'lazy',
                 size_cols_mobile: 2,
-                size_cols_desktop: 4,
+                size_cols_desktop: ymal_grid,
                 custom_crop: 'cover' -%}
         {%- else -%}
           {{ 'product-1' | placeholder_svg_tag }}
