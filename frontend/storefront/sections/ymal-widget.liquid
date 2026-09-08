@@ -155,11 +155,24 @@
 
     A flex or grid item defaults to min-width:auto, so a long product title
     pushes the card wider than its track instead of wrapping.
+
+    The same inline default applies to the card's inner wrappers - the theme
+    styles them from rules that assume its own product grid as an ancestor.
+    Forcing them to block is what puts the price on its own line under the
+    title rather than trailing after it.
   {%- endcomment -%}
   #shopify-section-{{ section.id }} .ymal__card {
     min-width: 0;
   }
-  #shopify-section-{{ section.id }} .ymal__card product-block {
+  #shopify-section-{{ section.id }} .ymal__card product-block,
+  #shopify-section-{{ section.id }} .ymal__card .block-inner,
+  #shopify-section-{{ section.id }} .ymal__card .block-inner-inner,
+  #shopify-section-{{ section.id }} .ymal__card .product-block__detail,
+  #shopify-section-{{ section.id }} .ymal__card .product-block__detail .inner,
+  #shopify-section-{{ section.id }} .ymal__card .product-block__detail .innerer,
+  #shopify-section-{{ section.id }} .ymal__card .product-link,
+  #shopify-section-{{ section.id }} .ymal__card .product-block__title,
+  #shopify-section-{{ section.id }} .ymal__card .product-price {
     display: block;
     width: 100%;
   }
