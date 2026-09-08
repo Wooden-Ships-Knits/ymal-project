@@ -21,7 +21,7 @@ import csv
 import json
 from collections import Counter
 
-from ymal import settings
+from ymal import settings, verify
 from ymal.catalog import (
     count_products,
     fetch_active_products,
@@ -193,6 +193,20 @@ def main() -> None:
     print(f"  → {json_path}")
 
     # The number Phase 1 exists to produce (docs/caveats.md §2).
+    # Check the result against the rule as stated in words, not against the
+    # code that produced it. A bug in eligibility.py cannot pass this by
+    # agreeing with itself.
+    problems = verify.check(rows)
+    print("\n" + "-" * 52)
+    if problems:
+        print("  FAILED SELF-CHECK - the list is wrong, do not publish it:")
+        for problem in problems:
+            print(f"    {problem}")
+    else:
+        print("  OK: self-check passed. Every eligible product is stocked at")
+        print(f"      Bali, carries no {settings.SALE_MARKER}, and is published.")
+    print("-" * 52)
+
     print("\n" + "-" * 52)
     if summary["eligible"] < 100:
         print("  WARNING: Under 100 eligible products. The 30-deep pool and")
