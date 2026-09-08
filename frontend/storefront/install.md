@@ -1,130 +1,132 @@
-# Installing Recently Viewed
+# Installing YMAL on the theme
 
-Ships on its own. No backend, no metafields, no config — the one block that can
-go live before anything else exists.
+The web team adds a YMAL block the same way they add a Wiser one: in the theme
+editor, from the block list. Wiser's appear under **Apps** because Wiser is an
+installed app shipping theme app extensions. YMAL's are theme sections, so they
+appear under **Sections** instead. Same drag, same settings panel, no app to
+install or host.
 
 **Back up the theme first.** Duplicate it, work on the copy, preview, publish.
 Non-negotiable on a live store.
 
 ---
 
-## 1. Copy three files into the theme
+## 1. Run the publish job first
+
+The card template fails closed: a product with no `ymal.eligible` metafield
+does not render. Install before publishing and every block will be empty.
+
+```bash
+cd backend
+.venv/bin/python -m scripts.publish_all --dry-run
+.venv/bin/python -m scripts.publish_all
+```
+
+## 2. Copy four files into the theme
 
 | From here | Into the theme |
 |---|---|
-| `assets/ymal-recently-viewed.js` | `assets/` |
+| `sections/ymal-widget.liquid` | `sections/` |
+| `snippets/ymal-card.liquid` | `snippets/` |
 | `snippets/ymal-recently-viewed.liquid` | `snippets/` |
 | `templates/product.ymal-card.liquid` | `templates/` |
+| `assets/ymal-recently-viewed.js` | `assets/` |
 
-## 2. Point the card template at the theme's real card
+## 3. Point the card at the theme's real card snippet
 
-`templates/product.ymal-card.liquid` ships with placeholder markup. Find the
-theme's own card snippet — usually `snippets/card-product.liquid` or
-`snippets/product-card.liquid` — and render that instead:
-
-```liquid
-{%- if product.available -%}
-  {%- render 'card-product', card_product: product -%}
-{%- endif -%}
-```
-
-This is the step that makes the block look native rather than bolted on. Do not
-skip it and ship the placeholder.
-
-## 3. Add the render tags
-
-**`templates/product.liquid`** (or the product section), where the widget
-should appear:
+`snippets/ymal-card.liquid` ships with placeholder markup. Find the theme's own
+card snippet - usually `snippets/card-product.liquid` or
+`snippets/product-card.liquid` - and render that instead:
 
 ```liquid
-{%- render 'ymal-recently-viewed',
-      page_type: 'product',
-      anchor: product,
-      heading: 'Recently Viewed',
-      slots: 4 -%}
+{%- render 'card-product', card_product: product -%}
 ```
 
-`anchor: product` does two jobs — it records the product being viewed, and
-keeps that product out of its own block.
+**Do not skip this and ship the placeholder.** It is the step that makes the
+block look native rather than bolted on.
 
-**Anywhere else** (home, cart, collection), omit the anchor:
+Leave the eligibility check above it exactly as it is. That check is the whole
+point, and this file is the only place it lives.
 
-```liquid
-{%- render 'ymal-recently-viewed', page_type: 'home', slots: 6 -%}
-```
+## 4. Add blocks in the theme editor
 
-## 4. Check it
+Open the theme editor, pick a template, **Add section** -> **YMAL
+Recommendations**. Then set:
 
-1. Open a product page. Nothing should appear — one view, and it is the anchor.
-2. Open a second product. The first one appears.
-3. Open a third. Two appear, newest first.
-4. `localStorage.getItem('ymal:viewed')` in the console shows handles and
-   timestamps, nothing else.
-5. Sell out a test product, or unpublish it, and confirm it drops out of the
-   block on the next load.
-6. Open a private window. The block should be absent — not empty, absent.
+| Setting | Notes |
+|---|---|
+| Block | Featured needs a product to be about, so it only works on a product page |
+| Heading | The web team's words |
+| Products to show | 2-12. Fewer may appear once the gate has run |
+| Page type | Used for tracking, so Analytics can group by page |
+
+Add the section more than once for more than one block on a page.
 
 ---
 
-## How it behaves
+## What to check before publishing
+
+1. **Preview, do not publish.** The theme editor previews on the live store
+   without affecting shoppers.
+2. **No `*SALE*` product appears in any block.** Search a block's rendered
+   products for the marker. One appearing means the gate is broken.
+3. **No fixed-stock product appears.** Cross-check a few against
+   `backend/data/phase1/active_products.csv` - anything with `eligible` false
+   must not be on screen.
+4. **A block with nothing to show renders nothing** - no stray heading.
+5. **Recently Viewed:** open a product page, see nothing (one view, and it is
+   the anchor); open a second, the first appears; open a third, two appear.
+6. **Private window:** Recently Viewed should be absent, not empty.
+
+## The kill switch
+
+Delete the section in the theme editor, or toggle its visibility. There is no
+deploy involved either way.
+
+For a store-wide stop without touching the theme, unpublish the metafields:
+every block except Recently Viewed then renders nothing, because the gate fails
+closed.
+
+## Where each block's list comes from
+
+| Block | Source |
+|---|---|
+| Featured | `product.metafields.ymal.featured` - this product's own pool |
+| Trending | `shop.metafields.ymal.trending` |
+| Top Selling | `shop.metafields.ymal.top_selling` |
+| New Arrivals | `shop.metafields.ymal.new_arrivals` |
+| Recently Viewed | the shopper's browser, no metafield at all |
+
+All four metafields are `list.product_reference`, so Liquid receives the live
+product object - a list written at 03:00 renders today's price at noon, and a
+product that sold out in between renders nothing.
+
+## Recently Viewed, specifically
+
+Ships on its own. No backend, no metafields, no config - the one block that can
+go live before anything else exists.
+
+It stores `{handle, id, ts}` for twenty products in `localStorage` and nothing
+else, and never leaves the device. Title, price, image and availability are
+fetched fresh from the theme on every render, so a handle stored three weeks
+ago still shows today's price.
+
+Per browser by nature: the same person on a phone and a laptop has two
+different lists. Every store works this way, Wiser almost certainly included.
 
 | Situation | What happens |
 |---|---|
-| No history yet | Section stays `hidden`. No empty heading. |
-| Private browsing / storage blocked | Same — the storage call throws, is caught, and the block never unhides. |
-| Product sold out since it was viewed | The card template renders nothing, the script skips it. |
-| Product is `*SALE*` or fixed stock | Same - the gate rejects it, the script skips it. |
-| `ymal.eligible` never published | Nothing renders. Fail closed, by design. Run the publish job. |
+| No history yet | Section stays hidden. No empty heading. |
+| Private browsing / storage blocked | The storage call throws, is caught, and the block never unhides. |
+| Product sold out, on `*SALE*`, or fixed stock | The gate rejects it, the script skips it. |
 | Product deleted or handle renamed | The fetch fails, the script skips it. |
-| Fewer surviving cards than `slots` | Renders what it has. |
 | Nothing survives | Section stays hidden. |
-
-## What it stores
-
-`{handle, id, ts}` — twenty entries, newest first. Nothing else, and it never
-leaves the device. Title, price, image and availability are fetched fresh from
-the theme on every render, so a handle stored three weeks ago still shows
-today's price.
-
-Per browser by nature: the same person on a phone and a laptop has two
-different lists. Every store works this way; Wiser almost certainly included.
 
 ## Tracking
 
 The script calls `window.ymalTrack(name, detail)` if it exists and does nothing
-if it does not — so this block can ship before the events module does, and
-starts reporting the moment that lands.
+if it does not, so blocks can ship before the events module does and start
+reporting the moment it lands.
 
-Events carry `block: 'recently_viewed'` and the page template. Without those
-two fields the Analytics tab has nothing to group by.
-
-## The eligibility gate
-
-**Settled 2026-09-05: the rule applies here too.** No `*SALE*` products, and
-only unfix (Bali To Produce) products, exactly as everywhere else.
-
-`templates/product.ymal-card.liquid` is the gate, and the only one. A product
-renders only if all three hold:
-
-| Check | Source |
-|---|---|
-| `product.available` | Liquid, live |
-| title has no `*SALE*` | Liquid, live |
-| `product.metafields.ymal.eligible` | published by `scripts/publish_eligibility.py` |
-
-The third cannot be computed in Liquid - it sees store-wide inventory totals
-but never inventory by location, so it has no way to know a product is stocked
-at Bali To Produce.
-
-**It fails closed.** A product with no `ymal.eligible` metafield does not
-render. "We have not checked" must not display as "fine to show" - that is the
-Wiser failure this project exists to fix. So run the publish job before
-installing this, or the block will be empty:
-
-```bash
-cd backend
-python -m scripts.publish_eligibility --dry-run
-python -m scripts.publish_eligibility
-```
-
-Re-run it whenever eligibility changes - nightly, after `fetch_products`.
+Events carry `block` and the page type. Without those two fields the Analytics
+tab has nothing to group by.

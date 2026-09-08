@@ -1,0 +1,61 @@
+{%- comment -%}
+  YMAL — one product card, and THE eligibility gate.
+
+  Every block renders through this, so the rule lives in exactly one file. An
+  ineligible product renders as nothing at all, and the caller skips the gap.
+
+  Usage:
+    {%- render 'ymal-card', product: some_product -%}
+
+  The rule (docs/logic.md 4.1), as the storefront can see it:
+
+  1. available    purchasable right now. Liquid knows this directly.
+  2. not *SALE*   markdown. Liquid can read the title, so it is checked here as
+                  well as in the metafield - it costs nothing and holds even if
+                  the metafield is stale.
+  3. eligible     stocked at Bali To Produce, so replenishable rather than
+                  fixed. Liquid CANNOT compute this: it sees store-wide
+                  inventory totals but never inventory by location. The
+                  pipeline publishes it to product.metafields.ymal.eligible
+                  (backend/scripts/publish_eligibility.py).
+
+  FAILS CLOSED. No metafield means no card. "We have not checked" must not
+  render as "fine to show" - that is the Wiser failure this project exists to
+  fix. The visible cost is an empty block until the publish job has run, which
+  is a problem someone notices.
+
+  `.value`, not the metafield object: the object EXISTS even when it holds
+  false, so testing it directly is truthy for an ineligible product and would
+  fail open.
+{%- endcomment -%}
+
+{%- assign ymal_eligible = product.metafields.ymal.eligible.value -%}
+
+{%- assign ymal_is_sale = false -%}
+{%- if product.title contains '*SALE*' -%}
+  {%- assign ymal_is_sale = true -%}
+{%- endif -%}
+
+{%- if product.available and ymal_eligible and ymal_is_sale == false -%}
+  {%- comment -%}
+    PLACEHOLDER. Replace with the theme's own card snippet so the block looks
+    native and stays that way when the theme changes. Usually one of:
+
+      {%- render 'card-product', card_product: product -%}
+      {%- render 'product-card', product: product -%}
+  {%- endcomment -%}
+  <a class="ymal__link" href="{{ product.url }}">
+    {%- if product.featured_image -%}
+      <img
+        class="ymal__image"
+        src="{{ product.featured_image | image_url: width: 400 }}"
+        alt="{{ product.featured_image.alt | escape }}"
+        width="400"
+        height="{{ 400 | divided_by: product.featured_image.aspect_ratio | round }}"
+        loading="lazy"
+      >
+    {%- endif -%}
+    <span class="ymal__name">{{ product.title | escape }}</span>
+    <span class="ymal__price">{{ product.price | money }}</span>
+  </a>
+{%- endif -%}

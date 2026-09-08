@@ -1,0 +1,150 @@
+{%- comment -%}
+  YMAL — one recommendation block, placed from the theme editor.
+
+  Add it the same way the web team adds a Wiser block: Add section -> YMAL
+  Recommendations, then choose which block, the heading and the slot count.
+  Wiser's appear under Apps because Wiser is an installed app shipping theme
+  app extensions; this is a theme section, so it appears under Sections.
+
+  Add it more than once for more than one block on a page.
+
+  Where each block's list comes from:
+
+    featured         product.metafields.ymal.featured   (this product's pool)
+    trending         shop.metafields.ymal.trending
+    top_selling      shop.metafields.ymal.top_selling
+    new_arrivals     shop.metafields.ymal.new_arrivals
+    recently_viewed  the shopper's own browser, no metafield at all
+
+  All four metafields are list.product_reference, so Liquid gets the LIVE
+  product - today's price, today's stock - from a list written at 03:00.
+
+  Every card renders through snippets/ymal-card.liquid, which is the
+  eligibility gate. An ineligible product renders nothing and is skipped, so a
+  block can come out shorter than its slot count. That is correct: showing a
+  fixed-stock or *SALE* product is the failure this project exists to prevent.
+{%- endcomment -%}
+
+{%- liquid
+  assign block_id = section.settings.block
+  assign slots = section.settings.slots | default: 6
+  assign items = null
+
+  case block_id
+    when 'featured'
+      assign items = product.metafields.ymal.featured.value
+    when 'trending'
+      assign items = shop.metafields.ymal.trending.value
+    when 'top_selling'
+      assign items = shop.metafields.ymal.top_selling.value
+    when 'new_arrivals'
+      assign items = shop.metafields.ymal.new_arrivals.value
+  endcase
+-%}
+
+{%- if block_id == 'recently_viewed' -%}
+  {%- comment -%} Rendered client-side; the snippet ships its own script. {%- endcomment -%}
+  {%- render 'ymal-recently-viewed',
+        page_type: section.settings.page_type,
+        anchor: product,
+        heading: section.settings.heading,
+        slots: slots -%}
+
+{%- else -%}
+  {%- comment -%}
+    Render the cards to a variable FIRST, then decide whether to draw the
+    heading. A heading with nothing under it is worse than no block at all,
+    and we cannot know the block is empty until the gate has run on every
+    candidate.
+  {%- endcomment -%}
+  {%- capture ymal_cards -%}
+    {%- assign shown = 0 -%}
+    {%- for item in items -%}
+      {%- if shown >= slots -%}{%- break -%}{%- endif -%}
+      {%- comment -%} Never recommend the product being viewed. {%- endcomment -%}
+      {%- if product != blank and item.id == product.id -%}{%- continue -%}{%- endif -%}
+
+      {%- capture card -%}{%- render 'ymal-card', product: item -%}{%- endcapture -%}
+      {%- assign trimmed = card | strip -%}
+      {%- unless trimmed == blank -%}
+        <li class="ymal__card">{{ card }}</li>
+        {%- assign shown = shown | plus: 1 -%}
+      {%- endunless -%}
+    {%- endfor -%}
+  {%- endcapture -%}
+
+  {%- assign has_cards = ymal_cards | strip -%}
+  {%- if has_cards != blank -%}
+    <section
+      class="ymal ymal--{{ block_id }}"
+      data-ymal-block="{{ block_id }}"
+      data-ymal-page="{{ section.settings.page_type | escape }}"
+    >
+      {%- if section.settings.heading != blank -%}
+        <h2 class="ymal__title">{{ section.settings.heading | escape }}</h2>
+      {%- endif -%}
+      <ul class="ymal__grid">{{ ymal_cards }}</ul>
+    </section>
+  {%- endif -%}
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "YMAL Recommendations",
+  "tag": "section",
+  "class": "ymal-section",
+  "settings": [
+    {
+      "type": "select",
+      "id": "block",
+      "label": "Block",
+      "default": "featured",
+      "info": "Featured needs a product to be about, so it only works on a product page.",
+      "options": [
+        { "value": "featured", "label": "Featured Products" },
+        { "value": "trending", "label": "Trending Products" },
+        { "value": "top_selling", "label": "Top Selling" },
+        { "value": "new_arrivals", "label": "New Arrivals" },
+        { "value": "recently_viewed", "label": "Recently Viewed" }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "You May Also Like"
+    },
+    {
+      "type": "range",
+      "id": "slots",
+      "label": "Products to show",
+      "min": 2,
+      "max": 12,
+      "step": 1,
+      "default": 6,
+      "info": "Fewer may appear: sold-out, markdown and fixed-stock products are filtered out at render."
+    },
+    {
+      "type": "select",
+      "id": "page_type",
+      "label": "Page type",
+      "default": "product",
+      "info": "Used for tracking, so Analytics can group by page.",
+      "options": [
+        { "value": "product", "label": "Product" },
+        { "value": "home", "label": "Home" },
+        { "value": "cart", "label": "Cart" },
+        { "value": "collection", "label": "Collection" },
+        { "value": "search", "label": "Search" },
+        { "value": "not_found", "label": "404" },
+        { "value": "blog", "label": "Blog" },
+        { "value": "account", "label": "Account" },
+        { "value": "thank_you", "label": "Thank you" }
+      ]
+    }
+  ],
+  "presets": [
+    { "name": "YMAL Recommendations" }
+  ]
+}
+{% endschema %}
