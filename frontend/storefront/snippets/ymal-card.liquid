@@ -5,10 +5,24 @@
   ineligible product renders as nothing at all, and the caller skips the gap.
 
   Usage:
-    {%- render 'ymal-card', product: some_product, grid: 4 -%}
+    {%- render 'ymal-card', product: some_product -%}
 
-  `grid` is the desktop column count and is only an image-sizing hint. Optional,
-  defaults to 4.
+  ---------------------------------------------------------------------------
+  Why this builds its own card instead of rendering the theme's product-block
+
+  product-block is styled contextually - its rules assume it sits inside the
+  theme's own product grid. Lifted into a different container it fell apart in
+  ways that could not be overridden from outside: the price rendered beside the
+  title rather than beneath it, even against id-scoped !important rules.
+
+  So the markup here is ours and the layout is predictable. It still uses the
+  theme's `image` and `price` snippets, so images are responsive and prices are
+  formatted, localised and show sale styling exactly as everywhere else.
+
+  What is given up: the hover-image swap, colour swatches, and the theme's
+  stock labels. Those live in product-block and are not worth re-implementing
+  for a recommendation strip.
+  ---------------------------------------------------------------------------
 
   The rule (docs/logic.md 4.1), as the storefront can see it:
 
@@ -40,16 +54,34 @@
 {%- endif -%}
 
 {%- if product.available and ymal_eligible and ymal_is_sale == false -%}
-  {%- comment -%}
-    The theme's own card, so the block looks native and stays that way when the
-    theme changes.
+  <div class="ymal-card">
+    <a class="ymal-card__link" href="{{ product.url }}">
+      <div class="ymal-card__media">
+        {%- if product.featured_media -%}
+          {%- render 'image' with product.featured_media.preview_image,
+                loading: 'lazy',
+                size_cols_mobile: 2,
+                size_cols_desktop: 4,
+                custom_crop: 'cover' -%}
+        {%- else -%}
+          {{ 'product-1' | placeholder_svg_tag }}
+        {%- endif -%}
+      </div>
 
-    `grid` is the desktop column count, used only for image sizing.
-    product-block falls back to `section.settings.grid` when it is missing, and
-    the YMAL section has no such setting - left blank, images size wrongly. A
-    snippet cannot see `section` (render isolates scope), so the caller passes
-    it in and it must match the CSS in sections/ymal-widget.liquid.
-  {%- endcomment -%}
-  {%- assign ymal_grid = grid | default: 4 -%}
-  {%- render 'product-block', product: product, grid: ymal_grid -%}
+      <div class="ymal-card__title">{{ product.title | escape }}</div>
+
+      <div class="ymal-card__price">
+        {%- render 'price', product: product, show_labels: true -%}
+      </div>
+    </a>
+
+    {%- comment -%}
+      Links to the product rather than opening a quick-buy drawer. The theme's
+      quick buy is wired to its own card markup, and a link that always works
+      beats a button that sometimes does.
+    {%- endcomment -%}
+    <a class="ymal-card__button btn btn--secondary" href="{{ product.url }}">
+      {{ 'products.product.quick_buy' | t | default: 'Choose Option' }}
+    </a>
+  </div>
 {%- endif -%}

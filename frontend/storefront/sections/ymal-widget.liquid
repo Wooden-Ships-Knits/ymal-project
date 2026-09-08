@@ -147,74 +147,59 @@
   }
 
   {%- comment -%}
-    Two defaults that break a card lifted out of the theme's own grid:
-
-    `product-block` is a custom element, and an unknown element defaults to
-    display:inline - which runs the title and price together on one line and
-    lets the text flow out of the card.
-
-    A flex or grid item defaults to min-width:auto, so a long product title
-    pushes the card wider than its track instead of wrapping.
-
-    The same inline default applies to the card's inner wrappers - the theme
-    styles them from rules that assume its own product grid as an ancestor.
-    Forcing them to block is what puts the price on its own line under the
-    title rather than trailing after it.
+    The card markup is ours (snippets/ymal-card.liquid), so its layout is
+    stated here rather than fought for against the theme's contextual rules.
+    Type, colour and the button's own styling still come from the theme.
   {%- endcomment -%}
   #shopify-section-{{ section.id }} .ymal__card {
     min-width: 0;
   }
-
+  #shopify-section-{{ section.id }} .ymal-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+  #shopify-section-{{ section.id }} .ymal-card__link {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    text-decoration: none;
+    color: inherit;
+  }
+  #shopify-section-{{ section.id }} .ymal-card__media {
+    aspect-ratio: {{ section.settings.image_ratio }};
+    overflow: hidden;
+    background: rgba(0, 0, 0, .03);
+  }
+  #shopify-section-{{ section.id }} .ymal-card__media img,
+  #shopify-section-{{ section.id }} .ymal-card__media svg {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  #shopify-section-{{ section.id }} .ymal-card__title {
+    font-size: {{ section.settings.card_text_size }}px;
+    line-height: 1.35;
+  }
+  #shopify-section-{{ section.id }} .ymal-card__price {
+    font-size: {{ section.settings.card_text_size }}px;
+  }
   {%- comment -%}
-    Lay the card out ourselves rather than relying on the theme's rules, which
-    assume the card sits inside its own product grid. Stacked in a column:
-    image, then title, then price, then the button - the same order the app
-    block on this store uses.
-
-    `!important` is deliberate and is confined to this section by the id
-    prefix. The theme's own card styling is contextual and was winning in ways
-    that put the price beside the title; overriding a handful of layout
-    properties is more predictable than chasing each rule.
+    Pushed to the bottom so buttons line up across cards whose titles wrap to
+    different numbers of lines.
   {%- endcomment -%}
-  #shopify-section-{{ section.id }} .ymal__card product-block,
-  #shopify-section-{{ section.id }} .ymal__card .block-inner,
-  #shopify-section-{{ section.id }} .ymal__card .block-inner-inner {
-    display: block !important;
-    width: 100% !important;
-    float: none !important;
+  #shopify-section-{{ section.id }} .ymal-card__button {
+    display: block;
+    width: 100%;
+    margin-top: auto;
+    text-align: center;
   }
-
-  #shopify-section-{{ section.id }} .ymal__card .product-block__detail,
-  #shopify-section-{{ section.id }} .ymal__card .product-block__detail .inner,
-  #shopify-section-{{ section.id }} .ymal__card .product-block__detail .innerer,
-  #shopify-section-{{ section.id }} .ymal__card .product-link {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: stretch !important;
-    width: 100% !important;
-    float: none !important;
-    gap: 4px;
+  {%- unless section.settings.show_button -%}
+  #shopify-section-{{ section.id }} .ymal-card__button {
+    display: none;
   }
-
-  #shopify-section-{{ section.id }} .ymal__card .product-block__title,
-  #shopify-section-{{ section.id }} .ymal__card .product-price,
-  #shopify-section-{{ section.id }} .ymal__card .product-price--block,
-  #shopify-section-{{ section.id }} .ymal__card .vendor,
-  #shopify-section-{{ section.id }} .ymal__card .product-block__subtitle {
-    display: block !important;
-    width: 100% !important;
-    float: none !important;
-    margin-inline: 0 !important;
-  }
-
-  {%- comment -%}
-    The quick-buy button spans the card, the way the app block's "Choose
-    Option" does.
-  {%- endcomment -%}
-  #shopify-section-{{ section.id }} .ymal__card .quickbuy-toggle.btn {
-    display: block !important;
-    width: 100% !important;
-  }
+  {%- endunless -%}
 
   #shopify-section-{{ section.id }} .ymal__grid {
     display: grid;
@@ -591,6 +576,42 @@
       "step": 4,
       "default": 48,
       "unit": "px"
+    },
+    {
+      "type": "select",
+      "id": "image_ratio",
+      "label": "Image shape",
+      "default": "7 / 9",
+      "options": [
+        {
+          "value": "7 / 9",
+          "label": "Portrait"
+        },
+        {
+          "value": "1 / 1",
+          "label": "Square"
+        },
+        {
+          "value": "4 / 3",
+          "label": "Landscape"
+        }
+      ]
+    },
+    {
+      "type": "range",
+      "id": "card_text_size",
+      "label": "Card text size",
+      "min": 10,
+      "max": 22,
+      "step": 1,
+      "default": 13,
+      "unit": "px"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_button",
+      "label": "Show the button",
+      "default": true
     },
     {
       "type": "range",

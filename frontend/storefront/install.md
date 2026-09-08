@@ -32,26 +32,29 @@ cd backend
 | `templates/product.ymal-card.liquid` | `templates/` |
 | `assets/ymal-recently-viewed.js` | `assets/` |
 
-## 3. Check the card snippet matches this theme
+## 3. The card is ours, not the theme's
 
-`snippets/ymal-card.liquid` renders the theme's own card:
+`snippets/ymal-card.liquid` builds its own card: image, title, price, button.
 
-```liquid
-{%- render 'product-block', product: product, grid: ymal_grid -%}
-```
+It was originally rendering the theme's `product-block`, which looked right in
+principle - the theme's card, so it matches the site. In practice that card is
+styled contextually: its rules assume it sits inside the theme's own product
+grid, and lifted into a different container the price rendered beside the title
+instead of beneath it. That could not be corrected from outside, even with
+id-scoped `!important` rules.
 
-That is correct for this store's theme (verified 2026-09-08). A different theme
-names its card something else - look in Snippets for `card-product`,
-`product-card`, `product-item` or similar, and check what parameters its header
-comment documents.
+So the layout is stated rather than inherited. It still uses the theme's
+`image` and `price` snippets, so images stay responsive and prices are
+formatted, localised and styled for sale exactly as everywhere else on the
+site.
 
-`grid` is the desktop column count and only sizes images. It is passed in
-because `product-block` otherwise falls back to `section.settings.grid`, which
-the YMAL section does not define - and because a Liquid `render` cannot see
-`section` at all.
+What is given up: the hover-image swap, colour swatches, and the theme's stock
+labels. Those live in `product-block` and were judged not worth
+re-implementing for a recommendation strip. If you want them later, the place
+to add them is this one file.
 
-Leave the eligibility check above it exactly as it is. That check is the whole
-point, and this file is the only place it lives.
+Leave the eligibility check at the top exactly as it is. That check is the
+whole point, and this file is the only place it lives.
 
 ## 4. Add blocks in the theme editor
 
