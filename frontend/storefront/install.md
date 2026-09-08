@@ -73,6 +73,8 @@ keeps that product out of its own block.
 | No history yet | Section stays `hidden`. No empty heading. |
 | Private browsing / storage blocked | Same — the storage call throws, is caught, and the block never unhides. |
 | Product sold out since it was viewed | The card template renders nothing, the script skips it. |
+| Product is `*SALE*` or fixed stock | Same - the gate rejects it, the script skips it. |
+| `ymal.eligible` never published | Nothing renders. Fail closed, by design. Run the publish job. |
 | Product deleted or handle renamed | The fetch fails, the script skips it. |
 | Fewer surviving cards than `slots` | Renders what it has. |
 | Nothing survives | Section stays hidden. |
@@ -96,10 +98,33 @@ starts reporting the moment that lands.
 Events carry `block: 'recently_viewed'` and the page template. Without those
 two fields the Analytics tab has nothing to group by.
 
-## Open question this block raises
+## The eligibility gate
 
-Should the eligibility gate apply here? The shopper chose to look at these
-products. Hiding a `*SALE*` item someone just viewed is strange, so the current
-behaviour filters on `product.available` only — purchasable, nothing more. If
-that turns out to be wrong, the check lives in
-`templates/product.ymal-card.liquid` and nowhere else.
+**Settled 2026-09-05: the rule applies here too.** No `*SALE*` products, and
+only unfix (Bali To Produce) products, exactly as everywhere else.
+
+`templates/product.ymal-card.liquid` is the gate, and the only one. A product
+renders only if all three hold:
+
+| Check | Source |
+|---|---|
+| `product.available` | Liquid, live |
+| title has no `*SALE*` | Liquid, live |
+| `product.metafields.ymal.eligible` | published by `scripts/publish_eligibility.py` |
+
+The third cannot be computed in Liquid - it sees store-wide inventory totals
+but never inventory by location, so it has no way to know a product is stocked
+at Bali To Produce.
+
+**It fails closed.** A product with no `ymal.eligible` metafield does not
+render. "We have not checked" must not display as "fine to show" - that is the
+Wiser failure this project exists to fix. So run the publish job before
+installing this, or the block will be empty:
+
+```bash
+cd backend
+python -m scripts.publish_eligibility --dry-run
+python -m scripts.publish_eligibility
+```
+
+Re-run it whenever eligibility changes - nightly, after `fetch_products`.
