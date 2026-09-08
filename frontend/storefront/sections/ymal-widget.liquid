@@ -64,10 +64,10 @@
       {%- comment -%} Never recommend the product being viewed. {%- endcomment -%}
       {%- if product != blank and item.id == product.id -%}{%- continue -%}{%- endif -%}
 
-      {%- capture card -%}{%- render 'ymal-card', product: item -%}{%- endcapture -%}
+      {%- capture card -%}{%- render 'ymal-card', product: item, grid: section.settings.columns -%}{%- endcapture -%}
       {%- assign trimmed = card | strip -%}
       {%- unless trimmed == blank -%}
-        <li class="ymal__card">{{ card }}</li>
+        <div class="ymal__card">{{ card }}</div>
         {%- assign shown = shown | plus: 1 -%}
       {%- endunless -%}
     {%- endfor -%}
@@ -75,18 +75,58 @@
 
   {%- assign has_cards = ymal_cards | strip -%}
   {%- if has_cards != blank -%}
-    <section
-      class="ymal ymal--{{ block_id }}"
+    <div class="section ymal ymal--{{ block_id }}"
       data-ymal-block="{{ block_id }}"
       data-ymal-page="{{ section.settings.page_type | escape }}"
     >
-      {%- if section.settings.heading != blank -%}
-        <h2 class="ymal__title">{{ section.settings.heading | escape }}</h2>
-      {%- endif -%}
-      <ul class="ymal__grid">{{ ymal_cards }}</ul>
-    </section>
+      <div class="container">
+        {%- if section.settings.heading != blank -%}
+          <h2 class="ymal__title h3">{{ section.settings.heading | escape }}</h2>
+        {%- endif -%}
+        <div class="ymal__grid">{{ ymal_cards }}</div>
+      </div>
+    </div>
   {%- endif -%}
 {%- endif -%}
+
+{%- comment -%}
+  Layout only. Everything inside a card is the theme's product-block, so this
+  styles the row and nothing else.
+
+  Scoped to this section's id: a page can carry more than one YMAL block, and
+  they must not restyle each other or anything else on the page.
+{%- endcomment -%}
+<style>
+  #shopify-section-{{ section.id }} .ymal__grid {
+    display: grid;
+    grid-template-columns: repeat({{ section.settings.columns }}, minmax(0, 1fr));
+    gap: 2rem 1.5rem;
+  }
+  #shopify-section-{{ section.id }} .ymal__title {
+    margin-bottom: 1.5rem;
+  }
+  @media (max-width: 1024px) {
+    #shopify-section-{{ section.id }} .ymal__grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+  @media (max-width: 768px) {
+    #shopify-section-{{ section.id }} .ymal__grid {
+      /* One scrolling row on a phone rather than a tall stack the shopper has
+         to scroll past. Matches how the theme's own product rows behave. */
+      display: flex;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      margin-inline: -1rem;
+      padding-inline: 1rem;
+    }
+    #shopify-section-{{ section.id }} .ymal__card {
+      flex: 0 0 62%;
+      scroll-snap-align: start;
+    }
+  }
+</style>
 
 {% schema %}
 {
@@ -123,6 +163,16 @@
       "step": 1,
       "default": 6,
       "info": "Fewer may appear: sold-out, markdown and fixed-stock products are filtered out at render."
+    },
+    {
+      "type": "range",
+      "id": "columns",
+      "label": "Columns on desktop",
+      "min": 2,
+      "max": 6,
+      "step": 1,
+      "default": 4,
+      "info": "Phones always show one scrolling row."
     },
     {
       "type": "select",

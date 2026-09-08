@@ -5,7 +5,10 @@
   ineligible product renders as nothing at all, and the caller skips the gap.
 
   Usage:
-    {%- render 'ymal-card', product: some_product -%}
+    {%- render 'ymal-card', product: some_product, grid: 4 -%}
+
+  `grid` is the desktop column count and is only an image-sizing hint. Optional,
+  defaults to 4.
 
   The rule (docs/logic.md 4.1), as the storefront can see it:
 
@@ -38,24 +41,15 @@
 
 {%- if product.available and ymal_eligible and ymal_is_sale == false -%}
   {%- comment -%}
-    PLACEHOLDER. Replace with the theme's own card snippet so the block looks
-    native and stays that way when the theme changes. Usually one of:
+    The theme's own card, so the block looks native and stays that way when the
+    theme changes.
 
-      {%- render 'card-product', card_product: product -%}
-      {%- render 'product-card', product: product -%}
+    `grid` is the desktop column count, used only for image sizing.
+    product-block falls back to `section.settings.grid` when it is missing, and
+    the YMAL section has no such setting - left blank, images size wrongly. A
+    snippet cannot see `section` (render isolates scope), so the caller passes
+    it in and it must match the CSS in sections/ymal-widget.liquid.
   {%- endcomment -%}
-  <a class="ymal__link" href="{{ product.url }}">
-    {%- if product.featured_image -%}
-      <img
-        class="ymal__image"
-        src="{{ product.featured_image | image_url: width: 400 }}"
-        alt="{{ product.featured_image.alt | escape }}"
-        width="400"
-        height="{{ 400 | divided_by: product.featured_image.aspect_ratio | round }}"
-        loading="lazy"
-      >
-    {%- endif -%}
-    <span class="ymal__name">{{ product.title | escape }}</span>
-    <span class="ymal__price">{{ product.price | money }}</span>
-  </a>
+  {%- assign ymal_grid = grid | default: 4 -%}
+  {%- render 'product-block', product: product, grid: ymal_grid -%}
 {%- endif -%}

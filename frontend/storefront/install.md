@@ -32,18 +32,23 @@ cd backend
 | `templates/product.ymal-card.liquid` | `templates/` |
 | `assets/ymal-recently-viewed.js` | `assets/` |
 
-## 3. Point the card at the theme's real card snippet
+## 3. Check the card snippet matches this theme
 
-`snippets/ymal-card.liquid` ships with placeholder markup. Find the theme's own
-card snippet - usually `snippets/card-product.liquid` or
-`snippets/product-card.liquid` - and render that instead:
+`snippets/ymal-card.liquid` renders the theme's own card:
 
 ```liquid
-{%- render 'card-product', card_product: product -%}
+{%- render 'product-block', product: product, grid: ymal_grid -%}
 ```
 
-**Do not skip this and ship the placeholder.** It is the step that makes the
-block look native rather than bolted on.
+That is correct for this store's theme (verified 2026-09-08). A different theme
+names its card something else - look in Snippets for `card-product`,
+`product-card`, `product-item` or similar, and check what parameters its header
+comment documents.
+
+`grid` is the desktop column count and only sizes images. It is passed in
+because `product-block` otherwise falls back to `section.settings.grid`, which
+the YMAL section does not define - and because a Liquid `render` cannot see
+`section` at all.
 
 Leave the eligibility check above it exactly as it is. That check is the whole
 point, and this file is the only place it lives.
@@ -58,6 +63,7 @@ Recommendations**. Then set:
 | Block | Featured needs a product to be about, so it only works on a product page |
 | Heading | The web team's words |
 | Products to show | 2-12. Fewer may appear once the gate has run |
+| Columns on desktop | 2-6. Phones always show one scrolling row |
 | Page type | Used for tracking, so Analytics can group by page |
 
 Add the section more than once for more than one block on a page.
