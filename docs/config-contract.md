@@ -54,11 +54,11 @@ list written at 03:00 renders yesterday's price at noon.
 It also means the pipeline never needs to fetch `featuredImage` or
 `priceRangeV2` at all.
 
-> **Verify early.** Confirm on the live theme that a *shop-level*
-> `list.product_reference` metafield resolves to product objects in Liquid the
-> way a product-level one does. It is a five-minute test, and the whole design
-> rests on it. If it does not, the fallback is a `json` metafield of product IDs
-> plus a Liquid lookup — workable, but wordier.
+> **VERIFIED 2026-09-08.** A *shop-level* `list.product_reference` metafield
+> does resolve to product objects, exactly as a product-level one does.
+> Confirmed against the live shop: `shop.metafields.ymal.trending` returns real
+> products with titles, and `product.metafields.ymal.featured` does the same.
+> The `json`-metafield fallback is not needed.
 
 ---
 

@@ -124,3 +124,57 @@ def count_orders(days_ago_start: int, days_ago_end: int = 0) -> dict:
         {"filter": f"created_at:>={start} AND created_at:<{end}"},
     )
     return data["ordersCount"]
+
+
+# Co-purchase needs only which products shared a basket - not when, not how
+# many. Asking for less per order and more orders per page is what makes a
+# year of history practical: see BASKETS_PAGE_SIZE in settings.py.
+BASKETS_QUERY = """
+query Baskets($cursor: String, $filter: String!) {
+  orders(first: %d, after: $cursor, query: $filter) {
+    pageInfo { hasNextPage endCursor }
+    edges {
+      node {
+        lineItems(first: %d) { nodes { product { id } } }
+      }
+    }
+  }
+}
+""" % (settings.BASKETS_PAGE_SIZE, settings.ORDER_LINE_ITEMS_PAGE_SIZE)
+
+
+def baskets(days_ago_start: int, days_ago_end: int = 0) -> tuple[list[set], dict]:
+    """
+    One set of product GIDs per order in the window.
+
+    Sets, not lists: a basket holding two of the same product still says only
+    that the product was bought, and co-purchase asks which products appeared
+    TOGETHER.
+
+    Returns (baskets, report). Only baskets with two or more distinct products
+    carry any signal, so the report separates them - a catalog whose orders are
+    nearly all single-item cannot support this phase at all.
+    """
+    start, end = day_bounds(days_ago_start, days_ago_end)
+    query_filter = f"created_at:>={start} AND created_at:<{end}"
+
+    all_baskets: list[set] = []
+    truncated = 0
+
+    for order in paginate(BASKETS_QUERY, ["orders"], {"filter": query_filter}):
+        lines = order["lineItems"]["nodes"]
+        if len(lines) >= settings.ORDER_LINE_ITEMS_PAGE_SIZE:
+            truncated += 1
+        products = {
+            line["product"]["id"] for line in lines if line.get("product")
+        }
+        all_baskets.append(products)
+
+    multi = [b for b in all_baskets if len(b) > 1]
+    return multi, {
+        "window": f"{start} to {end}",
+        "orders": len(all_baskets),
+        "multi_item_orders": len(multi),
+        "single_item_orders": len(all_baskets) - len(multi),
+        "truncated_orders": truncated,
+    }
