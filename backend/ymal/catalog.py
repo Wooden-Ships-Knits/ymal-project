@@ -234,3 +234,51 @@ def fetch_stock_by_product(location_ids: list[str]) -> dict[str, int]:
             totals[product_id] = totals.get(product_id, 0) + available
 
     return totals
+
+
+# Phase 2 needs price and collections, which the Phase 1 query does not fetch -
+# eligibility never needed either. Kept as its own pass rather than widened
+# into ACTIVE_PRODUCTS_QUERY: `collections` is a nested connection and nested
+# connections multiply query cost, so adding it there would slow the run that
+# every later phase depends on.
+PRODUCT_FEATURES_QUERY = """
+query ProductFeatures($cursor: String) {
+  products(first: %d, after: $cursor, query: "status:active") {
+    pageInfo { hasNextPage endCursor }
+    edges {
+      node {
+        id
+        priceRangeV2 {
+          minVariantPrice { amount currencyCode }
+          maxVariantPrice { amount }
+        }
+        collections(first: 10) {
+          edges { node { handle title } }
+        }
+      }
+    }
+  }
+}
+""" % settings.PRODUCTS_PAGE_SIZE
+
+
+def fetch_product_features() -> dict[str, dict]:
+    """
+    Price and collections per active product, keyed by product gid.
+
+    Separate from fetch_active_products because eligibility does not need
+    either, and this query nests a collections connection.
+    """
+    features = {}
+    for node in paginate(PRODUCT_FEATURES_QUERY, ["products"]):
+        price = node.get("priceRangeV2") or {}
+        features[node["id"]] = {
+            "price_min": float(price.get("minVariantPrice", {}).get("amount", 0) or 0),
+            "price_max": float(price.get("maxVariantPrice", {}).get("amount", 0) or 0),
+            "currency": price.get("minVariantPrice", {}).get("currencyCode", ""),
+            "collections": [
+                edge["node"]["handle"]
+                for edge in node.get("collections", {}).get("edges", [])
+            ],
+        }
+    return features
