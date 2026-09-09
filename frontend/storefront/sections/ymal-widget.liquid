@@ -258,18 +258,39 @@
   #shopify-section-{{ section.id }} .ymal--carousel .ymal__grid::-webkit-scrollbar {
     display: none;
   }
+  {%- comment -%}
+    Card sizing.
+
+    With Card width at 0 the row shows a set NUMBER of cards and each one
+    grows with the screen - which is what adapts across devices. A fixed pixel
+    width cannot: it is right on one screen and wrong on every other.
+
+    Three steps rather than one, because "six across" is right on a desktop
+    and unreadable on a phone.
+  {%- endcomment -%}
   #shopify-section-{{ section.id }} .ymal--carousel .ymal__card {
     {%- if section.settings.card_width > 0 -%}
-      /* Fixed card width, the way the app blocks on this store size theirs
-         (236px with a 20px gap). Cards stay the same size whatever the screen,
-         and more of them come into view rather than each one growing. */
       flex: 0 0 {{ section.settings.card_width }}px;
     {%- else -%}
-      /* Auto: exactly `columns` cards fill the row, each one growing with the
-         screen. */
       flex: 0 0 calc((100% - ({{ section.settings.columns | minus: 1 }} * {{ section.settings.column_gap }}px)) / {{ section.settings.columns }});
     {%- endif -%}
     scroll-snap-align: start;
+  }
+
+  @media (max-width: 1400px) {
+    {%- if section.settings.card_width == 0 -%}
+    #shopify-section-{{ section.id }} .ymal--carousel .ymal__card {
+      {%- assign mid_cols = section.settings.columns | at_most: 4 -%}
+      flex: 0 0 calc((100% - ({{ mid_cols | minus: 1 }} * {{ section.settings.column_gap }}px)) / {{ mid_cols }});
+    }
+    {%- endif -%}
+  }
+  @media (max-width: 1024px) {
+    #shopify-section-{{ section.id }} .ymal--carousel .ymal__card {
+      /* Two and a bit: the part-visible third card is what tells a shopper the
+         row scrolls, without needing an arrow. */
+      flex: 0 0 calc((100% - {{ section.settings.column_gap }}px) / 2.4) !important;
+    }
   }
   #shopify-section-{{ section.id }} .ymal__arrow {
     position: absolute;
@@ -320,7 +341,10 @@
       -webkit-overflow-scrolling: touch;
     }
     #shopify-section-{{ section.id }} .ymal__card {
-      flex: 0 0 62%;
+      /* One and a half cards, so the next one peeks in and the row reads as
+         scrollable. Overrides any fixed Card width, which on a phone is
+         almost always too wide. */
+      flex: 0 0 66% !important;
       scroll-snap-align: start;
     }
     #shopify-section-{{ section.id }} .ymal__title {
@@ -427,12 +451,12 @@
     {
       "type": "range",
       "id": "columns",
-      "label": "Columns on desktop",
+      "label": "Cards visible at once",
       "min": 2,
       "max": 6,
       "step": 1,
       "default": 4,
-      "info": "Phones always show one scrolling row."
+      "info": "On a wide desktop. Narrower screens step down to 4, then 2.4, then 1.5 on a phone."
     },
     {
       "type": "select",
@@ -658,7 +682,7 @@
       "step": 10,
       "default": 0,
       "unit": "px",
-      "info": "0 means cards stretch to fill the columns. The app blocks on this store use 236."
+      "info": "Leave at 0 for a layout that adapts to the screen - the row then shows the number of cards set above, and each grows with the screen. A fixed width is right on one screen size and wrong on the rest."
     },
     {
       "type": "range",
