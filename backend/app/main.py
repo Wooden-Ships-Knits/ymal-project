@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 from fastapi import Body, FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse
 
-from ymal import config_schema, config_store, registry, settings
+from ymal import config_schema, config_store, registry, runner, settings
 
 load_dotenv(settings.REPO_ROOT / ".env", override=True)
 
@@ -160,3 +160,34 @@ def get_page_templates() -> list[dict]:
         {"id": t["id"], "label": t["label"], "live": t["live"], "anchor": t["anchor"]}
         for t in registry.PAGE_TEMPLATES
     ]
+
+
+@app.get("/api/run")
+def get_run() -> dict:
+    """Where the pipeline run has got to. Polled by the console while running."""
+    return runner.status()
+
+
+@app.post("/api/run")
+def post_run(
+    skip_copurchase: bool = Body(default=False, embed=True),
+    x_ymal_token: str = Header(default=""),
+) -> dict:
+    """
+    Start the pipeline by hand, instead of waiting for the schedule.
+
+    Guarded like any other write: it ends by publishing to the live shop.
+
+    Returns 409 when a run is already going. Two chains publishing at once
+    would interleave their writes and leave the shop holding a mixture of two
+    runs - the one outcome worth refusing outright.
+    """
+    require_token(x_ymal_token)
+
+    result = runner.start(skip_copurchase=skip_copurchase)
+    if not result["started"]:
+        raise HTTPException(
+            status_code=409,
+            detail=f"A run is already in progress (started {result['started_at']}).",
+        )
+    return result
