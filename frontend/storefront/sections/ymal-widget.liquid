@@ -76,7 +76,7 @@
       {%- else -%}
         {%- assign image_cols = section.settings.columns -%}
       {%- endif -%}
-      {%- capture card -%}{%- render 'ymal-card', product: item, grid: image_cols -%}{%- endcapture -%}
+      {%- capture card -%}{%- render 'ymal-card', product: item, grid: image_cols, button_label: section.settings.button_label -%}{%- endcapture -%}
       {%- assign trimmed = card | strip -%}
       {%- unless trimmed == blank -%}
         <div class="ymal__card">{{ card }}</div>
@@ -676,6 +676,13 @@
       "id": "show_button",
       "label": "Show the button",
       "default": true
+    },
+    {
+      "type": "text",
+      "id": "button_label",
+      "label": "Button text",
+      "default": "Choose Option",
+      "info": "The button links to the product page."
     },
     {
       "type": "range",

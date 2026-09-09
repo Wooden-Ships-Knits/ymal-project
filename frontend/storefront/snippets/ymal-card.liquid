@@ -12,6 +12,10 @@
   or they look soft - and never the displayed size, which is CSS. Optional,
   defaults to 4.
 
+  `button_label` is the button's text. Optional, defaults to "Choose Option".
+  It was the theme's own `quick_buy` translation, which reads "Quick Buy" here
+  - a section setting is easier to change than a translation key.
+
   ---------------------------------------------------------------------------
   Why this builds its own card instead of rendering the theme's product-block
 
@@ -87,7 +91,7 @@
       beats a button that sometimes does.
     {%- endcomment -%}
     <a class="ymal-card__button btn btn--secondary" href="{{ product.url }}">
-      {{ 'products.product.quick_buy' | t | default: 'Choose Option' }}
+      {{ button_label | default: 'Choose Option' }}
     </a>
   </div>
 {%- endif -%}
