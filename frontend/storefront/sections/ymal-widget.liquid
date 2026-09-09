@@ -1,749 +1,480 @@
 {%- comment -%}
-  YMAL — one recommendation block, placed from the theme editor.
+  YMAL: this section can take its products from a YMAL recommendation list
+  instead of a collection. Everything else - the slider, the aspect-ratio
+  handling, product-block, quick buy - is the theme's and is untouched.
 
-  Add it the same way the web team adds a Wiser block: Add section -> YMAL
-  Recommendations, then choose which block, the heading and the slot count.
-  Wiser's appear under Apps because Wiser is an installed app shipping theme
-  app extensions; this is a theme section, so it appears under Sections.
+  Set "Products from" in the section settings. "Collection" is the original
+  behaviour and is the default, so existing uses of this section are unchanged.
 
-  Add it more than once for more than one block on a page.
+  Each YMAL list is a list.product_reference metafield, so Liquid receives live
+  product objects: today's price, today's stock, from a list written overnight.
 
-  Where each block's list comes from:
-
-    featured         product.metafields.ymal.featured   (this product's pool)
-    trending         shop.metafields.ymal.trending
-    top_selling      shop.metafields.ymal.top_selling
-    new_arrivals     shop.metafields.ymal.new_arrivals
-    recently_viewed  the shopper's own browser, no metafield at all
-
-  All four metafields are list.product_reference, so Liquid gets the LIVE
-  product - today's price, today's stock - from a list written at 03:00.
-
-  Every card renders through snippets/ymal-card.liquid, which is the
-  eligibility gate. An ineligible product renders nothing and is skipped, so a
-  block can come out shorter than its slot count. That is correct: showing a
-  fixed-stock or *SALE* product is the failure this project exists to prevent.
+  Every product is checked against the eligibility rule before it renders -
+  purchasable, no *SALE* marker, and stocked at Bali To Produce (published by
+  backend/scripts/publish_eligibility.py). An ineligible product is skipped, so
+  a YMAL row can be shorter than the requested count. That is correct: showing
+  a fixed-stock or markdown product is the failure YMAL exists to prevent.
 {%- endcomment -%}
-
 {%- liquid
-  assign block_id = section.settings.block
-  assign slots = section.settings.slots | default: 6
-  assign items = null
+  comment
+    `product` is the loop variable further down, which shadows the page's own
+    product on a product template. Keep a reference before that happens so the
+    anchor can still be excluded from its own recommendations.
+  endcomment
+  assign anchor_product = product
 
-  case block_id
+  assign ymal_source = section.settings.ymal_source | default: 'collection'
+
+  case ymal_source
     when 'featured'
-      assign items = product.metafields.ymal.featured.value
+      assign ymal_items = product.metafields.ymal.featured.value
     when 'trending'
-      assign items = shop.metafields.ymal.trending.value
+      assign ymal_items = shop.metafields.ymal.trending.value
     when 'top_selling'
-      assign items = shop.metafields.ymal.top_selling.value
+      assign ymal_items = shop.metafields.ymal.top_selling.value
     when 'new_arrivals'
-      assign items = shop.metafields.ymal.new_arrivals.value
+      assign ymal_items = shop.metafields.ymal.new_arrivals.value
   endcase
+
+  comment
+    Count the eligible products up front so the whole section can be dropped
+    when none survive. A heading with nothing under it is worse than no block.
+  endcomment
+  assign ymal_eligible_count = 0
+  if ymal_source != 'collection'
+    for ymal_item in ymal_items
+      if anchor_product != blank and ymal_item.id == anchor_product.id
+        continue
+      endif
+      unless ymal_item.available
+        continue
+      endunless
+      unless ymal_item.metafields.ymal.eligible.value
+        continue
+      endunless
+      if ymal_item.title contains '*SALE*'
+        continue
+      endif
+      assign ymal_eligible_count = ymal_eligible_count | plus: 1
+    endfor
+  endif
 -%}
+{%- if ymal_source == 'collection' or ymal_eligible_count > 0 -%}
+<div class="section-id-{{ section.id }} collection-slider-row {% if section.settings.color_scheme != 'default' %}use-color-scheme use-color-scheme--{{ section.settings.color_scheme }}{% endif %}">
+  <div class="container{% if section.settings.enable_carousel %} container--not-mobile{% endif %}{% if section.settings.full_width %} container--no-max{% endif %}">
+    <!-- NEW IN Section -->
+    {% if section.settings.show_new_in %}
+      <div class="new-in-section">
+        <h2 class="new-in-heading">{{ section.settings.new_in_heading }}</h2>
+        <p class="new-in-text">
+          <span class="desktop-text">{{ section.settings.desktop_text }}</span>
+          <span class="mobile-text">{{ section.settings.mobile_text }}</span>
+        </p>
+        <style>
+          /* Default: hide mobile text and show desktop text */
+          .mobile-text { display: none; }
+          /* For screens smaller than 768px (mobile devices), show mobile text and hide desktop text */
+          @media screen and (max-width: 768px) {
+            .desktop-text { display: none; }
+            .mobile-text { display: inline; }
+          }
+        </style>
+        {% if section.settings.show_new_in_button %}
+          <a href="{{ section.settings.new_in_button_link }}" class="btn btn-primary">{{ section.settings.new_in_button_text }}</a>
+        {% endif %}
+      </div>
+    {% endif %}
+    {%- if section.settings.enable_carousel -%}
+      <carousel-slider class="carousel block collection-slider">
+    {%- endif -%}
+    <h2 class="hometitle h4 align-center has-paging{% if section.settings.enable_carousel %} slider-nav{% endif %}" data-cc-animate data-cc-animate-delay="0.3s">
+      {% if section.settings.enable_carousel %}
+        <button name="prev" class="slider-nav__btn has-ltr-icon">
+          <span class="visually-hidden">{{ 'general.slider.previous' | t }}</span>
+          {% render 'icon-chevron-left' %}
+        </button>
+      {% endif %}
+      <span class="has-paging__title">{{ section.settings.title | escape }}</span>
+      {% if section.settings.enable_carousel %}
+        <button name="next" class="slider-nav__btn has-ltr-icon">
+          <span class="visually-hidden">{{ 'general.slider.next' | t }}</span>
+          {% render 'icon-chevron-right' %}
+        </button>
+      {% endif %}
+    </h2>
+    <div class="collection-listing fade-in-up{% if section.settings.enable_carousel %} slider {% if section.settings.full_width %}slider--edge-peek{% endif %} slider--mobile-container-pad slider--no-scrollbar{% endif %}" data-cc-animate>
+      <div class="product-grid product-grid--per-row-{{ section.settings.grid }} product-grid--per-row-mob-{{ settings.prod_thumb_mob_per_row }}{% if section.settings.enable_carousel %} slider__grid product-grid--carousel{% endif %}">
+        {%- liquid
+          assign source_collection = section.settings.source_collection
+          assign products_limit = section.settings.products_to_show | default: 8
 
-{%- if block_id == 'recently_viewed' -%}
-  {%- comment -%} Rendered client-side; the snippet ships its own script. {%- endcomment -%}
-  {%- render 'ymal-recently-viewed',
-        page_type: section.settings.page_type,
-        anchor: product,
-        heading: section.settings.heading,
-        slots: slots -%}
+          comment
+            A YMAL list stands in for the collection's products. The aspect-ratio
+            passes below read this too, so a YMAL row is measured the same way a
+            collection row is.
+          endcomment
+          if ymal_source == 'collection'
+            assign source_products = source_collection.products
+          else
+            assign source_products = ymal_items
+          endif
 
-{%- else -%}
-  {%- comment -%}
-    Render the cards to a variable FIRST, then decide whether to draw the
-    heading. A heading with nothing under it is worse than no block at all,
-    and we cannot know the block is empty until the gate has run on every
-    candidate.
-  {%- endcomment -%}
-  {%- capture ymal_cards -%}
-    {%- assign shown = 0 -%}
-    {%- for item in items -%}
-      {%- if shown >= slots -%}{%- break -%}{%- endif -%}
-      {%- comment -%} Never recommend the product being viewed. {%- endcomment -%}
-      {%- if product != blank and item.id == product.id -%}{%- continue -%}{%- endif -%}
+          comment
+            Liquid has no operator precedence and evaluates and/or right to
+            left, so this is computed as a single flag rather than written as a
+            compound condition that would not mean what it looks like.
+          endcomment
+          assign show_onboarding = false
+          if ymal_source == 'collection'
+            if source_collection == blank
+              assign show_onboarding = true
+            elsif source_collection.products_count == 0
+              assign show_onboarding = true
+            endif
+          endif
 
-      {%- comment -%}
-        `grid` is an image-resolution hint, not a layout instruction. With a
-        fixed card width, how many fit across the screen is what matters for
-        sharpness - not the column count, which only applies when the width is
-        automatic. Roughly 1600px of viewport divided by the card width.
-      {%- endcomment -%}
-      {%- if section.settings.card_width > 0 -%}
-        {%- assign image_cols = 1600 | divided_by: section.settings.card_width -%}
-        {%- assign image_cols = image_cols | at_least: 1 | at_most: 6 -%}
-      {%- else -%}
-        {%- assign image_cols = section.settings.columns -%}
-      {%- endif -%}
-      {%- capture card -%}{%- render 'ymal-card', product: item, grid: image_cols, button_label: section.settings.button_label -%}{%- endcapture -%}
-      {%- assign trimmed = card | strip -%}
-      {%- unless trimmed == blank -%}
-        <div class="ymal__card">{{ card }}</div>
-        {%- assign shown = shown | plus: 1 -%}
-      {%- endunless -%}
-    {%- endfor -%}
-  {%- endcapture -%}
+          if show_onboarding
+            for i in (1..4)
+              if section.settings.enable_carousel
+                echo '<div class="slider__item">'
+              endif
+              render 'onboarding-product-block', forloop: forloop
+              if section.settings.enable_carousel
+                echo '</div>'
+              endif
+            endfor
+          else
+            if settings.prod_thumb_shape == 'portrait-23'
+              assign chosen_aspect_ratio = 0.67
+            elsif settings.prod_thumb_shape == 'portrait-45'
+              assign chosen_aspect_ratio = 0.8
+            elsif settings.prod_thumb_shape == 'square'
+              assign chosen_aspect_ratio = 1.0
+            elsif settings.prod_thumb_shape == 'landscape-54'
+              assign chosen_aspect_ratio = 1.25
+            elsif settings.prod_thumb_shape == 'landscape-32'
+              assign chosen_aspect_ratio = 1.50
+            elsif settings.prod_thumb_shape == 'tallest'
+              assign chosen_aspect_ratio = 99
+              for product in source_products limit: products_limit
+                assign ar = product.featured_media.preview_image.aspect_ratio | default: 1.0
+                if ar < chosen_aspect_ratio
+                  assign chosen_aspect_ratio = ar
+                endif
+              endfor
+            else
+              assign chosen_aspect_ratio = 0
+              for product in source_products limit: products_limit
+                assign ar = product.featured_media.preview_image.aspect_ratio | default: 1.0
+                if ar > chosen_aspect_ratio
+                  assign chosen_aspect_ratio = ar
+                endif
+              endfor
+            endif
+            comment
+              Counted rather than `limit:`, because the gate below skips
+              products and a limit would count the skipped ones against the
+              total - a row of six could render two.
+            endcomment
+            assign ymal_shown = 0
+            for product in source_products
+              if ymal_shown >= products_limit
+                break
+              endif
 
-  {%- assign has_cards = ymal_cards | strip -%}
-  {%- if has_cards != blank -%}
-    {%- comment -%}
-      No theme wrapper classes. `.section` and `.container` mean different
-      things in different themes - in this one they pushed the whole block to
-      the right - so the section brings its own layout and inherits only type
-      and colour.
-    {%- endcomment -%}
-    <div class="ymal ymal--{{ block_id }} ymal--{{ section.settings.layout }}"
-      data-ymal-block="{{ block_id }}"
-      data-ymal-page="{{ section.settings.page_type | escape }}"
-    >
-      {%- if section.settings.heading != blank -%}
-        <h2 class="ymal__title">{{ section.settings.heading | escape }}</h2>
-      {%- endif -%}
+              comment
+                The eligibility gate, for YMAL sources only. A collection row is
+                the merchandiser's explicit choice and is left alone.
+              endcomment
+              if ymal_source != 'collection'
+                if anchor_product != blank and product.id == anchor_product.id
+                  continue
+                endif
+                unless product.available
+                  continue
+                endunless
+                unless product.metafields.ymal.eligible.value
+                  continue
+                endunless
+                if product.title contains '*SALE*'
+                  continue
+                endif
+              endif
 
-      <div class="ymal__viewport">
-        <div class="ymal__grid">{{ ymal_cards }}</div>
-
-        {%- if section.settings.layout == 'carousel' -%}
-          {%- comment -%}
-            Arrows are added by JS only if the row actually overflows - a block
-            that fits needs no arrows, and drawing dead ones looks broken. The
-            row scrolls natively either way, so this degrades to a swipeable
-            strip if the script never runs.
-          {%- endcomment -%}
-          <button class="ymal__arrow ymal__arrow--prev" type="button"
-                  aria-label="Previous products" hidden>
-            {%- render 'icon-chevron-left', stroke_width: 1.3 -%}
-          </button>
-          <button class="ymal__arrow ymal__arrow--next" type="button"
-                  aria-label="Next products" hidden>
-            {%- render 'icon-chevron-right', stroke_width: 1.3 -%}
-          </button>
-        {%- endif -%}
+              if section.settings.enable_carousel
+                echo '<div class="slider__item">'
+              endif
+              render 'product-block', product: product, custom_aspect_ratio: chosen_aspect_ratio, no_swiping: section.settings.enable_carousel, no_quick_buy_markup: section.settings.enable_carousel
+              if section.settings.enable_carousel
+                echo '</div>'
+              endif
+              assign ymal_shown = ymal_shown | plus: 1
+            endfor
+          endif
+        -%}
       </div>
     </div>
-  {%- endif -%}
+    {%- if section.settings.enable_carousel -%}
+      </carousel-slider>
+    {%- endif -%}
+  </div>
+  {% if settings.quickbuy_style != 'off' and section.settings.enable_carousel %}
+    <div class="quickbuy-container use-color-scheme use-color-scheme--{{ settings.quickbuy_color_scheme }}">
+      <a href="#" class="close-detail" aria-label="{{ 'accessibility.close' | t }}" tabindex="-1">{% render 'icon-close', stroke_width: 1 %}</a>
+      <div class="inner"></div>
+    </div>
+  {% endif %}
+</div>
 {%- endif -%}
-
-{%- comment -%}
-  Layout only. Everything inside a card is the theme's product-block, so this
-  styles the row and nothing else.
-
-  Scoped to this section's id: a page can carry more than one YMAL block, and
-  they must not restyle each other or anything else on the page.
-
-  The heading sets size, weight, alignment and spacing but NOT colour or
-  family - those inherit, so the block follows the theme's typography settings
-  and keeps following them when someone changes the palette.
-{%- endcomment -%}
+<script>
+  document.querySelectorAll('.new-in-heading').forEach(element => {
+    const text = element.textContent;
+    if (text.length > 0) {
+      const lastLetter = text.slice(-1);
+      const rest = text.slice(0, -1);
+      element.innerHTML = `${rest}<span class="last-letter">${lastLetter}</span>`;
+    }
+  });
+</script>
 <style>
   {%- comment -%}
-    Full width drops the maximum width only. Side padding still applies, so the
-    row can span the screen while keeping the first and last cards off the very
-    edge - dropping both left cards flush against the window.
-  {%- endcomment -%}
-  #shopify-section-{{ section.id }} .ymal {
-    padding-block: {{ section.settings.padding_top }}px {{ section.settings.padding_bottom }}px;
-    padding-inline: {{ section.settings.padding_inline }}px;
-    {%- unless section.settings.full_width -%}
-      max-width: {{ section.settings.max_width }}px;
-      margin-inline: auto;
-    {%- endunless -%}
-  }
-  #shopify-section-{{ section.id }} .ymal__title {
-    font-size: {{ section.settings.heading_size }}px;
-    font-weight: {{ section.settings.heading_weight }};
-    text-align: {{ section.settings.heading_align }};
-    margin: 0 0 {{ section.settings.heading_gap }}px;
-    line-height: 1.15;
-  }
-  #shopify-section-{{ section.id }} .ymal__viewport {
-    position: relative;
-  }
+    Cap how wide the row may get. "Products per row" stays whatever it is set
+    to, so a narrower cap divides the same number of cards into a smaller
+    space - which is what shrinks the images. Scoped to this section's id, so
+    the theme's other product rows are untouched.
 
-  {%- comment -%}
-    The card markup is ours (snippets/ymal-card.liquid), so its layout is
-    stated here rather than fought for against the theme's contextual rules.
-    Type, colour and the button's own styling still come from the theme.
+    0 means no cap: the row uses the theme's own container width.
   {%- endcomment -%}
-  #shopify-section-{{ section.id }} .ymal__card {
-    min-width: 0;
+  {%- if section.settings.max_width > 0 -%}
+  #shopify-section-{{ section.id }} .container {
+    max-width: {{ section.settings.max_width }}px;
+    margin-inline: auto;
   }
-  #shopify-section-{{ section.id }} .ymal-card {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
+  {%- endif -%}
+
+  .new-in-heading span.last-letter {
+    font-family: "Times New Roman", serif;
   }
-  #shopify-section-{{ section.id }} .ymal-card__link {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+  .new-in-section {
+    margin-right: 20px;
+    padding: 20px;
+    background-color: white; /* fixed */
+  }
+  .new-in-heading {
+    font-size: 26px;
+    margin-bottom: 10px;
+  }
+  .new-in-text {
+    font-size: 18px;
+    margin-bottom: 15px;
+  }
+  .btn-primary {
+    color: white;
+    padding: 10px 20px;
     text-decoration: none;
-    color: inherit;
+    border-radius: 0px;
+    border: none;
   }
-  #shopify-section-{{ section.id }} .ymal-card__media {
-    aspect-ratio: {{ section.settings.image_ratio }};
-    overflow: hidden;
-    background: rgba(0, 0, 0, .03);
+  .btn-primary:hover {
+    background-color: grey; /* fixed */
   }
-  #shopify-section-{{ section.id }} .ymal-card__media img,
-  #shopify-section-{{ section.id }} .ymal-card__media svg {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
-  #shopify-section-{{ section.id }} .ymal-card__title {
-    font-size: {{ section.settings.card_text_size }}px;
-    line-height: 1.35;
-  }
-  #shopify-section-{{ section.id }} .ymal-card__price {
-    font-size: {{ section.settings.card_text_size }}px;
-  }
-  {%- comment -%}
-    Pushed to the bottom so buttons line up across cards whose titles wrap to
-    different numbers of lines.
-  {%- endcomment -%}
-  #shopify-section-{{ section.id }} .ymal-card__button {
-    display: block;
-    width: 100%;
-    margin-top: auto;
-    box-sizing: border-box;
-    padding: 12px 16px;
-    border: 0;
-    text-align: center;
-    text-decoration: none;
-    text-transform: uppercase;
-    letter-spacing: .06em;
-    font-size: {{ section.settings.card_text_size | minus: 1 }}px;
-    background: {{ section.settings.button_background }};
-    color: {{ section.settings.button_text_colour }};
-    transition: opacity .15s;
-  }
-  #shopify-section-{{ section.id }} .ymal-card__button:hover {
-    opacity: .85;
-  }
-  {%- unless section.settings.show_button -%}
-  #shopify-section-{{ section.id }} .ymal-card__button {
-    display: none;
-  }
-  {%- endunless -%}
-
-  {%- comment -%}
-    The gap belongs to both layouts, so it is set on the row itself. Scoping it
-    to one of them was how the carousel lost its gutter entirely.
-  {%- endcomment -%}
-  #shopify-section-{{ section.id }} .ymal__grid {
-    gap: {{ section.settings.row_gap }}px {{ section.settings.column_gap }}px;
-  }
-  #shopify-section-{{ section.id }} .ymal--grid .ymal__grid {
-    display: grid;
-    {%- if section.settings.card_width > 0 -%}
-      grid-template-columns: repeat(auto-fill, {{ section.settings.card_width }}px);
-      justify-content: center;
-    {%- else -%}
-      grid-template-columns: repeat({{ section.settings.columns }}, minmax(0, 1fr));
-    {%- endif -%}
-  }
-
-  {%- comment -%}
-    Carousel: one scrolling row of fixed-fraction cards, rather than a grid
-    that wraps. Uses native scrolling with snap points, so it works by swipe,
-    trackpad, keyboard and arrows alike, and needs no library.
-  {%- endcomment -%}
-  {%- comment -%}
-    `justify-content` is deliberately NOT set here. On an overflowing flex
-    container, centring pushes the first items off the start edge into space
-    the browser will not scroll to - the row simply cannot be swiped back to
-    its beginning. That rule belongs to the wrapping grid only.
-  {%- endcomment -%}
-  #shopify-section-{{ section.id }} .ymal--carousel .ymal__grid {
-    display: flex;
-    justify-content: flex-start;
-    overflow-x: auto;
-    /* `proximity`, not `mandatory`. Mandatory forces every scroll to land on a
-       card boundary, so once the remaining distance is less than one card
-       there is no valid snap point left and the row refuses to move - it reads
-       as being stuck, and the wider the cards the sooner it happens. */
-    scroll-snap-type: x proximity;
-    scroll-behavior: smooth;
-    overscroll-behavior-x: contain;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-  }
-  #shopify-section-{{ section.id }} .ymal--carousel .ymal__grid::-webkit-scrollbar {
-    display: none;
-  }
-  {%- comment -%}
-    Card sizing.
-
-    With Card width at 0 the row shows a set NUMBER of cards and each one
-    grows with the screen - which is what adapts across devices. A fixed pixel
-    width cannot: it is right on one screen and wrong on every other.
-
-    Three steps rather than one, because "six across" is right on a desktop
-    and unreadable on a phone.
-  {%- endcomment -%}
-  #shopify-section-{{ section.id }} .ymal--carousel .ymal__card {
-    {%- if section.settings.card_width > 0 -%}
-      flex: 0 0 {{ section.settings.card_width }}px;
-    {%- else -%}
-      flex: 0 0 calc((100% - ({{ section.settings.columns | minus: 1 }} * {{ section.settings.column_gap }}px)) / {{ section.settings.columns }});
-    {%- endif -%}
-    scroll-snap-align: start;
-  }
-
-  @media (max-width: 1400px) {
-    {%- if section.settings.card_width == 0 -%}
-    #shopify-section-{{ section.id }} .ymal--carousel .ymal__card {
-      {%- assign mid_cols = section.settings.columns | at_most: 4 -%}
-      flex: 0 0 calc((100% - ({{ mid_cols | minus: 1 }} * {{ section.settings.column_gap }}px)) / {{ mid_cols }});
-    }
-    {%- endif -%}
-  }
-  @media (max-width: 1024px) {
-    #shopify-section-{{ section.id }} .ymal--carousel .ymal__card {
-      /* Two and a bit: the part-visible third card is what tells a shopper the
-         row scrolls, without needing an arrow. */
-      flex: 0 0 calc((100% - {{ section.settings.column_gap }}px) / 2.4) !important;
-    }
-  }
-  #shopify-section-{{ section.id }} .ymal__arrow {
+  /* Slider Navigation Button Styles */
+  .slider-nav__btn {
     position: absolute;
     top: 50%;
     transform: translateY(-50%);
-    z-index: 2;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 40px;
-    height: 40px;
-    padding: 0;
-    border: 0;
+    z-index: 5;
+    background-color: rgba(0, 0, 0, 0.5);
+    border: none;
+    color: white;
+    padding: 10px;
     cursor: pointer;
-    background: rgba(255, 255, 255, .85);
-    color: inherit;
   }
-  #shopify-section-{{ section.id }} .ymal__arrow:hover {
-    background: #fff;
+  .slider-nav__btn.has-ltr-icon {
+    display: flex;
+    justify-content: center;
+    align-items: center;
   }
-  #shopify-section-{{ section.id }} .ymal__arrow:focus-visible {
-    outline: 2px solid currentColor;
-    outline-offset: 2px;
+  .slider-nav__btn[name="prev"] {
+    left: -50px;
   }
-  {%- comment -%}
-    The arrows float over the ends of the row rather than reserving space
-    beside it - reserving it left visible dead space after the last card.
-  {%- endcomment -%}
-  #shopify-section-{{ section.id }} .ymal__arrow--prev { left: 0; }
-  #shopify-section-{{ section.id }} .ymal__arrow--next { right: 0; }
-  #shopify-section-{{ section.id }} .ymal__arrow[hidden] { display: none; }
-
-  @media (max-width: 1024px) {
-    #shopify-section-{{ section.id }} .ymal--grid .ymal__grid {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
+  .slider-nav__btn[name="next"] {
+    right: -60px;
   }
-  @media (max-width: 768px) {
-    /* One scrolling row on a phone whichever layout is chosen - a tall stack
-       is just something to scroll past. */
-    #shopify-section-{{ section.id }} .ymal__grid {
-      display: flex;
-      /* flex-start for the same reason as the carousel above: centring an
-         overflowing row makes its start unreachable. */
-      justify-content: flex-start;
-      overflow-x: auto;
-      scroll-snap-type: x proximity;
-      -webkit-overflow-scrolling: touch;
-    }
-    #shopify-section-{{ section.id }} .ymal__card {
-      /* One and a half cards, so the next one peeks in and the row reads as
-         scrollable. Overrides any fixed Card width, which on a phone is
-         almost always too wide. */
-      flex: 0 0 66% !important;
-      scroll-snap-align: start;
-    }
-    #shopify-section-{{ section.id }} .ymal__title {
-      font-size: {{ section.settings.heading_size | times: 0.7 | round }}px;
-    }
-    #shopify-section-{{ section.id }} .ymal__arrow { display: none; }
+  @media (max-width: 767px) {
+    .slider-nav__btn[name="prev"] { left: -5px; }
+    .slider-nav__btn[name="next"] { right: -5px; }
+  }
+  .slider-nav__btn:hover {
+    background-color: rgba(0, 0, 0, 0.8);
+  }
+  @media screen and (max-width: 768px) {
+    .new-in-text { font-size: 15px; }
+    .new-in-heading { font-size: 20px; }
   }
 </style>
-
-{%- if section.settings.layout == 'carousel' -%}
-<script>
-  (function () {
-    var root = document.getElementById("shopify-section-{{ section.id }}");
-    if (!root) return;
-    var row = root.querySelector(".ymal__grid");
-    var prev = root.querySelector(".ymal__arrow--prev");
-    var next = root.querySelector(".ymal__arrow--next");
-    if (!row || !prev || !next) return;
-
-    function step() {
-      var card = row.querySelector(".ymal__card");
-      return card ? card.getBoundingClientRect().width + {{ section.settings.column_gap }} : row.clientWidth;
-    }
-
-    function sync() {
-      // Arrows appear only when there is somewhere to go. A row that fits
-      // needs none, and a dead arrow reads as broken.
-      var overflows = row.scrollWidth > row.clientWidth + 4;
-      prev.hidden = !overflows || row.scrollLeft <= 4;
-      next.hidden = !overflows || row.scrollLeft >= row.scrollWidth - row.clientWidth - 4;
-    }
-
-    prev.addEventListener("click", function () {
-      row.scrollBy({ left: -step(), behavior: "smooth" });
-    });
-    next.addEventListener("click", function () {
-      row.scrollBy({ left: step(), behavior: "smooth" });
-    });
-
-    row.addEventListener("scroll", sync, { passive: true });
-    window.addEventListener("resize", sync);
-    // Images load late and change scrollWidth, so re-check once they have.
-    window.addEventListener("load", sync);
-    sync();
-  })();
-</script>
-{%- endif -%}
-
 {% schema %}
 {
   "name": "YMAL Recommendations",
-  "tag": "section",
-  "class": "ymal-section",
+  "class": "section-product-grid",
   "settings": [
     {
-      "type": "header",
-      "content": "Content"
-    },
-    {
-      "type": "select",
-      "id": "block",
-      "label": "Block",
-      "default": "featured",
-      "info": "Featured needs a product to be about, so it only works on a product page.",
-      "options": [
-        {
-          "value": "featured",
-          "label": "Featured Products"
-        },
-        {
-          "value": "trending",
-          "label": "Trending Products"
-        },
-        {
-          "value": "top_selling",
-          "label": "Top Selling"
-        },
-        {
-          "value": "new_arrivals",
-          "label": "New Arrivals"
-        },
-        {
-          "value": "recently_viewed",
-          "label": "Recently Viewed"
-        }
-      ]
-    },
-    {
       "type": "text",
-      "id": "heading",
+      "id": "title",
       "label": "Heading",
       "default": "You May Also Like"
     },
     {
-      "type": "range",
-      "id": "slots",
-      "label": "Products to show",
-      "min": 2,
-      "max": 12,
-      "step": 1,
-      "default": 6,
-      "info": "Fewer may appear: sold-out, markdown and fixed-stock products are filtered out at render."
-    },
-    {
-      "type": "range",
-      "id": "columns",
-      "label": "Cards visible at once",
-      "min": 2,
-      "max": 6,
-      "step": 1,
-      "default": 4,
-      "info": "On a wide desktop. Narrower screens step down to 4, then 2.4, then 1.5 on a phone."
-    },
-    {
       "type": "select",
-      "id": "page_type",
-      "label": "Page type",
-      "default": "product",
-      "info": "Used for tracking, so Analytics can group by page.",
+      "id": "ymal_source",
+      "label": "Products from",
+      "default": "collection",
+      "info": "YMAL lists are built nightly and filtered at render, so sold-out, markdown and fixed-stock products never appear. Featured needs a product page to be about.",
       "options": [
-        {
-          "value": "product",
-          "label": "Product"
-        },
-        {
-          "value": "home",
-          "label": "Home"
-        },
-        {
-          "value": "cart",
-          "label": "Cart"
-        },
         {
           "value": "collection",
-          "label": "Collection"
+          "label": "A collection"
         },
         {
-          "value": "search",
-          "label": "Search"
+          "value": "featured",
+          "label": "YMAL - Featured for this product"
         },
         {
-          "value": "not_found",
-          "label": "404"
+          "value": "trending",
+          "label": "YMAL - Trending"
         },
         {
-          "value": "blog",
-          "label": "Blog"
+          "value": "top_selling",
+          "label": "YMAL - Top Selling"
         },
         {
-          "value": "account",
-          "label": "Account"
-        },
-        {
-          "value": "thank_you",
-          "label": "Thank you"
+          "value": "new_arrivals",
+          "label": "YMAL - New Arrivals"
         }
       ]
     },
     {
-      "type": "header",
-      "content": "Heading"
+      "type": "collection",
+      "id": "source_collection",
+      "label": "Collection to mirror",
+      "info": "Used only when \"Products from\" is set to a collection."
     },
     {
       "type": "range",
-      "id": "heading_size",
-      "label": "Heading size",
-      "min": 16,
-      "max": 64,
-      "step": 2,
-      "default": 40,
-      "unit": "px",
-      "info": "Colour and typeface follow your theme settings."
-    },
-    {
-      "type": "select",
-      "id": "heading_weight",
-      "label": "Heading weight",
-      "default": "300",
-      "options": [
-        {
-          "value": "300",
-          "label": "Light"
-        },
-        {
-          "value": "400",
-          "label": "Regular"
-        },
-        {
-          "value": "600",
-          "label": "Bold"
-        }
-      ]
-    },
-    {
-      "type": "select",
-      "id": "heading_align",
-      "label": "Heading alignment",
-      "default": "center",
-      "options": [
-        {
-          "value": "left",
-          "label": "Left"
-        },
-        {
-          "value": "center",
-          "label": "Centre"
-        },
-        {
-          "value": "right",
-          "label": "Right"
-        }
-      ]
-    },
-    {
-      "type": "range",
-      "id": "heading_gap",
-      "label": "Space below heading",
-      "min": 0,
-      "max": 80,
-      "step": 4,
-      "default": 32,
-      "unit": "px"
-    },
-    {
-      "type": "header",
-      "content": "Layout"
-    },
-    {
-      "type": "select",
-      "id": "layout",
-      "label": "Layout",
-      "default": "carousel",
-      "info": "Carousel matches the app blocks already on this store.",
-      "options": [
-        {
-          "value": "carousel",
-          "label": "Carousel with arrows"
-        },
-        {
-          "value": "grid",
-          "label": "Grid that wraps"
-        }
-      ]
+      "id": "products_to_show",
+      "label": "Products to show",
+      "min": 2,
+      "max": 50,
+      "step": 1,
+      "default": 8,
+      "info": "A YMAL row may show fewer once ineligible products are filtered out."
     },
     {
       "type": "checkbox",
+      "id": "show_vendor",
+      "label": "Show product vendor",
+      "default": false
+    },
+    {
+      "type": "checkbox",
+      "id": "enable_carousel",
+      "label": "Enable carousel",
+      "default": true
+    },
+    {
+      "type": "range",
+      "id": "grid",
+      "label": "Products per row",
+      "min": 2,
+      "max": 5,
+      "step": 1,
+      "default": 4
+    },
+    {
+      "type": "select",
+      "id": "color_scheme",
+      "label": "Color scheme",
+      "default": "default",
+      "options": [
+        {
+          "value": "default",
+          "label": "Default"
+        },
+        {
+          "value": "1",
+          "label": "1"
+        },
+        {
+          "value": "2",
+          "label": "2"
+        }
+      ]
+    },
+    {
       "id": "full_width",
-      "label": "Full width",
-      "default": true,
-      "info": "Span the screen instead of a fixed maximum width. Side padding still applies."
+      "type": "checkbox",
+      "label": "Full page width",
+      "default": true
     },
     {
       "type": "range",
       "id": "max_width",
-      "label": "Maximum width",
-      "min": 800,
-      "max": 3000,
+      "label": "Maximum row width",
+      "min": 0,
+      "max": 2400,
       "step": 40,
-      "default": 1400,
+      "default": 0,
       "unit": "px",
-      "info": "Match your theme's other sections."
+      "info": "0 uses the theme's own width. A narrower row divides the same number of products into less space, so the images get smaller."
     },
     {
-      "type": "range",
-      "id": "padding_inline",
-      "label": "Space at the left and right edges",
-      "min": 0,
-      "max": 80,
-      "step": 4,
-      "default": 20,
-      "unit": "px",
-      "info": "Keeps the first and last cards off the very edge of the screen."
-    },
-    {
-      "type": "range",
-      "id": "padding_top",
-      "label": "Padding top",
-      "min": 0,
-      "max": 120,
-      "step": 4,
-      "default": 48,
-      "unit": "px"
-    },
-    {
-      "type": "range",
-      "id": "padding_bottom",
-      "label": "Padding bottom",
-      "min": 0,
-      "max": 120,
-      "step": 4,
-      "default": 48,
-      "unit": "px"
-    },
-    {
-      "type": "select",
-      "id": "image_ratio",
-      "label": "Image shape",
-      "default": "7 / 9",
-      "options": [
-        {
-          "value": "7 / 9",
-          "label": "Portrait"
-        },
-        {
-          "value": "1 / 1",
-          "label": "Square"
-        },
-        {
-          "value": "4 / 3",
-          "label": "Landscape"
-        }
-      ]
-    },
-    {
-      "type": "range",
-      "id": "card_text_size",
-      "label": "Card text size",
-      "min": 10,
-      "max": 22,
-      "step": 1,
-      "default": 13,
-      "unit": "px"
-    },
-    {
+      "id": "show_new_in",
       "type": "checkbox",
-      "id": "show_button",
-      "label": "Show the button",
+      "label": "Show New In Header",
       "default": true
     },
     {
+      "id": "new_in_heading",
       "type": "text",
-      "id": "button_label",
-      "label": "Button text",
-      "default": "Choose Option",
-      "info": "The button links to the product page."
+      "label": "New In Heading",
+      "default": "BLACK FRIDAY SALE!"
     },
     {
-      "type": "color",
-      "id": "button_background",
-      "label": "Button colour",
-      "default": "#000000"
+      "id": "desktop_text",
+      "type": "textarea",
+      "label": "Desktop Text",
+      "default": "Happening now! Buy One Sample (at already discounted prices), Get Another for 20% OFF! Hurry! Limited Qty's! SAVE UP TO 50% FROM ORIGINAL PRICES"
     },
     {
-      "type": "color",
-      "id": "button_text_colour",
-      "label": "Button text colour",
-      "default": "#ffffff"
+      "id": "mobile_text",
+      "type": "textarea",
+      "label": "Mobile Text",
+      "default": "Happening now! Buy One Sample (at already discounted prices), Get Another for 20% OFF! Hurry! Limited Qty's! SAVE UP TO 50% FROM ORIGINAL PRICES"
     },
     {
-      "type": "range",
-      "id": "card_width",
-      "label": "Card width",
-      "min": 0,
-      "max": 800,
-      "step": 10,
-      "default": 0,
-      "unit": "px",
-      "info": "Leave at 0 for a layout that adapts to the screen - the row then shows the number of cards set above, and each grows with the screen. A fixed width is right on one screen size and wrong on the rest."
+      "id": "show_new_in_button",
+      "type": "checkbox",
+      "label": "Show New In Button",
+      "default": true
     },
     {
-      "type": "range",
-      "id": "column_gap",
-      "label": "Gap between columns",
-      "min": 0,
-      "max": 60,
-      "step": 2,
-      "default": 20,
-      "unit": "px"
+      "id": "new_in_button_text",
+      "type": "text",
+      "label": "New In Button Text",
+      "default": "SHOP SALE"
     },
     {
-      "type": "range",
-      "id": "row_gap",
-      "label": "Gap between rows",
-      "min": 0,
-      "max": 80,
-      "step": 4,
-      "default": 40,
-      "unit": "px"
+      "id": "new_in_button_link",
+      "type": "url",
+      "label": "New In Button Link"
     }
   ],
   "presets": [
     {
-      "name": "YMAL Recommendations"
+      "name": "YMAL Recommendations",
+      "settings": {
+        "title": "You May Also Like"
+      }
     }
   ]
 }
