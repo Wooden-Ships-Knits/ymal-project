@@ -63,7 +63,18 @@ services:
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-ymal}:${POSTGRES_PASSWORD:?}@db:5432/${POSTGRES_DB:-ymal}
+      # Passed as separate parts, NOT as a URL. A password is not URL-safe -
+      # this shop's contains a "/", which terminates a URL's authority section
+      # and makes the host parse as the database name. psycopg quotes each
+      # value properly when given them separately.
+      #
+      # The previous value also used SQLAlchemy's "postgresql+psycopg://"
+      # dialect form, which psycopg itself does not accept.
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${POSTGRES_USER:-ymal}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-ymal}
     volumes:
       - ymal_data:/app/data
     depends_on:
