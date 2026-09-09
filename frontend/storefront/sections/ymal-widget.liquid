@@ -232,8 +232,13 @@
   #shopify-section-{{ section.id }} .ymal--carousel .ymal__grid {
     display: flex;
     overflow-x: auto;
-    scroll-snap-type: x mandatory;
+    /* `proximity`, not `mandatory`. Mandatory forces every scroll to land on a
+       card boundary, so once the remaining distance is less than one card
+       there is no valid snap point left and the row refuses to move - it reads
+       as being stuck, and the wider the cards the sooner it happens. */
+    scroll-snap-type: x proximity;
     scroll-behavior: smooth;
+    overscroll-behavior-x: contain;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
   }
@@ -252,6 +257,11 @@
       flex: 0 0 calc((100% - ({{ section.settings.columns | minus: 1 }} * {{ section.settings.column_gap }}px)) / {{ section.settings.columns }});
     {%- endif -%}
     scroll-snap-align: start;
+  }
+  #shopify-section-{{ section.id }} .ymal--carousel .ymal__card:last-child {
+    /* Reserve the arrow's width after the final card, so the last one is not
+       left sitting underneath it. */
+    margin-inline-end: 48px;
   }
 
   #shopify-section-{{ section.id }} .ymal__arrow {
