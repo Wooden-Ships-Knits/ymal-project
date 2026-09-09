@@ -213,7 +213,7 @@
   }
   {%- endunless -%}
 
-  #shopify-section-{{ section.id }} .ymal__grid {
+  #shopify-section-{{ section.id }} .ymal--grid .ymal__grid {
     display: grid;
     {%- if section.settings.card_width > 0 -%}
       grid-template-columns: repeat(auto-fill, {{ section.settings.card_width }}px);
@@ -229,8 +229,15 @@
     that wraps. Uses native scrolling with snap points, so it works by swipe,
     trackpad, keyboard and arrows alike, and needs no library.
   {%- endcomment -%}
+  {%- comment -%}
+    `justify-content` is deliberately NOT set here. On an overflowing flex
+    container, centring pushes the first items off the start edge into space
+    the browser will not scroll to - the row simply cannot be swiped back to
+    its beginning. That rule belongs to the wrapping grid only.
+  {%- endcomment -%}
   #shopify-section-{{ section.id }} .ymal--carousel .ymal__grid {
     display: flex;
+    justify-content: flex-start;
     overflow-x: auto;
     /* `proximity`, not `mandatory`. Mandatory forces every scroll to land on a
        card boundary, so once the remaining distance is less than one card
@@ -301,8 +308,11 @@
        is just something to scroll past. */
     #shopify-section-{{ section.id }} .ymal__grid {
       display: flex;
+      /* flex-start for the same reason as the carousel above: centring an
+         overflowing row makes its start unreachable. */
+      justify-content: flex-start;
       overflow-x: auto;
-      scroll-snap-type: x mandatory;
+      scroll-snap-type: x proximity;
       -webkit-overflow-scrolling: touch;
     }
     #shopify-section-{{ section.id }} .ymal__card {
