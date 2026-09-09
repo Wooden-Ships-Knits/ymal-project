@@ -263,3 +263,50 @@ def test_undo_also_strips_the_stamps_from_what_it_returns(client, monkeypatch):
         "/api/config", json=body["config"], headers={"X-YMAL-Token": TOKEN}
     )
     assert replayed.status_code == 200
+
+
+# ------------------------------------------------------------------
+# Manual pipeline runs
+# ------------------------------------------------------------------
+
+def test_run_status_needs_no_token(client):
+    body = client.get("/api/run").json()
+    assert body["running"] is False
+
+
+def test_starting_a_run_needs_the_token(client):
+    assert client.post("/api/run").status_code == 401
+
+
+def test_a_second_run_is_refused_while_one_is_going(client, monkeypatch):
+    # Two chains publishing at once would interleave their writes and leave the
+    # shop holding a mixture of two runs.
+    from ymal import runner
+
+    monkeypatch.setattr(
+        runner, "start", lambda skip_copurchase=False: {
+            "started": False, "started_at": "2026-09-09T00:00:00Z", "running": True
+        }
+    )
+
+    response = client.post("/api/run", headers={"X-YMAL-Token": TOKEN})
+    assert response.status_code == 409
+
+
+def test_a_run_starts_and_reports_itself(client, monkeypatch):
+    from ymal import runner
+
+    seen = {}
+    monkeypatch.setattr(
+        runner, "start",
+        lambda skip_copurchase=False: seen.update(skip=skip_copurchase)
+        or {"started": True, "running": True, "step": "starting"},
+    )
+
+    response = client.post(
+        "/api/run", json={"skip_copurchase": True}, headers={"X-YMAL-Token": TOKEN}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["started"] is True
+    assert seen["skip"] is True

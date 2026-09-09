@@ -22,31 +22,35 @@ cd backend
 .venv/bin/python -m scripts.publish_all
 ```
 
-## 2. Copy four files into the theme
+## 2. Two ways to render a block
 
-| From here | Into the theme |
+**Preferred: the theme's own `product-list` section.** It already has the
+slider, the aspect-ratio handling, quick buy and `product-block`, so a YMAL row
+looks exactly like every other product row on the site and stays that way when
+the theme changes.
+
+Copy `sections/product-list.liquid` over the theme's copy. It adds one setting,
+**Products from**, and leaves the collection behaviour as the default - so
+every existing use of that section is unaffected.
+
+Then in the theme editor: add a Product list section as usual, and set
+**Products from** to a YMAL list instead of a collection.
+
+**Alternative: the standalone `ymal-widget` section.** Self-contained, with its
+own card and layout settings. Useful on a theme that has no reusable product
+row, but on this store `product-list` is the better fit.
+
+| File | Needed for |
 |---|---|
-| `sections/ymal-widget.liquid` | `sections/` |
-| `snippets/ymal-card.liquid` | `snippets/` |
-| `snippets/ymal-recently-viewed.liquid` | `snippets/` |
-| `templates/product.ymal-card.liquid` | `templates/` |
-| `assets/ymal-recently-viewed.js` | `assets/` |
+| `sections/product-list.liquid` | the preferred route |
+| `sections/ymal-widget.liquid` | the standalone route |
+| `snippets/ymal-card.liquid` | the standalone route |
+| `snippets/ymal-recently-viewed.liquid` | Recently Viewed, either route |
+| `templates/product.ymal-card.liquid` | Recently Viewed, either route |
+| `assets/ymal-recently-viewed.js` | Recently Viewed, either route |
 
-## 3. Point the card at the theme's real card snippet
-
-`snippets/ymal-card.liquid` ships with placeholder markup. Find the theme's own
-card snippet - usually `snippets/card-product.liquid` or
-`snippets/product-card.liquid` - and render that instead:
-
-```liquid
-{%- render 'card-product', card_product: product -%}
-```
-
-**Do not skip this and ship the placeholder.** It is the step that makes the
-block look native rather than bolted on.
-
-Leave the eligibility check above it exactly as it is. That check is the whole
-point, and this file is the only place it lives.
+Recently Viewed is not a `product-list` option: it has no metafield to read, so
+it is rendered client-side from the shopper's browser and needs its own snippet.
 
 ## 4. Add blocks in the theme editor
 
@@ -58,6 +62,9 @@ Recommendations**. Then set:
 | Block | Featured needs a product to be about, so it only works on a product page |
 | Heading | The web team's words |
 | Products to show | 2-12. Fewer may appear once the gate has run |
+| Columns on desktop | 2-6. Phones always show one scrolling row |
+| Layout | Carousel with arrows, or a grid that wraps |
+| Full width | Edge to edge, matching the app blocks already on this store |
 | Page type | Used for tracking, so Analytics can group by page |
 
 Add the section more than once for more than one block on a page.
@@ -77,6 +84,34 @@ Add the section more than once for more than one block on a page.
 5. **Recently Viewed:** open a product page, see nothing (one view, and it is
    the anchor); open a second, the first appears; open a third, two appear.
 6. **Private window:** Recently Viewed should be absent, not empty.
+
+## Matching the existing app blocks
+
+The Wiser blocks on this store are full-bleed carousels, four across. To match:
+
+| Setting | Value |
+|---|---|
+| Layout | Carousel with arrows |
+| Full width | ticked |
+| Card width | 236px |
+| Gap between columns | 20px |
+| Heading size | 40px, Light, Centre |
+
+Those numbers are read off the app block's own rendered markup, not guessed.
+
+The **Choose Option** button on each card is not ours - it comes from the
+theme's `product-block`, which draws it when Theme settings -> quick buy style
+is set to "button". If the button is missing from YMAL cards it is missing from
+the theme's own product grids too, and the fix is that setting rather than
+anything here.
+
+What is deliberately NOT copied: the app's CSS class names. Reusing them would
+match for free, but that styling ships with the app and disappears the day it
+is uninstalled - which is the plan at Phase 7.
+
+The arrows only appear when the row actually overflows - a block showing four
+of four products needs none, and a dead arrow reads as broken. The row scrolls
+by swipe and trackpad regardless, so it still works if the script never runs.
 
 ## The kill switch
 

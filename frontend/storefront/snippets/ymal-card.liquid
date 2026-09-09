@@ -5,7 +5,33 @@
   ineligible product renders as nothing at all, and the caller skips the gap.
 
   Usage:
-    {%- render 'ymal-card', product: some_product -%}
+    {%- render 'ymal-card', product: some_product, grid: 4 -%}
+
+  `grid` is how many of these cards fit across the screen. It only sets the
+  resolution asked of Shopify's image CDN - wider cards need a bigger source
+  or they look soft - and never the displayed size, which is CSS. Optional,
+  defaults to 4.
+
+  `button_label` is the button's text. Optional, defaults to "Choose Option".
+  It was the theme's own `quick_buy` translation, which reads "Quick Buy" here
+  - a section setting is easier to change than a translation key.
+
+  ---------------------------------------------------------------------------
+  Why this builds its own card instead of rendering the theme's product-block
+
+  product-block is styled contextually - its rules assume it sits inside the
+  theme's own product grid. Lifted into a different container it fell apart in
+  ways that could not be overridden from outside: the price rendered beside the
+  title rather than beneath it, even against id-scoped !important rules.
+
+  So the markup here is ours and the layout is predictable. It still uses the
+  theme's `image` and `price` snippets, so images are responsive and prices are
+  formatted, localised and show sale styling exactly as everywhere else.
+
+  What is given up: the hover-image swap, colour swatches, and the theme's
+  stock labels. Those live in product-block and are not worth re-implementing
+  for a recommendation strip.
+  ---------------------------------------------------------------------------
 
   The rule (docs/logic.md 4.1), as the storefront can see it:
 
@@ -37,25 +63,39 @@
 {%- endif -%}
 
 {%- if product.available and ymal_eligible and ymal_is_sale == false -%}
-  {%- comment -%}
-    PLACEHOLDER. Replace with the theme's own card snippet so the block looks
-    native and stays that way when the theme changes. Usually one of:
+  <div class="ymal-card">
+    <a class="ymal-card__link" href="{{ product.url }}">
+      <div class="ymal-card__media">
+        {%- if product.featured_media -%}
+          {%- assign ymal_grid = grid | default: 4 -%}
+          {%- render 'image' with product.featured_media.preview_image,
+                loading: 'lazy',
+                size_cols_mobile: 2,
+                size_cols_desktop: ymal_grid,
+                custom_crop: 'cover' -%}
+        {%- else -%}
+          {{ 'product-1' | placeholder_svg_tag }}
+        {%- endif -%}
+      </div>
 
-      {%- render 'card-product', card_product: product -%}
-      {%- render 'product-card', product: product -%}
-  {%- endcomment -%}
-  <a class="ymal__link" href="{{ product.url }}">
-    {%- if product.featured_image -%}
-      <img
-        class="ymal__image"
-        src="{{ product.featured_image | image_url: width: 400 }}"
-        alt="{{ product.featured_image.alt | escape }}"
-        width="400"
-        height="{{ 400 | divided_by: product.featured_image.aspect_ratio | round }}"
-        loading="lazy"
-      >
-    {%- endif -%}
-    <span class="ymal__name">{{ product.title | escape }}</span>
-    <span class="ymal__price">{{ product.price | money }}</span>
-  </a>
+      <div class="ymal-card__title">{{ product.title | escape }}</div>
+
+      <div class="ymal-card__price">
+        {%- render 'price', product: product, show_labels: true -%}
+      </div>
+    </a>
+
+    {%- comment -%}
+      Links to the product rather than opening a quick-buy drawer. The theme's
+      quick buy is wired to its own card markup, and a link that always works
+      beats a button that sometimes does.
+
+      No theme button class. Those are styled contextually like the rest of the
+      card was, so the colours are section settings and the button looks the
+      same wherever the block is placed.
+    {%- endcomment -%}
+    <a class="ymal-card__button" href="{{ product.url }}">
+      {{ button_label | default: 'Choose Option' }}
+    </a>
+  </div>
 {%- endif -%}

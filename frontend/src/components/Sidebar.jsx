@@ -30,19 +30,26 @@ export default function Sidebar({ active, onSelect }) {
         <Item key={entry.id} entry={entry} active={active} onSelect={onSelect} />
       ))}
 
-      <button
-        className="sidebar__more"
-        onClick={() => setMoreOpen((open) => !open)}
-        type="button"
-        aria-expanded={moreOpen}
-      >
-        More {moreOpen ? '⌃' : '⌄'}
-      </button>
+      {/* The fold only exists when something is folded into it. With four
+          tabs there is nothing to hide, and a toggle that reveals an empty
+          list is worse than no toggle. */}
+      {NAV_MORE.length > 0 && (
+        <>
+          <button
+            className="sidebar__more"
+            onClick={() => setMoreOpen((open) => !open)}
+            type="button"
+            aria-expanded={moreOpen}
+          >
+            More {moreOpen ? '⌃' : '⌄'}
+          </button>
 
-      {moreOpen &&
-        NAV_MORE.map((entry) => (
-          <Item key={entry.id} entry={entry} active={active} onSelect={onSelect} />
-        ))}
+          {moreOpen &&
+            NAV_MORE.map((entry) => (
+              <Item key={entry.id} entry={entry} active={active} onSelect={onSelect} />
+            ))}
+        </>
+      )}
     </nav>
   )
 }
