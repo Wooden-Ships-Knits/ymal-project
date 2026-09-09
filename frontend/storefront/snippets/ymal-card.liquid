@@ -89,8 +89,12 @@
       Links to the product rather than opening a quick-buy drawer. The theme's
       quick buy is wired to its own card markup, and a link that always works
       beats a button that sometimes does.
+
+      No theme button class. Those are styled contextually like the rest of the
+      card was, so the colours are section settings and the button looks the
+      same wherever the block is placed.
     {%- endcomment -%}
-    <a class="ymal-card__button btn btn--secondary" href="{{ product.url }}">
+    <a class="ymal-card__button" href="{{ product.url }}">
       {{ button_label | default: 'Choose Option' }}
     </a>
   </div>

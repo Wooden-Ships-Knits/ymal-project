@@ -208,7 +208,20 @@
     display: block;
     width: 100%;
     margin-top: auto;
+    box-sizing: border-box;
+    padding: 12px 16px;
+    border: 0;
     text-align: center;
+    text-decoration: none;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    font-size: {{ section.settings.card_text_size | minus: 1 }}px;
+    background: {{ section.settings.button_background }};
+    color: {{ section.settings.button_text_colour }};
+    transition: opacity .15s;
+  }
+  #shopify-section-{{ section.id }} .ymal-card__button:hover {
+    opacity: .85;
   }
   {%- unless section.settings.show_button -%}
   #shopify-section-{{ section.id }} .ymal-card__button {
@@ -683,6 +696,18 @@
       "label": "Button text",
       "default": "Choose Option",
       "info": "The button links to the product page."
+    },
+    {
+      "type": "color",
+      "id": "button_background",
+      "label": "Button colour",
+      "default": "#000000"
+    },
+    {
+      "type": "color",
+      "id": "button_text_colour",
+      "label": "Button text colour",
+      "default": "#ffffff"
     },
     {
       "type": "range",
