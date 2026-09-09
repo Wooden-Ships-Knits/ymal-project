@@ -271,12 +271,6 @@
     {%- endif -%}
     scroll-snap-align: start;
   }
-  #shopify-section-{{ section.id }} .ymal--carousel .ymal__card:last-child {
-    /* Reserve the arrow's width after the final card, so the last one is not
-       left sitting underneath it. */
-    margin-inline-end: 48px;
-  }
-
   #shopify-section-{{ section.id }} .ymal__arrow {
     position: absolute;
     top: 50%;
@@ -300,6 +294,10 @@
     outline: 2px solid currentColor;
     outline-offset: 2px;
   }
+  {%- comment -%}
+    The arrows float over the ends of the row rather than reserving space
+    beside it - reserving it left visible dead space after the last card.
+  {%- endcomment -%}
   #shopify-section-{{ section.id }} .ymal__arrow--prev { left: 0; }
   #shopify-section-{{ section.id }} .ymal__arrow--next { right: 0; }
   #shopify-section-{{ section.id }} .ymal__arrow[hidden] { display: none; }
