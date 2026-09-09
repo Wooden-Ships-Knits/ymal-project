@@ -213,6 +213,13 @@
   }
   {%- endunless -%}
 
+  {%- comment -%}
+    The gap belongs to both layouts, so it is set on the row itself. Scoping it
+    to one of them was how the carousel lost its gutter entirely.
+  {%- endcomment -%}
+  #shopify-section-{{ section.id }} .ymal__grid {
+    gap: {{ section.settings.row_gap }}px {{ section.settings.column_gap }}px;
+  }
   #shopify-section-{{ section.id }} .ymal--grid .ymal__grid {
     display: grid;
     {%- if section.settings.card_width > 0 -%}
@@ -221,7 +228,6 @@
     {%- else -%}
       grid-template-columns: repeat({{ section.settings.columns }}, minmax(0, 1fr));
     {%- endif -%}
-    gap: {{ section.settings.row_gap }}px {{ section.settings.column_gap }}px;
   }
 
   {%- comment -%}
