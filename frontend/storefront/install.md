@@ -159,6 +159,39 @@ different lists. Every store works this way, Wiser almost certainly included.
 
 ## Tracking
 
+Copy `assets/ymal-track.js` into the theme and load it once, in
+`layout/theme.liquid` before `</head>`:
+
+```liquid
+<script src="{{ 'ymal-track.js' | asset_url }}" defer></script>
+```
+
+It defines `window.ymalTrack`, which the block scripts already call and which
+does nothing when absent - so blocks can ship before tracking, and tracking can
+be removed without touching them.
+
+**This data cannot be collected retroactively.** Whatever is not captured from
+the first day is gone, and it is what the Phase 8 ranking model trains on.
+
+What is recorded: which block, which page, which product, its position in the
+row, and a random session id the browser generates for itself. No cookie, no
+identifier that outlives the tab, nothing traceable to a person.
+
+Purchases work differently. Clicking a product in a YMAL row writes a cart
+attribute naming the block; Shopify carries that through checkout onto the
+order, and `scripts/attribute_orders.py` reads it back from orders the pipeline
+already fetches. No webhook, no session-to-order join, and nothing on the
+thank-you page, which Shopify restricts.
+
+The attribute is visible to the shopper on their own order, which is why it
+reads `YMAL block: trending` rather than an internal id.
+
+Attribution is last touch - whichever block was clicked most recently before
+checkout. It is not a claim that the block caused the sale; the honest number
+for that is the Phase 7 holdout.
+
+### Old notes
+
 The script calls `window.ymalTrack(name, detail)` if it exists and does nothing
 if it does not, so blocks can ship before the events module does and start
 reporting the moment it lands.

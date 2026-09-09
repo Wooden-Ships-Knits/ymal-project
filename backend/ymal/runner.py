@@ -30,6 +30,7 @@ STEPS = [
     ("build_copurchase", "co-purchase reranking"),
     ("build_blocks", "trending, top selling, new arrivals"),
     ("publish_all", "write everything to Shopify"),
+    ("attribute_orders", "attribute orders to the block that led to them"),
 ]
 
 SLOW_STEP = "build_copurchase"

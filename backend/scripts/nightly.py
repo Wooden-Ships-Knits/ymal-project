@@ -28,6 +28,10 @@ STEPS = [
     ("build_copurchase", "co-purchase reranking", []),
     ("build_blocks", "trending, top selling, new arrivals", []),
     ("publish_all", "write everything to Shopify", []),
+    # Reads the cart attribute back off orders, so purchases can be
+    # attributed. Last, because it reports on the storefront rather than
+    # feeding anything the earlier steps need.
+    ("attribute_orders", "attribute orders to the block that led to them", []),
 ]
 
 # Pulling a year of orders is by far the slowest step, and co-purchase pairs
