@@ -44,6 +44,9 @@ export default function Analytics() {
 
   if (!data) return <p>Loading…</p>
 
+  // The layout is always drawn, even with nothing in it. An empty state that
+  // replaces the whole screen hides the thing you need to look at while
+  // setting it up, and the banner below says plainly why every number is zero.
   const nothingYet = data.blocks.length === 0
 
   return (
@@ -53,6 +56,7 @@ export default function Analytics() {
           <button
             key={n}
             type="button"
+            className="btn"
             onClick={() => setDays(n)}
             aria-pressed={n === days}
             style={{
@@ -65,27 +69,24 @@ export default function Analytics() {
         ))}
       </p>
 
-      {nothingYet ? (
-        <div className="note">
-          <h3>No events recorded yet</h3>
+      {nothingYet && (
+        <div className="note" style={{ marginBottom: 18 }}>
+          <h3>Nothing tracked yet</h3>
           <p>
-            Nothing has been tracked in this period. That is expected until
-            <code> assets/ymal-track.js </code> is installed on the theme and a
-            YMAL block has been seen by a shopper.
+            Every number below is zero because no events have been recorded.
+            That is expected until <code>assets/ymal-track.js</code> is on the
+            theme and a shopper has seen a YMAL block.
           </p>
           <p>
             This data cannot be collected retroactively, so the sooner the
-            script is on the theme, the sooner Phase 8 has something to learn
-            from.
+            script is installed, the sooner there is something to read here.
           </p>
         </div>
-      ) : (
-        <>
-          <StatTiles totals={data.totals} />
-          <TrendChart daily={data.daily || []} currency={data.totals?.currency} />
-          <BlockTable blocks={data.blocks} revenue={data.revenue} />
-        </>
       )}
+
+      <StatTiles totals={data.totals} />
+      <TrendChart daily={data.daily || []} currency={data.totals?.currency} />
+      <BlockTable blocks={data.blocks} revenue={data.revenue} />
     </>
   )
 }

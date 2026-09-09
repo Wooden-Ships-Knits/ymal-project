@@ -18,8 +18,32 @@ function money(value, currency) {
   })}`.trim()
 }
 
+const ALL_BLOCKS = [
+  'featured',
+  'trending',
+  'top_selling',
+  'new_arrivals',
+  'recently_viewed',
+]
+
 export default function BlockTable({ blocks, revenue }) {
   const byBlock = Object.fromEntries((revenue || []).map((r) => [r.block, r]))
+  const measured = Object.fromEntries((blocks || []).map((b) => [b.block, b]))
+
+  // Every block is listed whether or not it has been seen, so the report has
+  // its full shape from the first day and a block with no traffic is visibly
+  // absent rather than silently missing from the table.
+  const rows = ALL_BLOCKS.map(
+    (id) =>
+      measured[id] || {
+        block: id,
+        impressions: 0,
+        clicks: 0,
+        add_to_cart: 0,
+        click_rate: null,
+        add_rate: null,
+      }
+  )
 
   return (
     <table className="table">
@@ -35,7 +59,7 @@ export default function BlockTable({ blocks, revenue }) {
         </tr>
       </thead>
       <tbody>
-        {blocks.map((b) => {
+        {rows.map((b) => {
           const money_ = byBlock[b.block] || {}
           return (
             <tr key={b.block}>
