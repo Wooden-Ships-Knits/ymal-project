@@ -169,15 +169,10 @@
   #shopify-section-{{ section.id }} .ymal__card {
     min-width: 0;
   }
-  {%- comment -%}
-    .ymal-card is a <product-block> custom element, and an unknown element
-    defaults to display:inline - so the display is stated explicitly.
-  {%- endcomment -%}
   #shopify-section-{{ section.id }} .ymal-card {
     display: flex;
     flex-direction: column;
     height: 100%;
-    position: relative;
   }
   #shopify-section-{{ section.id }} .ymal-card__link {
     display: flex;

@@ -63,17 +63,7 @@
 {%- endif -%}
 
 {%- if product.available and ymal_eligible and ymal_is_sale == false -%}
-  {%- comment -%}
-    Wrapped in <product-block> so the theme's quick-buy works. Its script binds
-    to that element and expects two things inside: a `.quickbuy-toggle` to
-    click, and an empty `.quickbuy-container` to fill with the variant picker.
-    Without the wrapper the button is just a link to the product page.
-
-    Only the wrapper and those two hooks are borrowed - the card's own layout
-    stays ours, because the theme's card styling assumes it sits inside the
-    theme's product grid and falls apart elsewhere.
-  {%- endcomment -%}
-  <product-block class="ymal-card" data-product-id="{{ product.id }}">
+  <div class="ymal-card">
     <a class="ymal-card__link" href="{{ product.url }}">
       <div class="ymal-card__media">
         {%- if product.featured_media -%}
@@ -96,25 +86,16 @@
     </a>
 
     {%- comment -%}
-      `quickbuy-toggle` opens the theme's variant picker. The href is a real
-      product link, so the button still works if that script never runs - and
-      gift cards skip it, as the theme's own card does.
-    {%- endcomment -%}
-    {%- unless product.tags contains 'gift card' -%}
-      <a class="ymal-card__button quickbuy-toggle" href="{{ product.url }}">
-        {{ button_label | default: 'Choose Option' }}
-      </a>
+      Links to the product rather than opening a quick-buy drawer. The theme's
+      quick buy is wired to its own card markup, and a link that always works
+      beats a button that sometimes does.
 
-      <div class="quickbuy-container use-color-scheme use-color-scheme--{{ settings.quickbuy_color_scheme }}">
-        <a href="#" class="close-detail" aria-label="{{ 'accessibility.close' | t }}" tabindex="-1">
-          {%- render 'icon-close', stroke_width: 1 -%}
-        </a>
-        <div class="inner"></div>
-      </div>
-    {%- else -%}
-      <a class="ymal-card__button" href="{{ product.url }}">
-        {{ button_label | default: 'Choose Option' }}
-      </a>
-    {%- endunless -%}
-  </product-block>
+      No theme button class. Those are styled contextually like the rest of the
+      card was, so the colours are section settings and the button looks the
+      same wherever the block is placed.
+    {%- endcomment -%}
+    <a class="ymal-card__button" href="{{ product.url }}">
+      {{ button_label | default: 'Choose Option' }}
+    </a>
+  </div>
 {%- endif -%}
