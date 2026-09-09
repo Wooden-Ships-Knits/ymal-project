@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { getAnalytics } from './api'
 import BlockTable from './BlockTable'
+import StatTiles from './StatTiles'
+import TrendChart from './TrendChart'
 
 /*
  * How each block is actually performing.
@@ -78,7 +80,11 @@ export default function Analytics() {
           </p>
         </div>
       ) : (
-        <BlockTable blocks={data.blocks} revenue={data.revenue} />
+        <>
+          <StatTiles totals={data.totals} />
+          <TrendChart daily={data.daily || []} currency={data.totals?.currency} />
+          <BlockTable blocks={data.blocks} revenue={data.revenue} />
+        </>
       )}
     </>
   )

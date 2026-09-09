@@ -189,3 +189,129 @@ def revenue(days: int = 30) -> list[dict]:
         {"block": b, "orders": n, "revenue": float(total), "currency": currency}
         for b, n, total, currency in rows
     ]
+
+
+def totals(days: int) -> dict:
+    """
+    The headline numbers, and the same numbers for the period before, so the
+    console can show which way each is moving.
+
+    Compared against the IMMEDIATELY PRECEDING window of the same length, not
+    against a fixed date. "Last 30 days versus the 30 before" is the only
+    comparison that holds its meaning as time passes.
+    """
+    with connection() as conn:
+        row = conn.execute(
+            """
+            WITH windows AS (
+              SELECT
+                now() - make_interval(days => %(days)s)     AS this_start,
+                now() - make_interval(days => %(days)s * 2) AS prev_start
+            ),
+            ev AS (
+              SELECT
+                COUNT(*) FILTER (WHERE type='impression'  AND created_at >= w.this_start) AS impressions,
+                COUNT(*) FILTER (WHERE type='click'       AND created_at >= w.this_start) AS clicks,
+                COUNT(*) FILTER (WHERE type='add_to_cart' AND created_at >= w.this_start) AS adds,
+                COUNT(*) FILTER (WHERE type='impression'  AND created_at >= w.prev_start AND created_at < w.this_start) AS prev_impressions,
+                COUNT(*) FILTER (WHERE type='click'       AND created_at >= w.prev_start AND created_at < w.this_start) AS prev_clicks,
+                COUNT(*) FILTER (WHERE type='add_to_cart' AND created_at >= w.prev_start AND created_at < w.this_start) AS prev_adds
+              FROM events, windows w
+            ),
+            ord AS (
+              SELECT
+                COUNT(*)                    FILTER (WHERE created_at >= w.this_start) AS orders,
+                COALESCE(SUM(total) FILTER (WHERE created_at >= w.this_start), 0)     AS revenue,
+                COALESCE(SUM(total) FILTER (WHERE created_at >= w.prev_start
+                                              AND created_at <  w.this_start), 0)     AS prev_revenue,
+                MAX(currency)                                                         AS currency
+              FROM attributed_orders, windows w
+            )
+            SELECT * FROM ev, ord
+            """,
+            {"days": days},
+        ).fetchone()
+
+    if row is None:
+        return {}
+
+    (impressions, clicks, adds, prev_impressions, prev_clicks, prev_adds,
+     orders, revenue, prev_revenue, currency) = row
+
+    return {
+        "impressions": impressions,
+        "clicks": clicks,
+        "add_to_cart": adds,
+        "orders": orders,
+        "revenue": float(revenue),
+        "currency": currency or "",
+        "click_rate": round(clicks / impressions, 4) if impressions else None,
+        # Wiser calls this "conversion rate" and computes it clicks-to-sales,
+        # so ours is the same ratio and comparable at a glance.
+        "conversion_rate": round(orders / clicks, 4) if clicks else None,
+        "change": {
+            "impressions": _change(impressions, prev_impressions),
+            "clicks": _change(clicks, prev_clicks),
+            "add_to_cart": _change(adds, prev_adds),
+            "revenue": _change(revenue, prev_revenue),
+        },
+    }
+
+
+def _change(now, before) -> float | None:
+    """
+    Percentage change against the previous window.
+
+    None when there is nothing to compare against - a rise from zero is not
+    "infinite growth", it is a first measurement, and showing it as a number
+    invites someone to read meaning into it.
+    """
+    now, before = float(now or 0), float(before or 0)
+    if before == 0:
+        return None
+    return round((now - before) / before, 4)
+
+
+def daily(days: int) -> list[dict]:
+    """
+    One row per day: clicks and attributed revenue.
+
+    Every day in the range is returned, including the empty ones. A chart that
+    silently drops quiet days compresses time and makes a gap look like a dip.
+    """
+    with connection() as conn:
+        rows = conn.execute(
+            """
+            WITH days AS (
+              SELECT generate_series(
+                date_trunc('day', now() - make_interval(days => %(days)s - 1)),
+                date_trunc('day', now()),
+                interval '1 day'
+              ) AS day
+            ),
+            clicks AS (
+              SELECT date_trunc('day', created_at) AS day, COUNT(*) AS n
+                FROM events
+               WHERE type = 'click'
+               GROUP BY 1
+            ),
+            money AS (
+              SELECT date_trunc('day', created_at) AS day, SUM(total) AS revenue
+                FROM attributed_orders
+               GROUP BY 1
+            )
+            SELECT to_char(d.day, 'YYYY-MM-DD'),
+                   COALESCE(c.n, 0),
+                   COALESCE(m.revenue, 0)
+              FROM days d
+              LEFT JOIN clicks c ON c.day = d.day
+              LEFT JOIN money  m ON m.day = d.day
+             ORDER BY d.day
+            """,
+            {"days": days},
+        ).fetchall()
+
+    return [
+        {"day": day, "clicks": clicks, "revenue": float(revenue)}
+        for day, clicks, revenue in rows
+    ]

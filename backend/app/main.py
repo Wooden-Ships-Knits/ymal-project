@@ -271,6 +271,8 @@ def get_analytics(days: int = 30) -> dict:
     try:
         return {
             "days": days,
+            "totals": db.totals(days),
+            "daily": db.daily(days),
             "blocks": db.summary(days),
             "revenue": db.revenue(days),
         }

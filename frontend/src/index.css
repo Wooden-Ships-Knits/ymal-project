@@ -110,3 +110,64 @@ body {
 .table th, .table td { padding: 10px 14px; border-bottom: 1px solid #eee; text-align: left; }
 .table th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; color: #7a7a8c; }
 .table td.num, .table th.num { text-align: right; }
+
+/* ------------------------------------------------------------------
+   Analytics
+   ------------------------------------------------------------------ */
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.tile {
+  background: #fff;
+  border: 1px solid #e6e6ec;
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+.tile__label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #7a7a8c;
+  margin-bottom: 8px;
+}
+.tile__value {
+  font-size: 26px;
+  font-weight: 600;
+  color: #1d1d1f;
+  /* Digits line up down a column of tiles rather than shuffling. */
+  font-variant-numeric: tabular-nums;
+}
+.tile__foot {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  margin-top: 8px;
+  font-size: 12px;
+}
+.tile__sub { color: #7a7a8c; }
+.tile__delta { font-variant-numeric: tabular-nums; }
+.tile__delta.is-up { color: #2c6e3f; }
+.tile__delta.is-down { color: #8c3a3a; }
+.tile__delta.is-flat { color: #a0a0ae; }
+
+.chart__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.chart { width: 100%; height: auto; display: block; }
+
+/* Grid and axis text stay recessive - they orient the reader and should not
+   compete with the data. */
+.chart__grid { stroke: #ececf2; stroke-width: 1; }
+.chart__tick { fill: #a0a0ae; font-size: 11px; }
+.chart__area { fill: #4f46b8; fill-opacity: 0.1; }
+.chart__line { fill: none; stroke: #4f46b8; stroke-width: 2; stroke-linejoin: round; }
+.chart__crosshair { stroke: #c9c9d6; stroke-width: 1; stroke-dasharray: 3 3; }
+/* A surface-coloured ring so the dot reads against the area fill beneath it. */
+.chart__dot { fill: #4f46b8; stroke: #fff; stroke-width: 2; }
