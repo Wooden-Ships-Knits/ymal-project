@@ -1,0 +1,464 @@
+{%- comment -%}
+  YMAL: this section can take its products from a YMAL recommendation list
+  instead of a collection. Everything else - the slider, the aspect-ratio
+  handling, product-block, quick buy - is the theme's and is untouched.
+
+  Set "Products from" in the section settings. "Collection" is the original
+  behaviour and is the default, so existing uses of this section are unchanged.
+
+  Each YMAL list is a list.product_reference metafield, so Liquid receives live
+  product objects: today's price, today's stock, from a list written overnight.
+
+  Every product is checked against the eligibility rule before it renders -
+  purchasable, no *SALE* marker, and stocked at Bali To Produce (published by
+  backend/scripts/publish_eligibility.py). An ineligible product is skipped, so
+  a YMAL row can be shorter than the requested count. That is correct: showing
+  a fixed-stock or markdown product is the failure YMAL exists to prevent.
+{%- endcomment -%}
+{%- liquid
+  comment
+    `product` is the loop variable further down, which shadows the page's own
+    product on a product template. Keep a reference before that happens so the
+    anchor can still be excluded from its own recommendations.
+  endcomment
+  assign anchor_product = product
+
+  assign ymal_source = section.settings.ymal_source | default: 'collection'
+
+  case ymal_source
+    when 'featured'
+      assign ymal_items = product.metafields.ymal.featured.value
+    when 'trending'
+      assign ymal_items = shop.metafields.ymal.trending.value
+    when 'top_selling'
+      assign ymal_items = shop.metafields.ymal.top_selling.value
+    when 'new_arrivals'
+      assign ymal_items = shop.metafields.ymal.new_arrivals.value
+  endcase
+
+  comment
+    Count the eligible products up front so the whole section can be dropped
+    when none survive. A heading with nothing under it is worse than no block.
+  endcomment
+  assign ymal_eligible_count = 0
+  if ymal_source != 'collection'
+    for ymal_item in ymal_items
+      if anchor_product != blank and ymal_item.id == anchor_product.id
+        continue
+      endif
+      unless ymal_item.available
+        continue
+      endunless
+      unless ymal_item.metafields.ymal.eligible.value
+        continue
+      endunless
+      if ymal_item.title contains '*SALE*'
+        continue
+      endif
+      assign ymal_eligible_count = ymal_eligible_count | plus: 1
+    endfor
+  endif
+-%}
+{%- if ymal_source == 'collection' or ymal_eligible_count > 0 -%}
+<div class="section-id-{{ section.id }} collection-slider-row {% if section.settings.color_scheme != 'default' %}use-color-scheme use-color-scheme--{{ section.settings.color_scheme }}{% endif %}">
+  <div class="container{% if section.settings.enable_carousel %} container--not-mobile{% endif %}{% if section.settings.full_width %} container--no-max{% endif %}">
+    <!-- NEW IN Section -->
+    {% if section.settings.show_new_in %}
+      <div class="new-in-section">
+        <h2 class="new-in-heading">{{ section.settings.new_in_heading }}</h2>
+        <p class="new-in-text">
+          <span class="desktop-text">{{ section.settings.desktop_text }}</span>
+          <span class="mobile-text">{{ section.settings.mobile_text }}</span>
+        </p>
+        <style>
+          /* Default: hide mobile text and show desktop text */
+          .mobile-text { display: none; }
+          /* For screens smaller than 768px (mobile devices), show mobile text and hide desktop text */
+          @media screen and (max-width: 768px) {
+            .desktop-text { display: none; }
+            .mobile-text { display: inline; }
+          }
+        </style>
+        {% if section.settings.show_new_in_button %}
+          <a href="{{ section.settings.new_in_button_link }}" class="btn btn-primary">{{ section.settings.new_in_button_text }}</a>
+        {% endif %}
+      </div>
+    {% endif %}
+    {%- if section.settings.enable_carousel -%}
+      <carousel-slider class="carousel block collection-slider">
+    {%- endif -%}
+    <h2 class="hometitle h4 align-center has-paging{% if section.settings.enable_carousel %} slider-nav{% endif %}" data-cc-animate data-cc-animate-delay="0.3s">
+      {% if section.settings.enable_carousel %}
+        <button name="prev" class="slider-nav__btn has-ltr-icon">
+          <span class="visually-hidden">{{ 'general.slider.previous' | t }}</span>
+          {% render 'icon-chevron-left' %}
+        </button>
+      {% endif %}
+      <span class="has-paging__title">{{ section.settings.title | escape }}</span>
+      {% if section.settings.enable_carousel %}
+        <button name="next" class="slider-nav__btn has-ltr-icon">
+          <span class="visually-hidden">{{ 'general.slider.next' | t }}</span>
+          {% render 'icon-chevron-right' %}
+        </button>
+      {% endif %}
+    </h2>
+    <div class="collection-listing fade-in-up{% if section.settings.enable_carousel %} slider {% if section.settings.full_width %}slider--edge-peek{% endif %} slider--mobile-container-pad slider--no-scrollbar{% endif %}" data-cc-animate>
+      <div class="product-grid product-grid--per-row-{{ section.settings.grid }} product-grid--per-row-mob-{{ settings.prod_thumb_mob_per_row }}{% if section.settings.enable_carousel %} slider__grid product-grid--carousel{% endif %}">
+        {%- liquid
+          assign source_collection = section.settings.source_collection
+          assign products_limit = section.settings.products_to_show | default: 8
+
+          comment
+            A YMAL list stands in for the collection's products. The aspect-ratio
+            passes below read this too, so a YMAL row is measured the same way a
+            collection row is.
+          endcomment
+          if ymal_source == 'collection'
+            assign source_products = source_collection.products
+          else
+            assign source_products = ymal_items
+          endif
+
+          comment
+            Liquid has no operator precedence and evaluates and/or right to
+            left, so this is computed as a single flag rather than written as a
+            compound condition that would not mean what it looks like.
+          endcomment
+          assign show_onboarding = false
+          if ymal_source == 'collection'
+            if source_collection == blank
+              assign show_onboarding = true
+            elsif source_collection.products_count == 0
+              assign show_onboarding = true
+            endif
+          endif
+
+          if show_onboarding
+            for i in (1..4)
+              if section.settings.enable_carousel
+                echo '<div class="slider__item">'
+              endif
+              render 'onboarding-product-block', forloop: forloop
+              if section.settings.enable_carousel
+                echo '</div>'
+              endif
+            endfor
+          else
+            if settings.prod_thumb_shape == 'portrait-23'
+              assign chosen_aspect_ratio = 0.67
+            elsif settings.prod_thumb_shape == 'portrait-45'
+              assign chosen_aspect_ratio = 0.8
+            elsif settings.prod_thumb_shape == 'square'
+              assign chosen_aspect_ratio = 1.0
+            elsif settings.prod_thumb_shape == 'landscape-54'
+              assign chosen_aspect_ratio = 1.25
+            elsif settings.prod_thumb_shape == 'landscape-32'
+              assign chosen_aspect_ratio = 1.50
+            elsif settings.prod_thumb_shape == 'tallest'
+              assign chosen_aspect_ratio = 99
+              for product in source_products limit: products_limit
+                assign ar = product.featured_media.preview_image.aspect_ratio | default: 1.0
+                if ar < chosen_aspect_ratio
+                  assign chosen_aspect_ratio = ar
+                endif
+              endfor
+            else
+              assign chosen_aspect_ratio = 0
+              for product in source_products limit: products_limit
+                assign ar = product.featured_media.preview_image.aspect_ratio | default: 1.0
+                if ar > chosen_aspect_ratio
+                  assign chosen_aspect_ratio = ar
+                endif
+              endfor
+            endif
+            comment
+              Counted rather than `limit:`, because the gate below skips
+              products and a limit would count the skipped ones against the
+              total - a row of six could render two.
+            endcomment
+            assign ymal_shown = 0
+            for product in source_products
+              if ymal_shown >= products_limit
+                break
+              endif
+
+              comment
+                The eligibility gate, for YMAL sources only. A collection row is
+                the merchandiser's explicit choice and is left alone.
+              endcomment
+              if ymal_source != 'collection'
+                if anchor_product != blank and product.id == anchor_product.id
+                  continue
+                endif
+                unless product.available
+                  continue
+                endunless
+                unless product.metafields.ymal.eligible.value
+                  continue
+                endunless
+                if product.title contains '*SALE*'
+                  continue
+                endif
+              endif
+
+              if section.settings.enable_carousel
+                echo '<div class="slider__item">'
+              endif
+              render 'product-block', product: product, custom_aspect_ratio: chosen_aspect_ratio, no_swiping: section.settings.enable_carousel, no_quick_buy_markup: section.settings.enable_carousel
+              if section.settings.enable_carousel
+                echo '</div>'
+              endif
+              assign ymal_shown = ymal_shown | plus: 1
+            endfor
+          endif
+        -%}
+      </div>
+    </div>
+    {%- if section.settings.enable_carousel -%}
+      </carousel-slider>
+    {%- endif -%}
+  </div>
+  {% if settings.quickbuy_style != 'off' and section.settings.enable_carousel %}
+    <div class="quickbuy-container use-color-scheme use-color-scheme--{{ settings.quickbuy_color_scheme }}">
+      <a href="#" class="close-detail" aria-label="{{ 'accessibility.close' | t }}" tabindex="-1">{% render 'icon-close', stroke_width: 1 %}</a>
+      <div class="inner"></div>
+    </div>
+  {% endif %}
+</div>
+{%- endif -%}
+<script>
+  document.querySelectorAll('.new-in-heading').forEach(element => {
+    const text = element.textContent;
+    if (text.length > 0) {
+      const lastLetter = text.slice(-1);
+      const rest = text.slice(0, -1);
+      element.innerHTML = `${rest}<span class="last-letter">${lastLetter}</span>`;
+    }
+  });
+</script>
+<style>
+  .new-in-heading span.last-letter {
+    font-family: "Times New Roman", serif;
+  }
+  .new-in-section {
+    margin-right: 20px;
+    padding: 20px;
+    background-color: white; /* fixed */
+  }
+  .new-in-heading {
+    font-size: 26px;
+    margin-bottom: 10px;
+  }
+  .new-in-text {
+    font-size: 18px;
+    margin-bottom: 15px;
+  }
+  .btn-primary {
+    color: white;
+    padding: 10px 20px;
+    text-decoration: none;
+    border-radius: 0px;
+    border: none;
+  }
+  .btn-primary:hover {
+    background-color: grey; /* fixed */
+  }
+  /* Slider Navigation Button Styles */
+  .slider-nav__btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 5;
+    background-color: rgba(0, 0, 0, 0.5);
+    border: none;
+    color: white;
+    padding: 10px;
+    cursor: pointer;
+  }
+  .slider-nav__btn.has-ltr-icon {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  .slider-nav__btn[name="prev"] {
+    left: -50px;
+  }
+  .slider-nav__btn[name="next"] {
+    right: -60px;
+  }
+  @media (max-width: 767px) {
+    .slider-nav__btn[name="prev"] { left: -5px; }
+    .slider-nav__btn[name="next"] { right: -5px; }
+  }
+  .slider-nav__btn:hover {
+    background-color: rgba(0, 0, 0, 0.8);
+  }
+  @media screen and (max-width: 768px) {
+    .new-in-text { font-size: 15px; }
+    .new-in-heading { font-size: 20px; }
+  }
+</style>
+{% schema %}
+{
+  "name": "Product list",
+  "class": "section-product-grid",
+  "disabled_on": {
+    "templates": [
+      "product",
+      "password"
+    ],
+    "groups": [
+      "aside"
+    ]
+  },
+  "settings": [
+    {
+      "type": "text",
+      "id": "title",
+      "label": "Heading",
+      "default": "Product list"
+    },
+    {
+      "type": "select",
+      "id": "ymal_source",
+      "label": "Products from",
+      "default": "collection",
+      "info": "YMAL lists are built nightly and filtered at render, so sold-out, markdown and fixed-stock products never appear. Featured needs a product page to be about.",
+      "options": [
+        {
+          "value": "collection",
+          "label": "A collection"
+        },
+        {
+          "value": "featured",
+          "label": "YMAL - Featured for this product"
+        },
+        {
+          "value": "trending",
+          "label": "YMAL - Trending"
+        },
+        {
+          "value": "top_selling",
+          "label": "YMAL - Top Selling"
+        },
+        {
+          "value": "new_arrivals",
+          "label": "YMAL - New Arrivals"
+        }
+      ]
+    },
+    {
+      "type": "collection",
+      "id": "source_collection",
+      "label": "Collection to mirror",
+      "info": "Used only when \"Products from\" is set to a collection."
+    },
+    {
+      "type": "range",
+      "id": "products_to_show",
+      "label": "Products to show",
+      "min": 2,
+      "max": 50,
+      "step": 1,
+      "default": 8,
+      "info": "A YMAL row may show fewer once ineligible products are filtered out."
+    },
+    {
+      "type": "checkbox",
+      "id": "show_vendor",
+      "label": "Show product vendor",
+      "default": false
+    },
+    {
+      "type": "checkbox",
+      "id": "enable_carousel",
+      "label": "Enable carousel",
+      "default": true
+    },
+    {
+      "type": "range",
+      "id": "grid",
+      "label": "Products per row",
+      "min": 2,
+      "max": 5,
+      "step": 1,
+      "default": 4
+    },
+    {
+      "type": "select",
+      "id": "color_scheme",
+      "label": "Color scheme",
+      "default": "default",
+      "options": [
+        {
+          "value": "default",
+          "label": "Default"
+        },
+        {
+          "value": "1",
+          "label": "1"
+        },
+        {
+          "value": "2",
+          "label": "2"
+        }
+      ]
+    },
+    {
+      "id": "full_width",
+      "type": "checkbox",
+      "label": "Full page width",
+      "default": true
+    },
+    {
+      "id": "show_new_in",
+      "type": "checkbox",
+      "label": "Show New In Header",
+      "default": true
+    },
+    {
+      "id": "new_in_heading",
+      "type": "text",
+      "label": "New In Heading",
+      "default": "BLACK FRIDAY SALE!"
+    },
+    {
+      "id": "desktop_text",
+      "type": "textarea",
+      "label": "Desktop Text",
+      "default": "Happening now! Buy One Sample (at already discounted prices), Get Another for 20% OFF! Hurry! Limited Qty's! SAVE UP TO 50% FROM ORIGINAL PRICES"
+    },
+    {
+      "id": "mobile_text",
+      "type": "textarea",
+      "label": "Mobile Text",
+      "default": "Happening now! Buy One Sample (at already discounted prices), Get Another for 20% OFF! Hurry! Limited Qty's! SAVE UP TO 50% FROM ORIGINAL PRICES"
+    },
+    {
+      "id": "show_new_in_button",
+      "type": "checkbox",
+      "label": "Show New In Button",
+      "default": true
+    },
+    {
+      "id": "new_in_button_text",
+      "type": "text",
+      "label": "New In Button Text",
+      "default": "SHOP SALE"
+    },
+    {
+      "id": "new_in_button_link",
+      "type": "url",
+      "label": "New In Button Link"
+    }
+  ],
+  "presets": [
+    {
+      "name": "Product list",
+      "settings": {
+        "title": "Product list"
+      }
+    }
+  ]
+}
+{% endschema %}

@@ -22,39 +22,35 @@ cd backend
 .venv/bin/python -m scripts.publish_all
 ```
 
-## 2. Copy four files into the theme
+## 2. Two ways to render a block
 
-| From here | Into the theme |
+**Preferred: the theme's own `product-list` section.** It already has the
+slider, the aspect-ratio handling, quick buy and `product-block`, so a YMAL row
+looks exactly like every other product row on the site and stays that way when
+the theme changes.
+
+Copy `sections/product-list.liquid` over the theme's copy. It adds one setting,
+**Products from**, and leaves the collection behaviour as the default - so
+every existing use of that section is unaffected.
+
+Then in the theme editor: add a Product list section as usual, and set
+**Products from** to a YMAL list instead of a collection.
+
+**Alternative: the standalone `ymal-widget` section.** Self-contained, with its
+own card and layout settings. Useful on a theme that has no reusable product
+row, but on this store `product-list` is the better fit.
+
+| File | Needed for |
 |---|---|
-| `sections/ymal-widget.liquid` | `sections/` |
-| `snippets/ymal-card.liquid` | `snippets/` |
-| `snippets/ymal-recently-viewed.liquid` | `snippets/` |
-| `templates/product.ymal-card.liquid` | `templates/` |
-| `assets/ymal-recently-viewed.js` | `assets/` |
+| `sections/product-list.liquid` | the preferred route |
+| `sections/ymal-widget.liquid` | the standalone route |
+| `snippets/ymal-card.liquid` | the standalone route |
+| `snippets/ymal-recently-viewed.liquid` | Recently Viewed, either route |
+| `templates/product.ymal-card.liquid` | Recently Viewed, either route |
+| `assets/ymal-recently-viewed.js` | Recently Viewed, either route |
 
-## 3. The card is ours, not the theme's
-
-`snippets/ymal-card.liquid` builds its own card: image, title, price, button.
-
-It was originally rendering the theme's `product-block`, which looked right in
-principle - the theme's card, so it matches the site. In practice that card is
-styled contextually: its rules assume it sits inside the theme's own product
-grid, and lifted into a different container the price rendered beside the title
-instead of beneath it. That could not be corrected from outside, even with
-id-scoped `!important` rules.
-
-So the layout is stated rather than inherited. It still uses the theme's
-`image` and `price` snippets, so images stay responsive and prices are
-formatted, localised and styled for sale exactly as everywhere else on the
-site.
-
-What is given up: the hover-image swap, colour swatches, and the theme's stock
-labels. Those live in `product-block` and were judged not worth
-re-implementing for a recommendation strip. If you want them later, the place
-to add them is this one file.
-
-Leave the eligibility check at the top exactly as it is. That check is the
-whole point, and this file is the only place it lives.
+Recently Viewed is not a `product-list` option: it has no metafield to read, so
+it is rendered client-side from the shopper's browser and needs its own snippet.
 
 ## 4. Add blocks in the theme editor
 
