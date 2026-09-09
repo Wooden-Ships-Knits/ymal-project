@@ -1,65 +1,3 @@
-{%- comment -%}
-  YMAL: this section can take its products from a YMAL recommendation list
-  instead of a collection. Everything else - the slider, the aspect-ratio
-  handling, product-block, quick buy - is the theme's and is untouched.
-
-  Set "Products from" in the section settings. "Collection" is the original
-  behaviour and is the default, so existing uses of this section are unchanged.
-
-  Each YMAL list is a list.product_reference metafield, so Liquid receives live
-  product objects: today's price, today's stock, from a list written overnight.
-
-  Every product is checked against the eligibility rule before it renders -
-  purchasable, no *SALE* marker, and stocked at Bali To Produce (published by
-  backend/scripts/publish_eligibility.py). An ineligible product is skipped, so
-  a YMAL row can be shorter than the requested count. That is correct: showing
-  a fixed-stock or markdown product is the failure YMAL exists to prevent.
-{%- endcomment -%}
-{%- liquid
-  comment
-    `product` is the loop variable further down, which shadows the page's own
-    product on a product template. Keep a reference before that happens so the
-    anchor can still be excluded from its own recommendations.
-  endcomment
-  assign anchor_product = product
-
-  assign ymal_source = section.settings.ymal_source | default: 'collection'
-
-  case ymal_source
-    when 'featured'
-      assign ymal_items = product.metafields.ymal.featured.value
-    when 'trending'
-      assign ymal_items = shop.metafields.ymal.trending.value
-    when 'top_selling'
-      assign ymal_items = shop.metafields.ymal.top_selling.value
-    when 'new_arrivals'
-      assign ymal_items = shop.metafields.ymal.new_arrivals.value
-  endcase
-
-  comment
-    Count the eligible products up front so the whole section can be dropped
-    when none survive. A heading with nothing under it is worse than no block.
-  endcomment
-  assign ymal_eligible_count = 0
-  if ymal_source != 'collection'
-    for ymal_item in ymal_items
-      if anchor_product != blank and ymal_item.id == anchor_product.id
-        continue
-      endif
-      unless ymal_item.available
-        continue
-      endunless
-      unless ymal_item.metafields.ymal.eligible.value
-        continue
-      endunless
-      if ymal_item.title contains '*SALE*'
-        continue
-      endif
-      assign ymal_eligible_count = ymal_eligible_count | plus: 1
-    endfor
-  endif
--%}
-{%- if ymal_source == 'collection' or ymal_eligible_count > 0 -%}
 <div class="section-id-{{ section.id }} collection-slider-row {% if section.settings.color_scheme != 'default' %}use-color-scheme use-color-scheme--{{ section.settings.color_scheme }}{% endif %}">
   <div class="container{% if section.settings.enable_carousel %} container--not-mobile{% endif %}{% if section.settings.full_width %} container--no-max{% endif %}">
     <!-- NEW IN Section -->
@@ -107,33 +45,7 @@
         {%- liquid
           assign source_collection = section.settings.source_collection
           assign products_limit = section.settings.products_to_show | default: 8
-
-          comment
-            A YMAL list stands in for the collection's products. The aspect-ratio
-            passes below read this too, so a YMAL row is measured the same way a
-            collection row is.
-          endcomment
-          if ymal_source == 'collection'
-            assign source_products = source_collection.products
-          else
-            assign source_products = ymal_items
-          endif
-
-          comment
-            Liquid has no operator precedence and evaluates and/or right to
-            left, so this is computed as a single flag rather than written as a
-            compound condition that would not mean what it looks like.
-          endcomment
-          assign show_onboarding = false
-          if ymal_source == 'collection'
-            if source_collection == blank
-              assign show_onboarding = true
-            elsif source_collection.products_count == 0
-              assign show_onboarding = true
-            endif
-          endif
-
-          if show_onboarding
+          if source_collection == blank or source_collection.products_count == 0
             for i in (1..4)
               if section.settings.enable_carousel
                 echo '<div class="slider__item">'
@@ -156,7 +68,7 @@
               assign chosen_aspect_ratio = 1.50
             elsif settings.prod_thumb_shape == 'tallest'
               assign chosen_aspect_ratio = 99
-              for product in source_products limit: products_limit
+              for product in source_collection.products limit: products_limit
                 assign ar = product.featured_media.preview_image.aspect_ratio | default: 1.0
                 if ar < chosen_aspect_ratio
                   assign chosen_aspect_ratio = ar
@@ -164,43 +76,14 @@
               endfor
             else
               assign chosen_aspect_ratio = 0
-              for product in source_products limit: products_limit
+              for product in source_collection.products limit: products_limit
                 assign ar = product.featured_media.preview_image.aspect_ratio | default: 1.0
                 if ar > chosen_aspect_ratio
                   assign chosen_aspect_ratio = ar
                 endif
               endfor
             endif
-            comment
-              Counted rather than `limit:`, because the gate below skips
-              products and a limit would count the skipped ones against the
-              total - a row of six could render two.
-            endcomment
-            assign ymal_shown = 0
-            for product in source_products
-              if ymal_shown >= products_limit
-                break
-              endif
-
-              comment
-                The eligibility gate, for YMAL sources only. A collection row is
-                the merchandiser's explicit choice and is left alone.
-              endcomment
-              if ymal_source != 'collection'
-                if anchor_product != blank and product.id == anchor_product.id
-                  continue
-                endif
-                unless product.available
-                  continue
-                endunless
-                unless product.metafields.ymal.eligible.value
-                  continue
-                endunless
-                if product.title contains '*SALE*'
-                  continue
-                endif
-              endif
-
+            for product in source_collection.products limit: products_limit
               if section.settings.enable_carousel
                 echo '<div class="slider__item">'
               endif
@@ -208,7 +91,6 @@
               if section.settings.enable_carousel
                 echo '</div>'
               endif
-              assign ymal_shown = ymal_shown | plus: 1
             endfor
           endif
         -%}
@@ -225,7 +107,6 @@
     </div>
   {% endif %}
 </div>
-{%- endif -%}
 <script>
   document.querySelectorAll('.new-in-heading').forEach(element => {
     const text = element.textContent;
@@ -319,39 +200,9 @@
       "default": "Product list"
     },
     {
-      "type": "select",
-      "id": "ymal_source",
-      "label": "Products from",
-      "default": "collection",
-      "info": "YMAL lists are built nightly and filtered at render, so sold-out, markdown and fixed-stock products never appear. Featured needs a product page to be about.",
-      "options": [
-        {
-          "value": "collection",
-          "label": "A collection"
-        },
-        {
-          "value": "featured",
-          "label": "YMAL - Featured for this product"
-        },
-        {
-          "value": "trending",
-          "label": "YMAL - Trending"
-        },
-        {
-          "value": "top_selling",
-          "label": "YMAL - Top Selling"
-        },
-        {
-          "value": "new_arrivals",
-          "label": "YMAL - New Arrivals"
-        }
-      ]
-    },
-    {
       "type": "collection",
       "id": "source_collection",
-      "label": "Collection to mirror",
-      "info": "Used only when \"Products from\" is set to a collection."
+      "label": "Collection to mirror"
     },
     {
       "type": "range",
@@ -360,8 +211,7 @@
       "min": 2,
       "max": 50,
       "step": 1,
-      "default": 8,
-      "info": "A YMAL row may show fewer once ineligible products are filtered out."
+      "default": 8
     },
     {
       "type": "checkbox",
