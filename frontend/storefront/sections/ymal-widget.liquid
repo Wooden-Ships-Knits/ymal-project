@@ -137,15 +137,18 @@
   and keeps following them when someone changes the palette.
 {%- endcomment -%}
 <style>
+  {%- comment -%}
+    Full width drops the maximum width only. Side padding still applies, so the
+    row can span the screen while keeping the first and last cards off the very
+    edge - dropping both left cards flush against the window.
+  {%- endcomment -%}
   #shopify-section-{{ section.id }} .ymal {
     padding-block: {{ section.settings.padding_top }}px {{ section.settings.padding_bottom }}px;
-    {%- if section.settings.full_width -%}
-      padding-inline: 0;
-    {%- else -%}
-      padding-inline: {{ section.settings.padding_inline }}px;
+    padding-inline: {{ section.settings.padding_inline }}px;
+    {%- unless section.settings.full_width -%}
       max-width: {{ section.settings.max_width }}px;
       margin-inline: auto;
-    {%- endif -%}
+    {%- endunless -%}
   }
   #shopify-section-{{ section.id }} .ymal__title {
     font-size: {{ section.settings.heading_size }}px;
@@ -594,14 +597,14 @@
       "id": "full_width",
       "label": "Full width",
       "default": true,
-      "info": "Edge to edge, ignoring maximum width and side padding."
+      "info": "Span the screen instead of a fixed maximum width. Side padding still applies."
     },
     {
       "type": "range",
       "id": "max_width",
       "label": "Maximum width",
       "min": 800,
-      "max": 2000,
+      "max": 3000,
       "step": 40,
       "default": 1400,
       "unit": "px",
@@ -610,12 +613,13 @@
     {
       "type": "range",
       "id": "padding_inline",
-      "label": "Side padding",
+      "label": "Space at the left and right edges",
       "min": 0,
       "max": 80,
       "step": 4,
       "default": 20,
-      "unit": "px"
+      "unit": "px",
+      "info": "Keeps the first and last cards off the very edge of the screen."
     },
     {
       "type": "range",
