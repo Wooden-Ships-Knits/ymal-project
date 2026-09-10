@@ -26,9 +26,9 @@ from datetime import datetime, timezone
 STEPS = [
     ("fetch_products", "the eligible product list"),
     ("build_features", "the feature table"),
+    ("build_blocks", "trending, top selling, new arrivals"),
     ("build_pools", "content similarity pools"),
     ("build_copurchase", "co-purchase reranking"),
-    ("build_blocks", "trending, top selling, new arrivals"),
     ("publish_all", "write everything to Shopify"),
     ("attribute_orders", "attribute orders to the block that led to them"),
 ]

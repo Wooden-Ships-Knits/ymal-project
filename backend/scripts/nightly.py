@@ -24,9 +24,12 @@ from datetime import datetime, timezone
 STEPS = [
     ("fetch_products", "the eligible product list", []),
     ("build_features", "the feature table", []),
+    # Blocks BEFORE pools: build_blocks counts units for Top Selling and
+    # writes them out, and build_pools uses those to nudge similar products by
+    # how well they sell. The other way round, pools would use yesterday's.
+    ("build_blocks", "trending, top selling, new arrivals", []),
     ("build_pools", "content similarity pools", []),
     ("build_copurchase", "co-purchase reranking", []),
-    ("build_blocks", "trending, top selling, new arrivals", []),
     ("publish_all", "write everything to Shopify", []),
     # Reads the cart attribute back off orders, so purchases can be
     # attributed. Last, because it reports on the storefront rather than

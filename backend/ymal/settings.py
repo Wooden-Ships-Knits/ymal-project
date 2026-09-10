@@ -218,7 +218,31 @@ SIMILARITY_WEIGHTS = {
     "fabric": 2.0,      # chunky next to lightweight looks wrong
     "colour": 1.5,
     "silhouette": 1.5,  # crew with crew, v-neck with v-neck
+    # Collections are the merchandiser's own grouping - game-day, beach-lake,
+    # cardigans - so two products sharing one were deliberately put together by
+    # someone who knows the range. Weighted like silhouette: real evidence, but
+    # not more telling than what the product looks like.
+    #
+    # Of the 23 collections on this shop, most are operational (testimonial,
+    # tax-clothing, discount-applicable-*) and sit on 88-100% of products.
+    # Those are dropped by frequency in similarity.py before scoring - IDF
+    # alone does not handle them, because its +1.0 floor still leaves a
+    # collection on every product scoring 0.82 against 1.92 for a rare one.
+    "collection": 1.5,
 }
+
+# How much a product's sales volume may lift it WITHIN its pool.
+#
+# Content similarity still decides who is in the pool; this only reorders them,
+# the same way co-purchase does. That split is deliberate: with 258 eligible
+# products and one selling 153 units in a fortnight, letting volume decide
+# membership would collapse every pool onto the same bestsellers - which is the
+# risk recorded in caveats.md.
+#
+# At 0.4 the best-selling product in a pool can rise by 40%, enough to move it
+# a few places among genuine matches and not enough to drag an unrelated
+# product to the top.
+POPULARITY_WEIGHT = 0.4
 
 # Hard rule: a recommendation must be in the same season as the anchor.
 # Decided 2026-09-08. Halves the candidate pool (152 autumn / 102 spring), so
