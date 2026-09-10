@@ -133,9 +133,17 @@ ORDER_LINE_ITEMS_PAGE_SIZE = 20
 # after 4 last fortnight is trending; one selling a steady 40 is Top Selling.
 TRENDING_WINDOW_DAYS = 14
 
-# Top Selling: plain volume over a long window. Same extract as Trending, one
-# argument apart.
-TOP_SELLING_WINDOW_DAYS = 90
+# Top Selling: plain volume. Same extract as Trending, one argument apart.
+#
+# Changed from 90 to 14 days on 2026-09-10, at the web team's request - what is
+# selling now, rather than what sold over a season.
+#
+# This is the SAME window Trending uses, so the two blocks now differ only in
+# the question they ask: Trending is rising (this fortnight against the one
+# before), Top Selling is raw volume. That is still a real distinction, but the
+# lists can converge - measure the overlap after changing it, and if the top
+# six are largely the same products, widen this again.
+TOP_SELLING_WINDOW_DAYS = 14
 
 # New Arrivals: published within this many days, newest first.
 NEW_ARRIVALS_WINDOW_DAYS = 30
