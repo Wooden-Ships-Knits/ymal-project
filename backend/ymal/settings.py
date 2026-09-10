@@ -229,6 +229,19 @@ SIMILARITY_WEIGHTS = {
     # alone does not handle them, because its +1.0 floor still leaves a
     # collection on every product scoring 0.82 against 1.92 for a rare one.
     "collection": 1.5,
+    # Everything the named facets do not claim: theme and occasion (halloween,
+    # spooky, tailgate, superbowl), cut (cropped, boyfriend), release drop, and
+    # anything else this catalog tags that a keyword list did not anticipate.
+    #
+    # Added 2026-09-10, after finding the named facets kept only 33% of the
+    # signal tags and silently discarded the rest. A pumpkin sweater's
+    # "halloween" and "spooky" tags counted for nothing, so it matched every
+    # other black graphic sweater on the one word they shared: "graphic".
+    #
+    # Weighted at 2.0 - below motif, above colour. These tags are often the
+    # most telling thing about a product, but they are also the least curated,
+    # so they should not outrank what the garment actually looks like.
+    "other": 2.0,
 }
 
 # How much a product's sales volume may lift it WITHIN its pool.

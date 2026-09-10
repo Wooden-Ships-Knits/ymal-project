@@ -90,13 +90,31 @@ def facet_of(tag: str) -> str | None:
     return None
 
 
+# Tags claimed by no named facet go here rather than being discarded.
+OTHER_FACET = "other"
+
+
 def split_facets(tags: set[str]) -> dict[str, set[str]]:
-    """Bucket a product's tags by facet. Tags matching none are dropped."""
+    """
+    Bucket a product's tags by facet.
+
+    Nothing is dropped. A tag matching no keyword goes to `other`, which is
+    where the theme and occasion vocabulary lives - halloween, spooky,
+    tailgate, superbowl - along with cut and release tags.
+
+    Discarding them was a real defect: the named facets kept 33% of the signal
+    tags and threw away the rest, so a pumpkin sweater's "halloween" and
+    "spooky" counted for nothing and it matched every other black graphic
+    sweater on the single word they shared.
+
+    IDF still decides how much each one is worth, so a rare "spooky season"
+    weighs heavily and a common "autumn" barely at all - no keyword list to
+    maintain.
+    """
     buckets: dict[str, set[str]] = {f: set() for f in settings.SIMILARITY_FACETS}
+    buckets.setdefault(OTHER_FACET, set())
     for tag in tags:
-        facet = facet_of(tag)
-        if facet:
-            buckets[facet].add(tag)
+        buckets[facet_of(tag) or OTHER_FACET].add(tag)
     return buckets
 
 
@@ -151,7 +169,13 @@ def score(
     total = 0.0
 
     for facet, weight in settings.SIMILARITY_WEIGHTS.items():
-        if facet == "collection":
+        if facet == OTHER_FACET:
+            total += weight * weighted_jaccard(
+                anchor["_facets"].get(OTHER_FACET, set()),
+                candidate["_facets"].get(OTHER_FACET, set()),
+                idf,
+            )
+        elif facet == "collection":
             # Collections have their own IDF, computed over collection
             # membership rather than tags: "cottons" as a collection and
             # "cottons" as a tag are different populations and would weigh each
