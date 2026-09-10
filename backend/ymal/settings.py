@@ -257,6 +257,18 @@ SIMILARITY_WEIGHTS = {
 # product to the top.
 POPULARITY_WEIGHT = 0.4
 
+# How sharply rare tags are favoured over common ones.
+#
+# 1.0 is plain IDF. Above that, a distinctive tag counts for
+# disproportionately more than a generic one - which is what makes "pumpkin"
+# beat three shared "halloween" variants rather than being averaged away
+# among the twenty tags every chunky crew sweater carries.
+#
+# Raise it and pools tighten around distinctive products; lower it and they
+# broaden towards whatever is generically similar. Measure the pools after
+# changing it.
+IDF_POWER = 2.0
+
 # Hard rule: a recommendation must be in the same season as the anchor.
 # Decided 2026-09-08. Halves the candidate pool (152 autumn / 102 spring), so
 # revisit if pools come out thin.

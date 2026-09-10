@@ -124,16 +124,26 @@ def inverse_document_frequency(
     """
     How much each tag says about a product.
 
-    A tag on half the catalog barely distinguishes anything; one on 18% says a
-    lot. Standard IDF, smoothed so a tag on every product scores near zero
-    rather than exactly zero.
+    No smoothing floor. An earlier version added 1.0 to every score, which left
+    a tag on the whole catalog worth 0.82 against 1.92 for a rare one - only a
+    2.3x gap. Two products then matched on the twenty generic tags every
+    sweater carries, and a single telling tag like "pumpkin" could not outweigh
+    them. Without the floor a universal tag is worth nothing, which is the
+    truth about it.
+
+    Raised to IDF_POWER on top, so the gap between a rare tag and a common one
+    widens further. At 2.0 a tag on 2% of the catalog is worth roughly thirty
+    times one on half of it.
     """
     total = len(tag_sets) or 1
     counts: dict[str, int] = {}
     for tags in tag_sets:
         for tag in tags:
             counts[tag] = counts.get(tag, 0) + 1
-    return {tag: math.log(total / (1 + count)) + 1.0 for tag, count in counts.items()}
+    return {
+        tag: max(math.log(total / (1 + count)), 0.0) ** settings.IDF_POWER
+        for tag, count in counts.items()
+    }
 
 
 def weighted_jaccard(a: set[str], b: set[str], idf: dict[str, float]) -> float:
