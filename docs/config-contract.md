@@ -110,7 +110,7 @@ Five blocks. `requires_anchor` means the block needs a product to be "about".
 |---|---|---|---|
 | `featured` | Featured Products | yes | tag similarity to the anchor |
 | `trending` | Trending Products | no | orders, last 14 days, by quantity |
-| `top_selling` | Top Selling | no | orders, last 90 days, by quantity |
+| `top_selling` | Top Selling | no | orders, last 14 days, by quantity |
 | `new_arrivals` | New Arrivals | no | `publishedAt` within 30 days |
 | `recently_viewed` | Recently Viewed | no | the shopper's own browser |
 
@@ -279,7 +279,7 @@ than discovered on the storefront.
 
 These stay in `backend/ymal/settings.py`, owned by engineering:
 
-- the Trending and Top Selling windows (14 and 90 days)
+- the Trending and Top Selling windows (both 14 days since 2026-09-10)
 - tag-scoring weights and the near-universal-tag cutoff
 - the eligibility rule — Bali location pattern, the `*SALE*` marker
 - stored list depth (roughly 3x what is displayed)

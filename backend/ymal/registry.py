@@ -8,7 +8,15 @@ two disagree, this file is right.
 
 Adding a block means editing both, plus adding it to ymal/blocks/ — a block
 configured here with nothing computing it produces a page that renders nothing.
+
+The descriptions that quote a window are built from settings rather than
+written out, because they are what the console shows the web team. Top
+Selling said "the last 90 days" for a day after the window became 14, which
+is worse than no description at all - it is a wrong one, in the one place
+someone would go to check.
 """
+
+from ymal import settings
 
 # At most four blocks on one page. A page of nothing but recommendations sells
 # nothing.
@@ -26,7 +34,10 @@ BLOCKS = [
     {
         "id": "trending",
         "label": "Trending Products",
-        "description": "Rising: selling more in the last 14 days than the 14 before.",
+        "description": (
+            f"Rising: selling more in the last {settings.TRENDING_WINDOW_DAYS} "
+            f"days than the {settings.TRENDING_WINDOW_DAYS} before."
+        ),
         "requires_anchor": False,
         "default_heading": "Trending Now",
         "default_slots": 6,
@@ -34,7 +45,9 @@ BLOCKS = [
     {
         "id": "top_selling",
         "label": "Top Selling",
-        "description": "Plain volume over the last 90 days.",
+        "description": (
+            f"Plain volume over the last {settings.TOP_SELLING_WINDOW_DAYS} days."
+        ),
         "requires_anchor": False,
         "default_heading": "Top Selling",
         "default_slots": 6,
@@ -42,7 +55,10 @@ BLOCKS = [
     {
         "id": "new_arrivals",
         "label": "New Arrivals",
-        "description": "Published in the last 30 days, newest first.",
+        "description": (
+            f"Published in the last {settings.NEW_ARRIVALS_WINDOW_DAYS} days, "
+            "newest first."
+        ),
         "requires_anchor": False,
         "default_heading": "New Arrivals",
         "default_slots": 6,

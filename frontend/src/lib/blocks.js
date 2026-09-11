@@ -23,7 +23,10 @@ export const BLOCKS = [
   {
     id: 'top_selling',
     label: 'Top Selling',
-    description: 'Plain volume over the last 90 days.',
+    // 14 days since 2026-09-10. This is the offline fallback copy; the
+    // server's registry.py builds the same line from settings and wins
+    // whenever the API is reachable.
+    description: 'Plain volume over the last 14 days.',
     requiresAnchor: false,
     defaultHeading: 'Top Selling',
     defaultSlots: 6,

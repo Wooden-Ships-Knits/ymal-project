@@ -2,7 +2,7 @@
 Build every block that can be computed from the backend, and report on each.
 
     trending      rising  — this 14-day window vs the previous one
-    top_selling   volume  — units sold over 90 days
+    top_selling   volume  — units sold over the last 14 days
     new_arrivals  date    — published in the last 30 days
 
 Featured and Recently Viewed are not here: Featured is per-product rather than
