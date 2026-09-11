@@ -263,3 +263,30 @@ Two lessons worth keeping:
 The same day, three *descriptions* were found still saying "90 days" after the
 window became 14. `ymal/registry.py` now builds them from `settings` so the
 console cannot describe a window it is not using.
+
+---
+
+## 8. Measuring convergence: count styles, not products
+
+Pools keep **one product per `style_key`**, and `style_key` is the title. So the
+ceiling on "how many different things can appear across all pools" is the number
+of distinct styles, not the number of eligible products.
+
+On 2026-09-11 that was **128 styles across 261 eligible products** - colorways
+are most of the catalog. A measurement of 124 distinct styles in some pool's top
+six is therefore 97% of the maximum, not a concentration problem.
+
+This was briefly misread as a sharp regression, because an earlier note counted
+products (224 of 257) against a later count of styles (124 of 261). The two
+numbers describe different things and must not be compared.
+
+When checking for convergence, the honest denominator is:
+
+```python
+len({r["style_key"] for r in rows})
+```
+
+A style with many colorways does have a real advantage - `build_pool` takes the
+best-scoring colorway of each style, so a twelve-colorway style gets twelve
+attempts to match each anchor while a one-colorway style gets one. That is worth
+knowing, and is not the same as the pools collapsing onto the bestsellers.

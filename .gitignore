@@ -29,5 +29,5 @@ dist/
 .idea/
 
 *.pdf
-
+solver/
 *.ipynb
