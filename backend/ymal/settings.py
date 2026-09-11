@@ -133,9 +133,17 @@ ORDER_LINE_ITEMS_PAGE_SIZE = 20
 # after 4 last fortnight is trending; one selling a steady 40 is Top Selling.
 TRENDING_WINDOW_DAYS = 14
 
-# Top Selling: plain volume over a long window. Same extract as Trending, one
-# argument apart.
-TOP_SELLING_WINDOW_DAYS = 90
+# Top Selling: plain volume. Same extract as Trending, one argument apart.
+#
+# Changed from 90 to 14 days on 2026-09-10, at the web team's request - what is
+# selling now, rather than what sold over a season.
+#
+# This is the SAME window Trending uses, so the two blocks now differ only in
+# the question they ask: Trending is rising (this fortnight against the one
+# before), Top Selling is raw volume. That is still a real distinction, but the
+# lists can converge - measure the overlap after changing it, and if the top
+# six are largely the same products, widen this again.
+TOP_SELLING_WINDOW_DAYS = 14
 
 # New Arrivals: published within this many days, newest first.
 NEW_ARRIVALS_WINDOW_DAYS = 30
@@ -210,7 +218,56 @@ SIMILARITY_WEIGHTS = {
     "fabric": 2.0,      # chunky next to lightweight looks wrong
     "colour": 1.5,
     "silhouette": 1.5,  # crew with crew, v-neck with v-neck
+    # Collections are the merchandiser's own grouping - game-day, beach-lake,
+    # cardigans - so two products sharing one were deliberately put together by
+    # someone who knows the range. Weighted like silhouette: real evidence, but
+    # not more telling than what the product looks like.
+    #
+    # Of the 23 collections on this shop, most are operational (testimonial,
+    # tax-clothing, discount-applicable-*) and sit on 88-100% of products.
+    # Those are dropped by frequency in similarity.py before scoring - IDF
+    # alone does not handle them, because its +1.0 floor still leaves a
+    # collection on every product scoring 0.82 against 1.92 for a rare one.
+    "collection": 1.5,
+    # Everything the named facets do not claim: theme and occasion (halloween,
+    # spooky, tailgate, superbowl), cut (cropped, boyfriend), release drop, and
+    # anything else this catalog tags that a keyword list did not anticipate.
+    #
+    # Added 2026-09-10, after finding the named facets kept only 33% of the
+    # signal tags and silently discarded the rest. A pumpkin sweater's
+    # "halloween" and "spooky" tags counted for nothing, so it matched every
+    # other black graphic sweater on the one word they shared: "graphic".
+    #
+    # Weighted at 2.0 - below motif, above colour. These tags are often the
+    # most telling thing about a product, but they are also the least curated,
+    # so they should not outrank what the garment actually looks like.
+    "other": 2.0,
 }
+
+# How much a product's sales volume may lift it WITHIN its pool.
+#
+# Content similarity still decides who is in the pool; this only reorders them,
+# the same way co-purchase does. That split is deliberate: with 258 eligible
+# products and one selling 153 units in a fortnight, letting volume decide
+# membership would collapse every pool onto the same bestsellers - which is the
+# risk recorded in caveats.md.
+#
+# At 0.4 the best-selling product in a pool can rise by 40%, enough to move it
+# a few places among genuine matches and not enough to drag an unrelated
+# product to the top.
+POPULARITY_WEIGHT = 0.4
+
+# How sharply rare tags are favoured over common ones.
+#
+# 1.0 is plain IDF. Above that, a distinctive tag counts for
+# disproportionately more than a generic one - which is what makes "pumpkin"
+# beat three shared "halloween" variants rather than being averaged away
+# among the twenty tags every chunky crew sweater carries.
+#
+# Raise it and pools tighten around distinctive products; lower it and they
+# broaden towards whatever is generically similar. Measure the pools after
+# changing it.
+IDF_POWER = 2.0
 
 # Hard rule: a recommendation must be in the same season as the anchor.
 # Decided 2026-09-08. Halves the candidate pool (152 autumn / 102 spring), so

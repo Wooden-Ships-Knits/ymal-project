@@ -1,0 +1,49 @@
+{%- comment -%}
+  YMAL - the compact card, for the cart drawer.
+
+  An alternate product template, fetched as
+  /products/<handle>?view=ymal-card-compact. Returns one row and nothing else.
+
+  Horizontal rather than the grid card, because the drawer is about 380px wide
+  and a portrait card would push the cart itself off the screen.
+
+  Carries the same eligibility gate as every other block - an ineligible
+  product renders as an empty string and the script skips it.
+{%- endcomment -%}
+
+{% layout none %}
+
+{%- assign ymal_eligible = product.metafields.ymal.eligible.value -%}
+
+{%- assign ymal_is_sale = false -%}
+{%- if product.title contains '*SALE*' -%}
+  {%- assign ymal_is_sale = true -%}
+{%- endif -%}
+
+{%- if product.available and ymal_eligible and ymal_is_sale == false -%}
+  {%- comment -%}
+    The variant list is emitted as JSON rather than a <select> so the script
+    owns the markup. It needs the ids anyway to add to the cart, and building
+    the control in one place keeps the drawer and any future placement
+    consistent.
+  {%- endcomment -%}
+  <div class="ymal-rv__card"
+       data-handle="{{ product.handle }}"
+       data-url="{{ product.url }}"
+       data-variants='{{ product.variants | map: 'id' | json }}'
+       data-variant-titles='{{ product.variants | map: 'title' | json }}'
+       data-variant-available='{{ product.variants | map: 'available' | json }}'>
+    <a class="ymal-rv__link" href="{{ product.url }}">
+      {%- if product.featured_media -%}
+        <img class="ymal-rv__img"
+             src="{{ product.featured_media.preview_image | image_url: width: 160 }}"
+             alt="{{ product.title | escape }}"
+             width="80" height="100" loading="lazy">
+      {%- endif -%}
+    </a>
+    <div class="ymal-rv__meta">
+      <a class="ymal-rv__name" href="{{ product.url }}">{{ product.title | escape }}</a>
+      <span class="ymal-rv__price">{{ product.price | money }}</span>
+    </div>
+  </div>
+{%- endif -%}

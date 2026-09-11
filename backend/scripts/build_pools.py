@@ -23,6 +23,23 @@ from ymal import settings, similarity
 OUT_DIR = settings.DATA_DIR / "phase3"
 
 
+def load_units() -> dict:
+    """
+    Units sold per product, written by build_blocks while it was already
+    counting them.
+
+    Optional. Without it every product scores as equally popular and the pools
+    are content-only, so this works before build_blocks has ever run - it just
+    says so rather than failing.
+    """
+    path = settings.DATA_DIR / "blocks" / "units.json"
+    if not path.exists():
+        print("  units.json not found - pools will be content-only.")
+        print("  Run `python -m scripts.build_blocks` first to include sales.")
+        return {}
+    return json.loads(path.read_text())["units"]
+
+
 def load_features() -> list[dict]:
     path = settings.DATA_DIR / "phase2" / "features.json"
     if not path.exists():
@@ -49,7 +66,12 @@ def main() -> None:
     rows = load_features()
     print(f"Eligible products: {len(rows)}")
 
-    pools = similarity.build_pools(rows)
+    units = load_units()
+    if units:
+        print(f"  sales for {len(units)} products, best seller "
+              f"{max(units.values())} units")
+
+    pools = similarity.build_pools(rows, units=units)
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     out = OUT_DIR / "pools.json"
@@ -78,6 +100,7 @@ def main() -> None:
           f"{int(statistics.median(sizes))}, max {max(sizes)}")
     print(f"  empty pools     : {empty}")
     print(f"  thin (under 6)  : {thin}")
+    print(f"  popularity      : {'on' if units else 'off (no units.json)'}")
     print(f"\n  -> {out}")
 
     if "--show" in sys.argv:

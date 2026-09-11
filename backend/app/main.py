@@ -13,9 +13,10 @@ import secrets
 
 from dotenv import load_dotenv
 from fastapi import Body, FastAPI, Header, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from ymal import config_schema, config_store, registry, runner, settings
+from ymal import config_schema, config_store, db, events, registry, runner, settings
 
 load_dotenv(settings.REPO_ROOT / ".env", override=True)
 
@@ -32,6 +33,45 @@ if not API_TOKEN:
     )
 
 app = FastAPI(title="YMAL Console API")
+
+# The tracking endpoint is called by shoppers' browsers on the storefront,
+# which is a different origin from this API. Only the storefront is allowed -
+# a wildcard would let any page on the internet post events into the store's
+# analytics.
+STOREFRONT_ORIGINS = [
+    o.strip()
+    for o in os.getenv(
+        "YMAL_STOREFRONT_ORIGINS",
+        "https://www.woodenships.com,https://woodenships.com",
+    ).split(",")
+    if o.strip()
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=STOREFRONT_ORIGINS,
+    allow_methods=["POST"],
+    allow_headers=["Content-Type"],
+    # No cookies or credentials: the beacon carries nothing that identifies a
+    # person, and allowing credentials here would be inviting them.
+    allow_credentials=False,
+)
+
+
+@app.on_event("startup")
+def _ensure_schema() -> None:
+    """
+    Create the events tables if they are missing.
+
+    Deliberately does not stop the API when the database is unreachable: the
+    console's config screens do not need it, and a store should not lose its
+    admin because analytics storage is down.
+    """
+    try:
+        db.migrate()
+    except Exception as exc:
+        print(f"WARNING: tracking storage unavailable ({exc}). "
+              "Event endpoints will return 503.")
 
 
 def require_token(x_ymal_token: str) -> None:
@@ -191,3 +231,54 @@ def post_run(
             detail=f"A run is already in progress (started {result['started_at']}).",
         )
     return result
+
+
+@app.post("/api/events")
+def post_events(payload: dict = Body(...)) -> JSONResponse:
+    """
+    Record storefront tracking events.
+
+    THE ONLY UNAUTHENTICATED WRITE IN THIS PROJECT. Shoppers' browsers call it
+    with no credentials, so every event is validated against a fixed shape and
+    reduced to known columns before storage - an endpoint that keeps whatever
+    it is sent is how personal data arrives by accident.
+
+    A partly-bad batch stores its good events rather than failing whole: the
+    browser sends by beacon and has no way to retry, so rejecting everything
+    would lose real data over one malformed row.
+    """
+    good, problems = events.clean_batch(payload.get("events"))
+
+    try:
+        stored = db.insert_events(good)
+    except db.NoDatabase:
+        raise HTTPException(
+            status_code=503, detail="Tracking storage is not configured."
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Could not store events: {exc}")
+
+    return JSONResponse(
+        status_code=202,
+        content={"stored": stored, "rejected": problems},
+    )
+
+
+@app.get("/api/analytics")
+def get_analytics(days: int = 30) -> dict:
+    """Per-block performance for the console's Analytics screen."""
+    days = max(1, min(days, 365))
+    try:
+        return {
+            "days": days,
+            "totals": db.totals(days),
+            "daily": db.daily(days),
+            "blocks": db.summary(days),
+            "revenue": db.revenue(days),
+        }
+    except db.NoDatabase:
+        raise HTTPException(
+            status_code=503, detail="Tracking storage is not configured."
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Could not read analytics: {exc}")

@@ -226,6 +226,93 @@
   {% endif %}
 </div>
 {%- endif -%}
+{%- comment -%}
+  Tracking. Only for YMAL rows - a collection row is the theme's own and is not
+  ours to measure.
+
+  Calls window.ymalTrack if assets/ymal-track.js is loaded, and does nothing at
+  all if it is not, so this section can ship before tracking does.
+{%- endcomment -%}
+{%- if ymal_source != 'collection' -%}
+<script>
+  (function () {
+    var root = document.getElementById("shopify-section-{{ section.id }}");
+    if (!root || typeof window.ymalTrack !== "function") return;
+
+    var block = {{ ymal_source | json }};
+    var pageType = {{ section.settings.page_type | default: 'unknown' | json }};
+    var anchor = {{ anchor_product.handle | default: '' | json }};
+
+    function handleOf(card) {
+      var link = card.querySelector('a[href*="/products/"]');
+      if (!link) return null;
+      // The href may carry a collection prefix or a query string; the handle
+      // is the segment straight after /products/.
+      var match = link.getAttribute("href").match(/\/products\/([^/?#]+)/);
+      return match ? match[1] : null;
+    }
+
+    var cards = Array.prototype.slice.call(
+      root.querySelectorAll("product-block, .product-block")
+    );
+    if (!cards.length) return;
+
+    var handles = cards.map(handleOf).filter(Boolean);
+
+    // An impression is fired when the row is actually seen, not when it
+    // renders. A block below the fold that nobody scrolled to is not an
+    // impression, and counting it would flatter every click rate on the page.
+    if ("IntersectionObserver" in window && handles.length) {
+      var seen = false;
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting || seen) return;
+          seen = true;
+          io.disconnect();
+          window.ymalTrack("ymal_impression", {
+            block: block,
+            page_type: pageType,
+            anchor: anchor,
+            handles: handles
+          });
+        });
+      }, { threshold: 0.5 });
+      io.observe(root);
+    }
+
+    // Delegated, so it survives the slider moving cards around.
+    root.addEventListener("click", function (event) {
+      var card = event.target.closest("product-block, .product-block");
+      if (!card || !root.contains(card)) return;
+      var handle = handleOf(card);
+      if (!handle) return;
+
+      window.ymalTrack("ymal_click", {
+        block: block,
+        page_type: pageType,
+        anchor: anchor,
+        handle: handle,
+        position: cards.indexOf(card) + 1
+      });
+
+      // Attribution for the purchase, carried through checkout onto the order.
+      // Read back by the nightly order pass, so no webhook and no session
+      // join is needed. Deliberately a plain block name: the shopper can see
+      // this on their own order.
+      try {
+        fetch("/cart/update.js", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ attributes: { "YMAL block": block } })
+        }).catch(function () {});
+      } catch (e) {
+        /* Attribution is never worth breaking a storefront over. */
+      }
+    });
+  })();
+</script>
+{%- endif -%}
+
 <script>
   document.querySelectorAll('.new-in-heading').forEach(element => {
     const text = element.textContent;

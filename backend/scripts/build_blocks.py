@@ -123,6 +123,17 @@ def build_top_selling(products, eligible, titles, dedupe_by) -> None:
     })
     show("top_selling", rows, [("units", "units", 6)])
 
+    # Every product's units, not just the ranked thirty. build_pools uses this
+    # to nudge similar products by how well they sell, and counting them again
+    # there would mean a second pull of the same orders.
+    write("units", {
+        "block": "units",
+        "definition": "units sold per product over the Top Selling window",
+        "window_days": days,
+        "window": report["window"],
+        "units": dict(units),
+    })
+
 
 def build_new_arrivals(products, eligible, titles, dedupe_by) -> None:
     days = settings.NEW_ARRIVALS_WINDOW_DAYS

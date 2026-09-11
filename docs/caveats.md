@@ -176,6 +176,18 @@ touching the scoring code.
 | Fabric / weight | 2.0 | tags: cotton, wool, chunky, lightweight, blend |
 | Colour family | 1.5 | tags: neutral, dark, white, black, grassy |
 | Silhouette | 1.5 | `product_type_normalised`, not tags |
+| Collection | 1.5 | Shopify collections - game-day, beach-lake, cardigans |
+
+**Collections added 2026-09-10.** They are the merchandiser's own grouping, so
+two products sharing one were deliberately put together by someone who knows
+the range.
+
+Collections on more than 60% of the catalog are dropped before scoring. This
+shop has 23 collections and six of them (`testimonial`,
+`cloud-search-all-products`, `tax-clothing`, `discount-applicable-*`) sit on
+88-100% of products; left in, they would dominate every comparison and make any
+two products look related. IDF alone does not neutralise them - its `+1.0`
+floor leaves a universal collection at 0.82 against 1.92 for a rare one.
 
 Motif is weighted highest because it is the most visible thing a shopper
 matches on. Rarer tags count for more than common ones (IDF), so `football`
@@ -194,9 +206,15 @@ pool (`SEASONLESS_IGNORES_SEASON`).
 - **Price.** Measured 2026-09-08: every eligible product is $137-$159, a 16%
   spread clustered on a handful of values. Price cannot distinguish anything on
   this catalog. Revisit if the range ever widens.
-- **Sales velocity.** That is Trending and Top Selling, which are their own
-  blocks. Folding popularity into similarity would make every pool converge on
-  the same bestsellers.
+- **Sales velocity as a similarity signal.** Folding popularity into similarity
+  would make every pool converge on the same bestsellers.
+
+  **Revised 2026-09-10:** popularity now REORDERS a pool without deciding who
+  is in it, the same split co-purchase uses - `POPULARITY_WEIGHT = 0.4`, so the
+  best seller in a pool can rise by 40%. Measured after the change: the pools
+  still draw on 224 of 257 products, and the most-used product appears in 34 of
+  257 top-sixes. Convergence did not happen, but it is the thing to re-measure
+  if the weight is ever raised.
 
 ### To change the criteria
 

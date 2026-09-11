@@ -54,6 +54,27 @@ def normalise_tags(tags: list[str], vocabulary: set[str]) -> set[str]:
     }
 
 
+# A collection on nearly every product says nothing about any of them. This
+# shop's 23 collections include testimonial, cloud-search-all-products,
+# tax-clothing and discount-applicable-* on 88-100% of the catalog.
+#
+# IDF alone does NOT handle these: the formula carries a +1.0 floor, so a
+# collection on 100% of products still scores 0.82 against 1.92 for a rare one.
+# With six such collections on every product they would dominate the overlap
+# and make every pair look related. They are removed outright instead.
+NEAR_UNIVERSAL_COLLECTIONS = 0.6
+
+
+def signal_collections(
+    handles: set[str], frequency: dict[str, int], total: int
+) -> set[str]:
+    """The collections that can actually tell two products apart."""
+    return {
+        h for h in handles
+        if frequency.get(h, 0) < total * NEAR_UNIVERSAL_COLLECTIONS
+    }
+
+
 def facet_of(tag: str) -> str | None:
     """
     Which facet a tag belongs to, or None.
@@ -69,13 +90,31 @@ def facet_of(tag: str) -> str | None:
     return None
 
 
+# Tags claimed by no named facet go here rather than being discarded.
+OTHER_FACET = "other"
+
+
 def split_facets(tags: set[str]) -> dict[str, set[str]]:
-    """Bucket a product's tags by facet. Tags matching none are dropped."""
+    """
+    Bucket a product's tags by facet.
+
+    Nothing is dropped. A tag matching no keyword goes to `other`, which is
+    where the theme and occasion vocabulary lives - halloween, spooky,
+    tailgate, superbowl - along with cut and release tags.
+
+    Discarding them was a real defect: the named facets kept 33% of the signal
+    tags and threw away the rest, so a pumpkin sweater's "halloween" and
+    "spooky" counted for nothing and it matched every other black graphic
+    sweater on the single word they shared.
+
+    IDF still decides how much each one is worth, so a rare "spooky season"
+    weighs heavily and a common "autumn" barely at all - no keyword list to
+    maintain.
+    """
     buckets: dict[str, set[str]] = {f: set() for f in settings.SIMILARITY_FACETS}
+    buckets.setdefault(OTHER_FACET, set())
     for tag in tags:
-        facet = facet_of(tag)
-        if facet:
-            buckets[facet].add(tag)
+        buckets[facet_of(tag) or OTHER_FACET].add(tag)
     return buckets
 
 
@@ -85,16 +124,26 @@ def inverse_document_frequency(
     """
     How much each tag says about a product.
 
-    A tag on half the catalog barely distinguishes anything; one on 18% says a
-    lot. Standard IDF, smoothed so a tag on every product scores near zero
-    rather than exactly zero.
+    No smoothing floor. An earlier version added 1.0 to every score, which left
+    a tag on the whole catalog worth 0.82 against 1.92 for a rare one - only a
+    2.3x gap. Two products then matched on the twenty generic tags every
+    sweater carries, and a single telling tag like "pumpkin" could not outweigh
+    them. Without the floor a universal tag is worth nothing, which is the
+    truth about it.
+
+    Raised to IDF_POWER on top, so the gap between a rare tag and a common one
+    widens further. At 2.0 a tag on 2% of the catalog is worth roughly thirty
+    times one on half of it.
     """
     total = len(tag_sets) or 1
     counts: dict[str, int] = {}
     for tags in tag_sets:
         for tag in tags:
             counts[tag] = counts.get(tag, 0) + 1
-    return {tag: math.log(total / (1 + count)) + 1.0 for tag, count in counts.items()}
+    return {
+        tag: max(math.log(total / (1 + count)), 0.0) ** settings.IDF_POWER
+        for tag, count in counts.items()
+    }
 
 
 def weighted_jaccard(a: set[str], b: set[str], idf: dict[str, float]) -> float:
@@ -115,7 +164,12 @@ def weighted_jaccard(a: set[str], b: set[str], idf: dict[str, float]) -> float:
     return numerator / denominator if denominator else 0.0
 
 
-def score(anchor: dict, candidate: dict, idf: dict[str, float]) -> float:
+def score(
+    anchor: dict,
+    candidate: dict,
+    idf: dict[str, float],
+    collection_idf: dict[str, float] | None = None,
+) -> float:
     """
     How related two products are. Higher is more related.
 
@@ -125,7 +179,21 @@ def score(anchor: dict, candidate: dict, idf: dict[str, float]) -> float:
     total = 0.0
 
     for facet, weight in settings.SIMILARITY_WEIGHTS.items():
-        if facet == "silhouette":
+        if facet == OTHER_FACET:
+            total += weight * weighted_jaccard(
+                anchor["_facets"].get(OTHER_FACET, set()),
+                candidate["_facets"].get(OTHER_FACET, set()),
+                idf,
+            )
+        elif facet == "collection":
+            # Collections have their own IDF, computed over collection
+            # membership rather than tags: "cottons" as a collection and
+            # "cottons" as a tag are different populations and would weigh each
+            # other wrongly if pooled.
+            total += weight * weighted_jaccard(
+                anchor["_collections"], candidate["_collections"], collection_idf or {}
+            )
+        elif facet == "silhouette":
             same = (
                 anchor["product_type_normalised"]
                 and anchor["product_type_normalised"]
@@ -156,23 +224,59 @@ def season_allows(anchor: dict, candidate: dict) -> bool:
 
 def prepare(rows: list[dict]) -> tuple[list[dict], dict[str, float]]:
     """
-    Attach normalised facet tag sets to each row, and compute IDF once.
+    Attach the facet tag sets and collections to each row, and compute both
+    IDF tables once.
 
     Done up front because both are shared across every anchor - recomputing
     per anchor would be 258 times the work for the same answer.
     """
     vocabulary = build_vocabulary([r["signal_tags"] for r in rows])
 
+    raw_collections = [
+        {c.strip().lower() for c in row.get("collections", []) if c} for row in rows
+    ]
+    frequency: dict[str, int] = {}
+    for handles in raw_collections:
+        for handle in handles:
+            frequency[handle] = frequency.get(handle, 0) + 1
+
     prepared = []
-    for row in rows:
+    for row, handles in zip(rows, raw_collections):
         tags = normalise_tags(row["signal_tags"], vocabulary)
-        prepared.append({**row, "_tags": tags, "_facets": split_facets(tags)})
+        prepared.append({
+            **row,
+            "_tags": tags,
+            "_facets": split_facets(tags),
+            "_collections": signal_collections(handles, frequency, len(rows)),
+        })
 
     idf = inverse_document_frequency([r["_tags"] for r in prepared])
-    return prepared, idf
+    collection_idf = inverse_document_frequency([r["_collections"] for r in prepared])
+    return prepared, idf, collection_idf
 
 
-def build_pool(anchor: dict, candidates: list[dict], idf: dict, depth: int) -> list[dict]:
+def popularity(units: dict, gid: str, most: int) -> float:
+    """
+    How well this product sells, as 0-1 against the best seller in the catalog.
+
+    Square-rooted so the scale is not owned by its extremes: one product here
+    sells 153 units in a fortnight while most sell single digits, and a linear
+    scale would leave every other product indistinguishable at nearly zero.
+    """
+    if most <= 0:
+        return 0.0
+    return (max(units.get(gid, 0), 0) / most) ** 0.5
+
+
+def build_pool(
+    anchor: dict,
+    candidates: list[dict],
+    idf: dict,
+    depth: int,
+    collection_idf: dict | None = None,
+    units: dict | None = None,
+    most_units: int = 0,
+) -> list[dict]:
     """
     The ranked candidate pool for one product.
 
@@ -191,9 +295,15 @@ def build_pool(anchor: dict, candidates: list[dict], idf: dict, depth: int) -> l
         if not season_allows(anchor, candidate):
             continue
 
-        value = score(anchor, candidate, idf)
-        if value <= 0:
+        content = score(anchor, candidate, idf, collection_idf)
+        if content <= 0:
             continue
+
+        # Popularity reorders within the pool; it never decides membership.
+        # A product that is not similar enough to be here does not get in by
+        # selling well.
+        sells = popularity(units or {}, candidate["product_gid"], most_units)
+        value = content * (1 + settings.POPULARITY_WEIGHT * sells)
 
         current = best_by_style.get(candidate["style_key"])
         if current is None or value > current["score"]:
@@ -203,6 +313,8 @@ def build_pool(anchor: dict, candidates: list[dict], idf: dict, depth: int) -> l
                 "title": candidate["title"],
                 "style_key": candidate["style_key"],
                 "score": round(value, 4),
+                "content_score": round(content, 4),
+                "popularity": round(sells, 3),
             }
 
     ranked = sorted(
@@ -211,12 +323,26 @@ def build_pool(anchor: dict, candidates: list[dict], idf: dict, depth: int) -> l
     return ranked[:depth]
 
 
-def build_pools(rows: list[dict], depth: int | None = None) -> dict[str, list[dict]]:
-    """Every eligible product's pool, keyed by product_id."""
+def build_pools(
+    rows: list[dict],
+    depth: int | None = None,
+    units: dict | None = None,
+) -> dict[str, list[dict]]:
+    """
+    Every eligible product's pool, keyed by product_id.
+
+    `units` is units sold per product gid, from data/blocks/units.json. Absent,
+    every product scores as equally popular and the pools are content-only -
+    so this still works before build_blocks has ever run.
+    """
     depth = depth or settings.POOL_DEPTH
-    prepared, idf = prepare(rows)
+    prepared, idf, collection_idf = prepare(rows)
+    most_units = max(units.values()) if units else 0
+
     return {
-        anchor["product_id"]: build_pool(anchor, prepared, idf, depth)
+        anchor["product_id"]: build_pool(
+            anchor, prepared, idf, depth, collection_idf, units, most_units
+        )
         for anchor in prepared
     }
 

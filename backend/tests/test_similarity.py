@@ -8,15 +8,18 @@ is why the ranking rules get direct tests rather than being trusted.
 from ymal import settings, similarity
 
 
-def row(pid, title, style, tags, season="autumn", ptype="crewneck"):
+def row(pid, title, style, tags, season="autumn", ptype="crewneck",
+        collections=None):
     return {
         "product_id": pid,
+        "product_gid": "gid://shopify/Product/" + pid,
         "handle": title.lower().replace(" ", "-"),
         "title": title,
         "style_key": style,
         "product_type_normalised": ptype,
         "season": season,
         "signal_tags": tags,
+        "collections": collections or [],
     }
 
 
@@ -152,3 +155,91 @@ def test_an_empty_pool_is_caught():
     pools = similarity.build_pools(rows)
 
     assert any("empty pool" in p for p in similarity.check(rows, pools))
+
+
+# ------------------------------------------------------------------
+# Collections and popularity
+# ------------------------------------------------------------------
+
+def test_a_shared_collection_lifts_a_candidate():
+    # Collections are the merchandiser's own grouping, so sharing one is real
+    # evidence that two products belong together.
+    rows = [
+        row("1", "ANCHOR", "ANCHOR", ["stripe"], collections=["game-day"]),
+        row("2", "SAME COLLECTION", "SAME COLLECTION", ["stripe"], collections=["game-day"]),
+        row("3", "OTHER", "OTHER", ["stripe"], collections=["cardigans"]),
+    ]
+    pools = similarity.build_pools(rows)
+
+    assert pools["1"][0]["title"] == "SAME COLLECTION"
+
+
+def test_a_collection_on_everything_is_dropped_before_scoring():
+    # 88-100% of this shop's products sit in operational collections like
+    # tax-clothing. IDF alone does not neutralise them - its +1.0 floor leaves
+    # a universal term at 0.82 against 1.92 for a rare one - so they are
+    # removed by frequency instead.
+    # "all" is on every product; "game-day" on two of five, which is under the
+    # cutoff and so survives.
+    rows = [
+        row(str(i), f"P{i}", f"P{i}", ["stripe"], collections=["all"])
+        for i in range(1, 6)
+    ]
+    rows[0]["collections"] = ["all", "game-day"]
+    rows[1]["collections"] = ["all", "game-day"]
+
+    prepared, idf, collection_idf = similarity.prepare(rows)
+
+    assert "all" not in prepared[0]["_collections"]
+    assert "game-day" in prepared[0]["_collections"]
+
+
+def test_popularity_is_zero_when_nothing_has_sold():
+    assert similarity.popularity({}, "gid", 0) == 0.0
+
+
+def test_popularity_is_square_rooted():
+    # One product sells 153 units in a fortnight while most sell single
+    # digits. On a linear scale everything else would sit at nearly zero and
+    # be indistinguishable.
+    assert similarity.popularity({"a": 25}, "a", 100) == 0.5
+
+
+def test_a_better_seller_ranks_higher_among_equals():
+    rows = [
+        row("1", "ANCHOR", "ANCHOR", ["stripe"]),
+        row("2", "QUIET", "QUIET", ["stripe"]),
+        row("3", "POPULAR", "POPULAR", ["stripe"]),
+    ]
+    units = {"gid://shopify/Product/2": 1, "gid://shopify/Product/3": 100}
+
+    pools = similarity.build_pools(rows, units=units)
+
+    assert pools["1"][0]["title"] == "POPULAR"
+
+
+def test_selling_well_does_not_get_an_unrelated_product_into_a_pool():
+    # The whole safety argument: content decides membership, popularity only
+    # reorders. Otherwise every pool collapses onto the same bestsellers.
+    rows = [
+        row("1", "ANCHOR", "ANCHOR", ["stripe"]),
+        row("2", "RELATED", "RELATED", ["stripe"]),
+        row("3", "UNRELATED", "UNRELATED", ["nothing-in-common"], ptype="cardigan"),
+    ]
+    units = {"gid://shopify/Product/3": 10000}
+
+    pools = similarity.build_pools(rows, units=units)
+
+    assert [c["title"] for c in pools["1"]] == ["RELATED"]
+
+
+def test_pools_still_build_without_any_sales_data():
+    # build_pools may run before build_blocks has ever written units.json.
+    rows = [
+        row("1", "ANCHOR", "ANCHOR", ["stripe"]),
+        row("2", "OTHER", "OTHER", ["stripe"]),
+    ]
+    pools = similarity.build_pools(rows, units=None)
+
+    assert len(pools["1"]) == 1
+    assert pools["1"][0]["popularity"] == 0.0

@@ -1,0 +1,86 @@
+{%- comment -%}
+  YMAL — Recently Viewed, for the cart drawer.
+
+  Usage, inside the drawer's markup:
+
+    {%- render 'ymal-recently-viewed-cart', slots: 3 -%}
+
+  Renders an empty, hidden container. The script fills it from the shopper's
+  own browsing history and unhides it only if something survived - so a shopper
+  with no history, or a browser blocking storage, sees nothing at all rather
+  than an empty heading in their cart.
+
+  NEWEST FIRST here. Someone looking at their cart is still deciding, and the
+  most recent thing they looked at is the strongest candidate. (The checkout
+  placement reverses this deliberately - by then the recent items are the ones
+  they have already rejected, and the older ones are worth another look.)
+
+  No metafield, no backend. It reads the same localStorage list every other
+  YMAL placement reads, and every card is fetched fresh from the theme so a
+  handle stored three weeks ago still shows today's price and stock.
+{%- endcomment -%}
+
+<div class="ymal-rv" data-ymal-block="recently_viewed"
+     data-ymal-page="cart"
+     data-ymal-slots="{{ slots | default: 3 }}"
+     hidden>
+  <div class="ymal-rv__head">
+    <span class="ymal-rv__title">{{ heading | default: 'Recently Viewed' }}</span>
+    <span class="ymal-rv__nav">
+      <button type="button" class="ymal-rv__arrow" data-ymal-prev aria-label="Previous" hidden>&lsaquo;</button>
+      <button type="button" class="ymal-rv__arrow" data-ymal-next aria-label="Next" hidden>&rsaquo;</button>
+    </span>
+  </div>
+  <div class="ymal-rv__items" data-ymal-items></div>
+</div>
+
+<style>
+  .ymal-rv{
+    border-top:1px solid rgba(0,0,0,.1);
+    padding:14px 16px;
+    background:rgba(0,0,0,.02);
+  }
+  .ymal-rv[hidden]{display:none !important}
+  .ymal-rv__head{
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:10px;
+  }
+  .ymal-rv__title{
+    font-size:11.5px; letter-spacing:.09em; text-transform:uppercase;
+    opacity:.7;
+  }
+  .ymal-rv__nav{display:flex; gap:5px}
+  .ymal-rv__arrow{
+    width:22px; height:22px; padding:0; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    background:#fff; border:1px solid rgba(0,0,0,.15);
+    font:inherit; font-size:13px; line-height:1;
+  }
+  .ymal-rv__arrow[hidden]{display:none}
+  .ymal-rv__items{display:flex; flex-direction:column; gap:8px}
+
+  /* One row per product: image, then name and price, then the control. */
+  .ymal-rv__card{
+    display:flex; gap:11px; align-items:center;
+    background:#fff; border:1px solid rgba(0,0,0,.1); padding:9px;
+  }
+  .ymal-rv__img{
+    width:52px; height:66px; object-fit:cover; display:block; flex:0 0 52px;
+  }
+  /* min-width:0 or a long product title pushes the button out of the row. */
+  .ymal-rv__meta{flex:1; min-width:0; display:flex; flex-direction:column; gap:2px}
+  .ymal-rv__name{font-size:12px; line-height:1.25; text-decoration:none; color:inherit}
+  .ymal-rv__price{font-size:12px; opacity:.7}
+  .ymal-rv__add{
+    padding:7px 13px; cursor:pointer; white-space:nowrap;
+    background:#000; color:#fff; border:0;
+    font:inherit; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase;
+  }
+  .ymal-rv__add[disabled]{opacity:.5; cursor:default}
+  .ymal-rv__variant{
+    font:inherit; font-size:11px; max-width:100%;
+    margin-top:4px; padding:3px 4px; border:1px solid rgba(0,0,0,.15);
+  }
+</style>
+
+<script src="{{ 'ymal-recently-viewed-cart.js' | asset_url }}" defer></script>

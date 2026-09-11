@@ -29,3 +29,5 @@ dist/
 .idea/
 
 *.pdf
+
+*.ipynb
