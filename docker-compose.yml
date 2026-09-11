@@ -9,8 +9,21 @@
 # unreliable. On the VM: git clone, then docker compose up.
 #
 #   docker compose up web                  # the console (build + serve)
-#   docker compose run --rm pipeline       # rebuild the block lists now
-#   docker compose up                     # console + api together
+#   docker compose up -d --build           # console + api together
+#   docker compose run --rm api python -m scripts.nightly
+#
+# One-shot pipeline work runs in the `api` service, NOT in a service of its
+# own. There used to be a profile-gated `pipeline` service, and it caused a
+# real bug: `docker compose up -d --build` does not rebuild services outside
+# the default profile, so the pipeline image silently stayed on the code it
+# was first built with. On 2026-09-11 the nightly cron was still publishing a
+# 90-day Top Selling list from that stale image while the console's Manual
+# Update - which runs inside `api` - correctly produced 14 days. Two copies of
+# settings.py, one storefront, and nothing failing loudly.
+#
+# `api` is a superset of what the pipeline needed (same image, same .env, same
+# data volume, plus the database), it is always rebuilt by `up --build`, and it
+# matches how the sibling stack on this VM already runs its nightly syncs.
 #
 # The console's host port defaults to 8083 and is overridable with
 # YMAL_WEB_PORT in .env, since one VM may run several of these stacks.
@@ -34,27 +47,6 @@ services:
       timeout: 5s
       retries: 12
     restart: unless-stopped
-
-  # The nightly pipeline: fetch products and orders, build the block lists.
-  # Not a long-running service - `docker compose run --rm pipeline` on demand,
-  # and on a schedule once the host cron or a scheduler service calls it.
-  pipeline:
-    build: ./backend
-    env_file: .env
-    volumes:
-      # Block lists and the Phase 1 product table. A named volume rather than a
-      # bind mount, so this works the same on the VM as on a laptop.
-      - ymal_data:/app/data
-    depends_on:
-      db:
-        condition: service_healthy
-    # Profile-gated so `docker compose up` does not start it. This is a
-    # one-shot task, not a service: it runs, does the work, and exits. Left in
-    # the default set it would fire on every `up -d` and pull thousands of
-    # orders as a side effect of starting the console.
-    #   docker compose run --rm pipeline
-    profiles: ["pipeline"]
-    restart: "no"
 
   # The console's API. No longer profile-gated: backend/app exists, so this
   # starts with `docker compose up` alongside the console.

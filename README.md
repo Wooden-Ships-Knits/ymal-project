@@ -61,7 +61,7 @@ about Drive is specifically about bind mounts, and this uses named volumes.
 ```bash
 docker compose logs -f api
 docker compose down
-docker compose run --rm pipeline
+docker compose run --rm api python -m scripts.nightly
 ```
 
 That is the right way to check the whole system works, and it is how the VM
@@ -128,13 +128,52 @@ metafield store all run against known inputs or a stubbed GraphQL client.
 
 ### Note on the pipeline in Docker
 
-The pipeline is profile-gated, so `docker compose up` does not start it -
-otherwise every `up` would pull thousands of orders as a side effect of
-starting the console. Run it on demand:
+The pipeline is not a service. It is a one-shot command run inside `api`:
 
 ```bash
-docker compose run --rm pipeline
+docker compose run --rm api python -m scripts.nightly
 ```
+
+It deliberately has no service of its own. A `pipeline` service existed until
+2026-09-11 and was profile-gated, so that `docker compose up` would not pull
+thousands of orders as a side effect of starting the console. That gate is also
+what broke it: **`docker compose up -d --build` does not rebuild services
+outside the default profile.** The pipeline image kept running the code it was
+first built with, so the nightly cron published a 90-day Top Selling list for a
+day after the window had been changed to 14 - while the console's Manual
+Update, which runs inside `api`, produced 14 correctly. Nothing errored; the two
+containers simply held different copies of `settings.py`.
+
+Running it in `api` means one image, one code path, and `up --build` keeping
+both honest.
+
+### Deploying a change to the VM
+
+Rebuilding is not optional. `backend/Dockerfile` does `COPY . .`, so the code is
+baked into the image and a `git pull` alone changes nothing that runs.
+
+```bash
+cd ~/ymal-project
+git pull
+docker compose up -d --build
+docker compose run --rm api python -c "from ymal import settings; print(settings.TOP_SELLING_WINDOW_DAYS)"
+```
+
+The last line is a habit worth keeping: it prints a value from the image that
+actually runs, which is the only copy of the settings that matters.
+
+### The nightly cron
+
+On the VM, in `crontab -e`. 12:00 UTC is 20:00 Makassar - see
+`scripts/nightly.py` for why.
+
+```
+0 12 * * * cd ~/ymal-project && docker compose run --rm api python -m scripts.nightly >> ~/ymal-nightly.log 2>&1
+```
+
+This matches how the sibling stack on the same VM runs its warehouse syncs, all
+of which use `docker compose run --rm api`. Do not reintroduce a separate
+service for it.
 
 Frontend structure follows `wholesale-order-entry`: React 18 + Vite, no router,
 tabs are `useState` plus a `TABS` array, one folder per feature with its own

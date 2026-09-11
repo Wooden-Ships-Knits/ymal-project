@@ -224,3 +224,42 @@ pool (`SEASONLESS_IGNORES_SEASON`).
 
 Nothing is published to Shopify by that script, so retuning is free.
 
+
+---
+
+## 7. Two images, one storefront — the stale pipeline bug
+
+**Found 2026-09-11 by the web team**, who saw Top Selling revert to an older,
+longer-window list overnight and come back correct after clicking Manual Update.
+
+`backend/Dockerfile` ends in `COPY . .`, so the code is baked into the image.
+The compose file had a separate `pipeline` service, profile-gated so that
+`docker compose up` would not pull thousands of orders just to start the
+console. But **`docker compose up -d --build` does not rebuild services outside
+the default profile.** So:
+
+| What ran | Which image | `TOP_SELLING_WINDOW_DAYS` |
+|---|---|---|
+| the nightly cron | `pipeline`, never rebuilt | 90 |
+| the console's Manual Update | `api`, rebuilt on every deploy | 14 |
+
+Both read `settings.py`. There were two copies of it on the VM. Nothing failed,
+no error was logged, and the only visible symptom was a storefront list that
+changed back and forth depending on which one had written last.
+
+**Fixed** by deleting the `pipeline` service. One-shot pipeline work now runs as
+`docker compose run --rm api python -m scripts.nightly`, matching the six
+warehouse syncs already in that VM's crontab, which all use
+`docker compose run --rm api`.
+
+Two lessons worth keeping:
+
+- **A profile gate is not free.** It exempts a service from `--build`, which
+  turns "we deployed that" into a claim nobody can check by reading the repo.
+- **Verify against the image, not the file.** `git pull` proves nothing about
+  what runs. `docker compose run --rm api python -c "from ymal import settings;
+  print(settings.TOP_SELLING_WINDOW_DAYS)"` does.
+
+The same day, three *descriptions* were found still saying "90 days" after the
+window became 14. `ymal/registry.py` now builds them from `settings` so the
+console cannot describe a window it is not using.
