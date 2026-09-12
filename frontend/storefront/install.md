@@ -22,35 +22,66 @@ cd backend
 .venv/bin/python -m scripts.publish_all
 ```
 
-## 2. Two ways to render a block
+## 2. Which files to copy, and which NOT to
 
-**Preferred: the theme's own `product-list` section.** It already has the
-slider, the aspect-ratio handling, quick buy and `product-block`, so a YMAL row
-looks exactly like every other product row on the site and stays that way when
-the theme changes.
+`ymal-widget.liquid` IS the theme's own `product-list` section, copied and
+given one extra setting - **Products from**. Same slider, same aspect-ratio
+handling, same quick buy, same `product-block`, so a YMAL row looks like every
+other product row on the site. It is installed under a new name rather than
+over the original, so the theme keeps a working `product-list` either way.
 
-Copy `sections/product-list.liquid` over the theme's copy. It adds one setting,
-**Products from**, and leaves the collection behaviour as the default - so
-every existing use of that section is unaffected.
-
-Then in the theme editor: add a Product list section as usual, and set
-**Products from** to a YMAL list instead of a collection.
-
-**Alternative: the standalone `ymal-widget` section.** Self-contained, with its
-own card and layout settings. Useful on a theme that has no reusable product
-row, but on this store `product-list` is the better fit.
+### Safe: new files, nothing in the theme shares these names
 
 | File | Needed for |
 |---|---|
-| `sections/product-list.liquid` | the preferred route |
-| `sections/ymal-widget.liquid` | the standalone route |
-| `snippets/ymal-card.liquid` | the standalone route |
-| `snippets/ymal-recently-viewed.liquid` | Recently Viewed, either route |
-| `templates/product.ymal-card.liquid` | Recently Viewed, either route |
-| `assets/ymal-recently-viewed.js` | Recently Viewed, either route |
+| `sections/ymal-widget.liquid` | every block except Recently Viewed |
+| `snippets/ymal-card.liquid` | the card used inside that section |
+| `snippets/ymal-recently-viewed.liquid` | Recently Viewed on a product or home page |
+| `snippets/ymal-recently-viewed-cart.liquid` | Recently Viewed in the cart drawer |
+| `templates/product.ymal-card.liquid` | Recently Viewed card fetch |
+| `templates/product.ymal-card-compact.liquid` | Recently Viewed card in the cart drawer |
+| `assets/ymal-recently-viewed.js` | Recently Viewed |
+| `assets/ymal-recently-viewed-cart.js` | Recently Viewed in the cart drawer |
+| `assets/ymal-track.js` | analytics AND purchase attribution |
 
-Recently Viewed is not a `product-list` option: it has no metafield to read, so
-it is rendered client-side from the shopper's browser and needs its own snippet.
+### DO NOT copy: `sections/product-list.liquid`
+
+That file is the theme's ORIGINAL section, reconstructed and kept here only so
+the YMAL version can be diffed against it. It contains no YMAL code at all.
+Copying it over the theme reverts that section to the day it was reconstructed
+and silently discards anything the web team has changed since.
+
+Install `ymal-widget.liquid` instead. If you ever do want the setting on the
+real `product-list` section, diff the two files and apply the difference by
+hand - do not overwrite.
+
+### Hand-edit, do not overwrite: `sections/cart-drawer.liquid`
+
+The copy here is the theme's own cart drawer plus a three-line insertion. The
+theme's version moves; this one does not. Paste the insertion rather than the
+file, after the cross-sells block:
+
+```liquid
+<div class="cart-drawer__content-item">
+  {%- render 'ymal-recently-viewed-cart', slots: 3 -%}
+</div>
+```
+
+### Hand-edit: `layout/theme.liquid`
+
+```liquid
+<script src="{{ 'ymal-track.js' | asset_url }}" defer></script>
+```
+
+Without this there is no analytics AND no purchase attribution. The block
+script starts with `if (typeof window.ymalTrack !== "function") return;`, so a
+missing tag also skips the `/cart/update.js` call that writes the `YMAL block`
+cart attribute - the thing `attribute_orders` reads back off orders. It fails
+silently, with no console error and no empty state; the Analytics tab simply
+stays at zero.
+
+Recently Viewed is not a `Products from` option: it has no metafield to read,
+so it renders client-side from the shopper's browser and needs its own snippet.
 
 ## 4. Add blocks in the theme editor
 
