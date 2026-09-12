@@ -73,6 +73,12 @@ file, after the cross-sells block:
 <script src="{{ 'ymal-track.js' | asset_url }}" defer></script>
 ```
 
+Anywhere in `<head>` is fine, and `defer` is correct - it must NOT be dropped
+to force ordering. The section's own inline script waits for DOMContentLoaded
+precisely so that a deferred track script has already run by the time it looks
+for `window.ymalTrack`. Loading it without `defer` also works but blocks
+parsing for no benefit.
+
 Without this there is no analytics AND no purchase attribution. The block
 script starts with `if (typeof window.ymalTrack !== "function") return;`, so a
 missing tag also skips the `/cart/update.js` call that writes the `YMAL block`
