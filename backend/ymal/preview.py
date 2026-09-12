@@ -34,7 +34,7 @@ _LOCK = threading.Lock()
 
 _features: tuple[float, list[dict]] | None = None
 _prepared_cache: dict[tuple[float, float], tuple] = {}
-_units: tuple[float, dict, int] | None = None
+_units: tuple[float, dict, dict | None] | None = None
 
 
 def features_path():
@@ -67,22 +67,27 @@ def features() -> list[dict]:
     return _features[1]
 
 
-def units() -> tuple[dict, int]:
+def units() -> tuple[dict, dict | None]:
     """
-    Units sold per product gid, and the catalog's best seller.
+    Units per product, and build_blocks' per-style map when it wrote one.
 
-    Optional. Absent, every product scores as equally popular - the same
+    The style map is preferred because build_blocks can see every ACTIVE
+    product, so it counts a sold-out colorway's sales as demand for the style.
+    `None` means an older units.json, and rank() derives totals from the
+    eligible rows instead.
+
+    Both optional. Absent, every product scores as equally popular - the same
     fallback build_pools takes, so a preview before build_blocks has ever run
     shows content-only ranking rather than failing.
     """
     global _units
     path = units_path()
     if not path.exists():
-        return {}, 0
+        return {}, None
     stamp = _mtime(path)
     if _units is None or _units[0] != stamp:
-        data = json.loads(path.read_text())["units"]
-        _units = (stamp, data, max(data.values()) if data else 0)
+        data = json.loads(path.read_text())
+        _units = (stamp, data["units"], data.get("by_style"))
     return _units[1], _units[2]
 
 
@@ -152,7 +157,17 @@ def rank(product_id: str, given: dict | None, limit: int = 10) -> dict:
             prepared_anchor = next(
                 r for r in prepared if r["product_id"] == anchor["product_id"]
             )
-            sold, most = units()
+            # Per style, and scaled against the best style that can appear
+            # in a pool - the same two rules build_pools applies, so the
+            # preview and the published list cannot disagree.
+            sold, by_style = units()
+            totals = (
+                by_style
+                if by_style is not None
+                else similarity.units_by_style(rows, sold)
+            )
+            in_pool = {similarity.style_of(r) for r in rows}
+            most = max((totals.get(s, 0) for s in in_pool), default=0)
 
             pool = similarity.build_pool(
                 prepared_anchor,
@@ -160,7 +175,7 @@ def rank(product_id: str, given: dict | None, limit: int = 10) -> dict:
                 idf,
                 limit,
                 collection_idf,
-                sold,
+                totals,
                 most,
             )
         finally:

@@ -87,7 +87,9 @@ def stub_features(monkeypatch):
         },
     ]
     monkeypatch.setattr(preview, "features", lambda: rows)
-    monkeypatch.setattr(preview, "units", lambda: ({}, 0))
+    # (per-product units, build_blocks' per-style map). None means an older
+    # units.json, so preview derives totals from the rows above.
+    monkeypatch.setattr(preview, "units", lambda: ({}, None))
     monkeypatch.setattr(preview, "_prepared_cache", {})
     return rows
 

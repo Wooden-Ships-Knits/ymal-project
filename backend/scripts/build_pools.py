@@ -36,8 +36,12 @@ def load_units() -> dict:
     if not path.exists():
         print("  units.json not found - pools will be content-only.")
         print("  Run `python -m scripts.build_blocks` first to include sales.")
-        return {}
-    return json.loads(path.read_text())["units"]
+        return {}, None
+    data = json.loads(path.read_text())
+    # by_style is written by build_blocks. Absent on a units.json from before
+    # 2026-09-12, in which case build_pools derives it from the eligible rows
+    # and simply misses sold-out colorways.
+    return data["units"], data.get("by_style")
 
 
 def load_features() -> list[dict]:
@@ -72,12 +76,12 @@ def main() -> None:
     rows = load_features()
     print(f"Eligible products: {len(rows)}")
 
-    units = load_units()
+    units, style_units = load_units()
     if units:
         print(f"  sales for {len(units)} products, best seller "
               f"{max(units.values())} units")
 
-    pools = similarity.build_pools(rows, units=units)
+    pools = similarity.build_pools(rows, units=units, style_units=style_units)
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     out = OUT_DIR / "pools.json"

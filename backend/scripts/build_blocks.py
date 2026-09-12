@@ -126,12 +126,33 @@ def build_top_selling(products, eligible, titles, dedupe_by) -> None:
     # Every product's units, not just the ranked thirty. build_pools uses this
     # to nudge similar products by how well they sell, and counting them again
     # there would mean a second pull of the same orders.
+    # Summed per style as well as per product. A pool row is a style -
+    # build_pool keeps one product per style and shows the best colorway - so
+    # ranking it on one colorway's sales understates a style with many. Done
+    # here because this is the only step that can see EVERY active product, so
+    # a sold-out colorway's sales still count as demand for the style.
+    #
+    # *SALE* products are skipped: they carry the marker in their title, so
+    # they are a different style anyway, and markdown volume is not evidence of
+    # full-price demand.
+    by_style: dict[str, int] = {}
+    for gid, sold in units.items():
+        title = titles.get(gid)
+        if not title or "*SALE*" in title:
+            continue
+        key = dedupe_by[gid]
+        by_style[key] = by_style.get(key, 0) + sold
+
     write("units", {
         "block": "units",
         "definition": "units sold per product over the Top Selling window",
         "window_days": days,
         "window": report["window"],
         "units": dict(units),
+        "by_style": by_style,
+        "by_style_definition": (
+            "units summed across every active colorway of a title, *SALE* excluded"
+        ),
     })
 
 

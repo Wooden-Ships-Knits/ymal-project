@@ -69,6 +69,15 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-ymal}
     volumes:
       - ymal_data:/app/data
+      # Release notes, rendered on the console's Dashboard. Mounted rather than
+      # copied because this Dockerfile's build context is ./backend and cannot
+      # reach ../docs - and because a mount means `git pull` updates the notes
+      # without rebuilding an image.
+      #
+      # Read-only, and tiny: the Drive warning at the top of this file is about
+      # bind-mounting the whole repo for writes, not about one text file the VM
+      # serves from its own clone.
+      - ./docs:/app/docs:ro
     depends_on:
       db:
         condition: service_healthy

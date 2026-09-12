@@ -21,7 +21,7 @@
  * against the real catalog before they are published.
  */
 export const NAV = [
-  { id: 'dashboard', label: 'Dashboard',        status: 'planned' },
+  { id: 'dashboard', label: 'Dashboard',        status: 'live'    },
   { id: 'analytics', label: 'Analytics',        status: 'planned' },
   { id: 'exclude',   label: 'Exclude Products', status: 'planned' },
   { id: 'tuning',    label: 'Ranking',          status: 'live'    },

@@ -313,6 +313,42 @@ def post_tuning_preview(payload: dict = Body(...)) -> dict:
         raise HTTPException(status_code=404, detail=str(exc))
 
 
+# ---------------------------------------------------------------------------
+# Version notes — docs/version.md, rendered on the Dashboard.
+#
+# The file is NOT baked into the image: backend/Dockerfile's build context is
+# ./backend and cannot reach ../docs. docker-compose bind-mounts it read-only
+# instead, which also means a `git pull` updates the notes without a rebuild.
+#
+# Two candidate paths because the layout differs. In a checkout the backend
+# sits beside docs/; in the container the backend IS /app, so the mount lands
+# at /app/docs.
+# ---------------------------------------------------------------------------
+
+VERSION_PATHS = (
+    settings.BACKEND_ROOT / "docs" / "version.md",
+    settings.REPO_ROOT / "docs" / "version.md",
+)
+
+
+@app.get("/api/version")
+def get_version() -> dict:
+    for path in VERSION_PATHS:
+        if path.exists():
+            return {"markdown": path.read_text(), "source": path.name}
+
+    # Not an error. A deployment without the mount should show the console, not
+    # a red banner about release notes.
+    return {
+        "markdown": "",
+        "source": None,
+        "detail": (
+            "docs/version.md is not readable from the API. On the VM, check "
+            "that docker-compose mounts ./docs into the api service."
+        ),
+    }
+
+
 @app.get("/api/blocks")
 def get_blocks() -> list[dict]:
     try:

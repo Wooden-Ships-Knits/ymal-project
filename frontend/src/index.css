@@ -171,3 +171,40 @@ body {
 .chart__crosshair { stroke: #c9c9d6; stroke-width: 1; stroke-dasharray: 3 3; }
 /* A surface-coloured ring so the dot reads against the area fill beneath it. */
 .chart__dot { fill: #4f46b8; stroke: #fff; stroke-width: 2; }
+
+/*
+ * Rendered markdown — the Dashboard's release notes.
+ *
+ * Scoped to .markdown so these element selectors cannot reach the rest of the
+ * console, which styles by class throughout.
+ */
+.markdown { max-width: 68ch; line-height: 1.6; }
+.markdown h1 { font-size: 22px; margin: 0 0 4px; }
+.markdown h2 {
+  font-size: 17px;
+  margin: 28px 0 8px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line, #e5e5e5);
+}
+.markdown h1 + p { color: var(--muted, #666); margin-top: 0; }
+.markdown h2:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
+.markdown h3 { font-size: 14px; margin: 20px 0 6px; }
+.markdown p, .markdown li { font-size: 13px; }
+.markdown ul { padding-left: 20px; }
+.markdown li { margin-bottom: 6px; }
+.markdown code {
+  font-size: 12px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--surface-2, #f4f4f4);
+}
+.markdown hr { display: none; }  /* the h2 border already separates versions */
+.markdown table { border-collapse: collapse; width: 100%; margin: 10px 0 16px; }
+.markdown th, .markdown td {
+  text-align: left;
+  font-size: 12px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line, #e5e5e5);
+  vertical-align: top;
+}
+.markdown th { color: var(--muted, #666); font-weight: 600; }
