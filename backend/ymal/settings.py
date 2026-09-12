@@ -5,6 +5,7 @@ Everything tunable lives here rather than in the pipeline code, so the
 eligibility rule can be adjusted without editing logic.
 """
 
+import os
 from pathlib import Path
 
 # ------------------------------------------------------------------
@@ -180,6 +181,18 @@ STORED_LIST_DEPTH = 30
 # ------------------------------------------------------------------
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = BACKEND_ROOT.parent
+
+# Where the console and its API are published, as the internet sees them.
+#
+# The tracking health check probes THIS, not the container, because it is the
+# only thing a shopper's browser can reach - the VM's nginx, its basic auth and
+# its TLS included. Probing the API directly would pass while the storefront
+# stayed broken, which is worse than not checking.
+YMAL_PUBLIC_URL = os.getenv("YMAL_PUBLIC_URL", "https://ymal.pt-infashion.com")
+
+# The storefront's exact origin, used to check the CORS allowlist would let a
+# shopper through. A missing hyphen here is enough to lose every event.
+SHOP_ORIGIN = os.getenv("YMAL_SHOP_ORIGIN", "https://www.wooden-ships.com")
 DATA_DIR = BACKEND_ROOT / "data"
 PHASE1_DIR = DATA_DIR / "phase1"
 

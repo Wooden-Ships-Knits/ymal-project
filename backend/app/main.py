@@ -11,6 +11,8 @@ Run:  cd backend && uvicorn app.main:app --reload
 import json
 import os
 import secrets
+import threading
+import time
 
 from dotenv import load_dotenv
 from fastapi import Body, FastAPI, Header, HTTPException, Request
@@ -26,6 +28,7 @@ from ymal import (
     registry,
     runner,
     settings,
+    tracking_health,
     tuning,
 )
 
@@ -126,6 +129,48 @@ def _split_stamps(stored: dict) -> dict:
 @app.get("/api/health")
 def health() -> dict:
     return {"ok": True}
+
+
+def tracking_url() -> str:
+    return settings.YMAL_PUBLIC_URL.rstrip("/") + "/api/events"
+
+
+@app.on_event("startup")
+def _check_tracking() -> None:
+    """
+    Say, in the log, whether a shopper's browser can reach tracking.
+
+    In a background thread with a short timeout: this probes our own public
+    URL, so doing it inline would make the API wait on nginx, which may not be
+    up yet during a `docker compose up`. A slow or failing probe must never
+    delay or prevent the console starting.
+    """
+
+    def run() -> None:
+        # nginx and TLS need a moment after a compose up; a probe fired the
+        # instant uvicorn binds reports a false failure.
+        time.sleep(5)
+        result = tracking_health.probe(tracking_url(), settings.SHOP_ORIGIN)
+        print(tracking_health.describe(result), flush=True)
+
+    threading.Thread(target=run, daemon=True, name="tracking-health").start()
+
+
+@app.get("/api/tracking-health")
+def get_tracking_health() -> dict:
+    """
+    Probed on demand, from the console.
+
+    Unauthenticated like the endpoint it tests: it sends an empty batch, stores
+    nothing, and reveals only whether a public URL answers.
+    """
+    result = tracking_health.probe(tracking_url(), settings.SHOP_ORIGIN)
+    return {
+        **result,
+        "url": tracking_url(),
+        "shop_origin": settings.SHOP_ORIGIN,
+        "summary": tracking_health.describe(result),
+    }
 
 
 @app.get("/api/config")

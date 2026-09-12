@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getAnalytics } from './api'
+import { getAnalytics, getTrackingHealth } from './api'
 import BlockTable from './BlockTable'
 import StatTiles from './StatTiles'
 import TrendChart from './TrendChart'
@@ -18,6 +18,17 @@ export default function Analytics() {
   const [days, setDays] = useState(30)
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
+  // Checked once per visit, not per range change - it probes the network.
+  const [health, setHealth] = useState(null)
+
+  useEffect(() => {
+    getTrackingHealth()
+      .then(setHealth)
+      // A failing health check must not replace the screen. The worst case is
+      // that we cannot say why the numbers are zero, which is where we were
+      // before this existed.
+      .catch(() => setHealth(null))
+  }, [])
 
   useEffect(() => {
     setError('')
@@ -69,13 +80,31 @@ export default function Analytics() {
         ))}
       </p>
 
-      {nothingYet && (
+      {/*
+        Two different zeroes. "Nobody has clicked yet" is fine and expected;
+        "the endpoint refuses every beacon" is a broken deployment that looked
+        exactly the same until this check existed. Say which one it is.
+      */}
+      {health && !health.ok && (
+        <div className="note" style={{ marginBottom: 18, borderLeftColor: '#b85450' }}>
+          <h3>Tracking is not recording</h3>
+          <p>{health.hint}</p>
+          <p className="card__sub">
+            Probed <code>{health.url}</code> as a shopper's browser would
+            {health.status ? ` — HTTP ${health.status}` : ' — no answer'}.
+            {health.detail ? ` ${health.detail}` : ''}
+          </p>
+        </div>
+      )}
+
+      {nothingYet && (!health || health.ok) && (
         <div className="note" style={{ marginBottom: 18 }}>
           <h3>Nothing tracked yet</h3>
           <p>
             Every number below is zero because no events have been recorded.
             That is expected until <code>assets/ymal-track.js</code> is on the
             theme and a shopper has seen a YMAL block.
+            {health?.ok && ' The endpoint itself is reachable and working.'}
           </p>
           <p>
             This data cannot be collected retroactively, so the sooner the
