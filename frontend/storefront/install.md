@@ -102,7 +102,11 @@ Recommendations**. Then set:
 | Columns on desktop | 2-6. Phones always show one scrolling row |
 | Layout | Carousel with arrows, or a grid that wraps |
 | Full width | Edge to edge, matching the app blocks already on this store |
-| Page type | Used for tracking, so Analytics can group by page |
+
+
+There is no page-type setting: it is derived from the template, so tracking
+cannot be mislabelled by someone forgetting to set it. `index` is recorded
+as `home` and `404` as `not_found`, matching docs/config-contract.md section 5.
 
 Add the section more than once for more than one block on a page.
 

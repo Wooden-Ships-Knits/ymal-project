@@ -25,6 +25,27 @@
 
   assign ymal_source = section.settings.ymal_source | default: 'collection'
 
+  comment
+    Which kind of page this is, for tracking. DERIVED, not a setting: a
+    dropdown someone has to set correctly on every placement is a dropdown
+    that will be wrong somewhere, and the events it mislabels cannot be
+    corrected afterwards.
+
+    Names match docs/config-contract.md section 5 so Analytics can group by
+    them. Shopify's own template names differ in three places.
+  endcomment
+  assign ymal_page_type = template.name | default: 'unknown'
+  case ymal_page_type
+    when 'index'
+      assign ymal_page_type = 'home'
+    when '404'
+      assign ymal_page_type = 'not_found'
+    when 'article'
+      assign ymal_page_type = 'blog'
+    when 'customers/login', 'customers/account', 'customers/register'
+      assign ymal_page_type = 'account'
+  endcase
+
   case ymal_source
     when 'featured'
       assign ymal_items = product.metafields.ymal.featured.value
@@ -250,7 +271,7 @@
       if (!root || typeof window.ymalTrack !== "function") return;
 
       var block = {{ ymal_source | json }};
-      var pageType = {{ section.settings.page_type | default: 'unknown' | json }};
+      var pageType = {{ ymal_page_type | json }};
       var anchor = {{ anchor_product.handle | default: '' | json }};
 
       function handleOf(card) {
