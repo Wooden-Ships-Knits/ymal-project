@@ -32,7 +32,7 @@
     corrected afterwards.
 
     Names match docs/config-contract.md section 5 so Analytics can group by
-    them. Shopify's own template names differ in three places.
+    them. Shopify's own template names differ in four places.
   endcomment
   assign ymal_page_type = template.name | default: 'unknown'
   case ymal_page_type
@@ -83,28 +83,6 @@
 {%- if ymal_source == 'collection' or ymal_eligible_count > 0 -%}
 <div class="section-id-{{ section.id }} collection-slider-row {% if section.settings.color_scheme != 'default' %}use-color-scheme use-color-scheme--{{ section.settings.color_scheme }}{% endif %}">
   <div class="container{% if section.settings.enable_carousel %} container--not-mobile{% endif %}{% if section.settings.full_width %} container--no-max{% endif %}">
-    <!-- NEW IN Section -->
-    {% if section.settings.show_new_in %}
-      <div class="new-in-section">
-        <h2 class="new-in-heading">{{ section.settings.new_in_heading }}</h2>
-        <p class="new-in-text">
-          <span class="desktop-text">{{ section.settings.desktop_text }}</span>
-          <span class="mobile-text">{{ section.settings.mobile_text }}</span>
-        </p>
-        <style>
-          /* Default: hide mobile text and show desktop text */
-          .mobile-text { display: none; }
-          /* For screens smaller than 768px (mobile devices), show mobile text and hide desktop text */
-          @media screen and (max-width: 768px) {
-            .desktop-text { display: none; }
-            .mobile-text { display: inline; }
-          }
-        </style>
-        {% if section.settings.show_new_in_button %}
-          <a href="{{ section.settings.new_in_button_link }}" class="btn btn-primary">{{ section.settings.new_in_button_text }}</a>
-        {% endif %}
-      </div>
-    {% endif %}
     {%- if section.settings.enable_carousel -%}
       <carousel-slider class="carousel block collection-slider">
     {%- endif -%}
@@ -351,16 +329,6 @@
 </script>
 {%- endif -%}
 
-<script>
-  document.querySelectorAll('.new-in-heading').forEach(element => {
-    const text = element.textContent;
-    if (text.length > 0) {
-      const lastLetter = text.slice(-1);
-      const rest = text.slice(0, -1);
-      element.innerHTML = `${rest}<span class="last-letter">${lastLetter}</span>`;
-    }
-  });
-</script>
 <style>
   {%- comment -%}
     Cap how wide the row may get. "Products per row" stays whatever it is set
@@ -377,32 +345,6 @@
   }
   {%- endif -%}
 
-  .new-in-heading span.last-letter {
-    font-family: "Times New Roman", serif;
-  }
-  .new-in-section {
-    margin-right: 20px;
-    padding: 20px;
-    background-color: white; /* fixed */
-  }
-  .new-in-heading {
-    font-size: 26px;
-    margin-bottom: 10px;
-  }
-  .new-in-text {
-    font-size: 18px;
-    margin-bottom: 15px;
-  }
-  .btn-primary {
-    color: white;
-    padding: 10px 20px;
-    text-decoration: none;
-    border-radius: 0px;
-    border: none;
-  }
-  .btn-primary:hover {
-    background-color: grey; /* fixed */
-  }
   /* Slider Navigation Button Styles */
   .slider-nav__btn {
     position: absolute;
@@ -432,10 +374,6 @@
   }
   .slider-nav__btn:hover {
     background-color: rgba(0, 0, 0, 0.8);
-  }
-  @media screen and (max-width: 768px) {
-    .new-in-text { font-size: 15px; }
-    .new-in-heading { font-size: 20px; }
   }
 </style>
 {% schema %}
@@ -551,47 +489,6 @@
       "default": 0,
       "unit": "px",
       "info": "0 uses the theme's own width. A narrower row divides the same number of products into less space, so the images get smaller."
-    },
-    {
-      "id": "show_new_in",
-      "type": "checkbox",
-      "label": "Show New In Header",
-      "default": true
-    },
-    {
-      "id": "new_in_heading",
-      "type": "text",
-      "label": "New In Heading",
-      "default": "BLACK FRIDAY SALE!"
-    },
-    {
-      "id": "desktop_text",
-      "type": "textarea",
-      "label": "Desktop Text",
-      "default": "Happening now! Buy One Sample (at already discounted prices), Get Another for 20% OFF! Hurry! Limited Qty's! SAVE UP TO 50% FROM ORIGINAL PRICES"
-    },
-    {
-      "id": "mobile_text",
-      "type": "textarea",
-      "label": "Mobile Text",
-      "default": "Happening now! Buy One Sample (at already discounted prices), Get Another for 20% OFF! Hurry! Limited Qty's! SAVE UP TO 50% FROM ORIGINAL PRICES"
-    },
-    {
-      "id": "show_new_in_button",
-      "type": "checkbox",
-      "label": "Show New In Button",
-      "default": true
-    },
-    {
-      "id": "new_in_button_text",
-      "type": "text",
-      "label": "New In Button Text",
-      "default": "SHOP SALE"
-    },
-    {
-      "id": "new_in_button_link",
-      "type": "url",
-      "label": "New In Button Link"
     }
   ],
   "presets": [
