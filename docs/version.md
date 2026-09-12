@@ -8,6 +8,56 @@ team, not just by engineers.
 
 ---
 
+## v1.2 — 2026-09-12
+
+### Tracking was installed and recorded nothing
+
+Three separate faults, each enough on its own to lose every event. All three
+failed silently: the block rendered, no error appeared anywhere, and the
+Analytics tab read zero — which looks exactly like "nobody has clicked yet".
+
+**The password.** The VM's nginx puts HTTP basic auth in front of
+`ymal.pt-infashion.com` so the console is not public. That auth also covered
+`/api/events`, and a shopper's browser has no password, so every beacon got a
+401 before it reached us. Fixed in the VM's nginx, which is not part of this
+repository — `frontend/storefront/install.md` now carries the exact block to
+add and a command that proves it.
+
+**One missing hyphen.** The list of sites allowed to send events named
+`woodenships.com`. The shop is `wooden-ships.com`. The browser refused every
+beacon before it left the page. This would still have blocked everything after
+fixing the password.
+
+**A race the beacon could lose.** Events were sent as `application/json`, which
+obliges the browser to ask permission first. A beacon fired as someone leaves
+the page loses that exchange often enough to matter. They now go as plain text,
+which needs no permission step. The file says, in capitals, not to change it
+back.
+
+### The console now says when tracking is broken
+
+A table of zeroes meant two completely different things — nobody has clicked
+yet, or the endpoint refuses every event — and there was no way to tell them
+apart. That, rather than any one of the faults above, is what let this go
+unnoticed.
+
+The Analytics tab now checks the real public address the way a shopper's
+browser would, and says which of the two it is. When something is wrong it
+names the cause and where the fix lives. The same check runs when the API
+starts, so it also appears in the VM's logs.
+
+### After updating
+
+1. Add the nginx block from `install.md`, and reload nginx.
+2. `git pull && docker compose up -d --build` on the VM.
+3. Re-copy **two** theme files — `assets/ymal-track.js` and
+   `sections/ymal-widget.liquid`. Both changed. `theme.liquid` is unchanged.
+4. `docker compose run --rm api python -m scripts.nightly` to publish.
+5. Click a recommendation, then open Analytics. A red banner names whatever is
+   still wrong.
+
+---
+
 ## v1.1 — 2026-09-12
 
 ### Ranking is now tunable from the console
