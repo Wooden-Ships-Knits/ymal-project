@@ -275,18 +275,98 @@ than discovered on the storefront.
 
 ---
 
-## 10. What is deliberately NOT in the config
+## 10. The line between the console and the code
 
-These stay in `backend/ymal/settings.py`, owned by engineering:
+The original version of this section said every scoring knob stayed in
+`settings.py`, "owned by engineering", and that we should revisit once the team
+had used the console for a while. That happened on 2026-09-12: the web team
+asked for the ranking weights, having been told four times in a week to change a
+number in Python and wait for a deploy.
 
-- the Trending and Top Selling windows (both 14 days since 2026-09-10)
-- tag-scoring weights and the near-universal-tag cutoff
-- the eligibility rule — Bali location pattern, the `*SALE*` marker
-- stored list depth (roughly 3x what is displayed)
+### In the config, editable from the console
 
-Every knob added to the console is another way to break the storefront, and
-these need judgment rather than a preference. Revisit once the team has been
-using the console for a while and we know what they actually want to change.
+The `tuning` block — see §10.1. All of it changes only the **order** of a row:
+
+- `popularity_weight` — how much sales volume may lift a product within a pool
+- `idf_power` — how sharply rare tags are favoured over common ones
+- `weights` — the six facet weights: motif, fabric, colour, silhouette,
+  collection, other
+
+The worst a bad value here can do is produce a badly-ordered row.
+
+### Still in `backend/ymal/settings.py`
+
+- **the eligibility rule** — the Bali location pattern, the `*SALE*` marker
+- **`REQUIRE_SAME_SEASON`** and the seasonless fallback
+- the Trending / Top Selling / New Arrivals windows
+- stored list depth, and the near-universal-collection cutoff
+
+The split is not "simple vs complex". It is that everything above decides
+**whether** a product may be shown, and a wrong value puts a markdown or
+out-of-season product in front of a shopper. That is a different class of
+mistake from an ugly row, and not one a slider should be able to make.
+
+The windows stay for a narrower reason: Shopify silently truncates order history
+past 60 days, so a window set beyond it returns less data than it claims and
+looks perfectly healthy. Until the pipeline detects and reports that, the number
+should not be a slider.
+
+### 10.1 The tuning block
+
+```json
+"tuning": {
+  "popularity_weight": 0.4,
+  "idf_power": 2.0,
+  "weights": {
+    "motif": 3.0, "fabric": 2.0, "colour": 1.5,
+    "silhouette": 1.5, "collection": 1.5, "other": 2.0
+  }
+}
+```
+
+Every field is optional, and **the whole block is optional** — absent means "use
+the `settings.py` defaults", which is what every config written before
+2026-09-12 says. `weights` merges per facet, so sending only `motif` leaves the
+other five alone.
+
+Ranges are defined once, in `ymal/tuning.py`, and enforced by
+`config_schema.validate` like everything else here: **rejected, not clamped**. A
+clamped value would leave the console displaying a number the pipeline is not
+using, which is exactly the bug that had Top Selling described as 90 days while
+computing 14.
+
+One rule is not a range: at least one facet weight must be above zero. All six at
+zero scores every candidate at zero, `build_pool` drops candidates scoring zero,
+and every pool in the shop comes out empty — a symptom that gives no hint of its
+cause.
+
+### 10.2 How it reaches the pipeline
+
+`ymal/tuning.py` reads the block and assigns to the `settings` module at the
+start of `build_pools`. That is blunt, and it works only because every consumer
+reads `settings.POPULARITY_WEIGHT` at call time rather than copying it into a
+local at import. **If you ever change that, this breaks silently.**
+
+`apply()` always starts from the defaults, so a key the console removes returns
+to its `settings.py` value rather than keeping the last run's number. This
+matters because the api container is long-lived and also serves preview requests
+with arbitrary tunings.
+
+Shopify being unreachable is not fatal: the run proceeds on the `settings.py`
+defaults and says so. A pipeline that refused to build because a settings
+document could not be read would be worse than one that builds with the values
+in the code.
+
+### 10.3 Saving is not publishing
+
+`PUT /api/tuning` stores numbers. Nothing reaches a shopper until the pipeline
+runs — either the nightly job, or **Rebuild and publish** in the console, which
+is the same `/api/run` Manual Update uses. They are two actions on purpose:
+tying them together would mean fiddling with a slider fired off a Shopify
+republish per drag.
+
+`POST /api/tuning/preview` ranks one product under an unsaved tuning, in memory,
+off the feature table on disk. It needs no token because it writes nothing.
 
 ---
 

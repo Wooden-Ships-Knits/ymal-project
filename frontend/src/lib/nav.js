@@ -15,11 +15,16 @@
  *   Flush Cache        there is no cache to flush.
  *
  * What is left is what only this console can do.
+ *
+ * Ranking added 2026-09-12. It is the one screen that changes what shoppers
+ * see without a deploy, and the only place the scoring weights can be tried
+ * against the real catalog before they are published.
  */
 export const NAV = [
   { id: 'dashboard', label: 'Dashboard',        status: 'planned' },
   { id: 'analytics', label: 'Analytics',        status: 'planned' },
   { id: 'exclude',   label: 'Exclude Products', status: 'planned' },
+  { id: 'tuning',    label: 'Ranking',          status: 'live'    },
   { id: 'run',       label: 'Manual Update',    status: 'live'    },
 ]
 

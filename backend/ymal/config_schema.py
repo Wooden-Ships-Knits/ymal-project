@@ -10,7 +10,7 @@ Returns a list of {path, message} in the shape the contract specifies and
 frontend/src/api.js already reads.
 """
 
-from ymal import registry
+from ymal import registry, tuning
 
 CURRENT_VERSION = 1
 
@@ -24,7 +24,7 @@ MAX_HEADING = 60
 MIN_SLOTS = 2
 MAX_SLOTS = 12
 
-TOP_LEVEL_FIELDS = frozenset({"version", "enabled", "placements"})
+TOP_LEVEL_FIELDS = frozenset({"version", "enabled", "placements", "tuning"})
 
 # Written by the server on every save. A client that supplies them is asking
 # us to record an audit trail it authored, which is not an audit trail.
@@ -51,6 +51,7 @@ def validate(config: object) -> list[dict]:
     errors: list[dict] = []
     errors += _check_top_level(config)
     errors += _check_placements(config.get("placements"))
+    errors += _check_tuning(config.get("tuning"))
     return errors
 
 
@@ -174,6 +175,108 @@ def _check_entries(template_id: str, entries: list) -> list[dict]:
             errors.append({"path": f"{path}.{field}", "message": "is not a known field"})
 
     return errors
+
+
+def _check_tuning(given: object) -> list[dict]:
+    """
+    The ranking knobs — docs/config-contract.md section 10.
+
+    Optional: a config with no `tuning` means "use the settings.py defaults",
+    which is what every config written before this existed says.
+
+    Ranges come from ymal/tuning.py so there is one definition of what is
+    allowed. Out of range is REJECTED, not clamped: a clamped value leaves the
+    console displaying a number the pipeline is not using, which is the exact
+    class of bug that had Top Selling described as 90 days while computing 14.
+    """
+    if given is None:
+        return []
+    if not isinstance(given, dict):
+        return [{"path": "tuning", "message": "must be an object"}]
+
+    errors: list[dict] = []
+
+    errors += _check_number(
+        given,
+        "popularity_weight",
+        tuning.MIN_POPULARITY_WEIGHT,
+        tuning.MAX_POPULARITY_WEIGHT,
+    )
+    errors += _check_number(
+        given, "idf_power", tuning.MIN_IDF_POWER, tuning.MAX_IDF_POWER
+    )
+    errors += _check_weights(given.get("weights"))
+
+    for field in sorted(set(given) - tuning.KEYS):
+        errors.append(
+            {"path": f"tuning.{field}", "message": "is not a known tuning setting"}
+        )
+
+    return errors
+
+
+def _check_weights(weights: object) -> list[dict]:
+    if weights is None:
+        return []
+    if not isinstance(weights, dict):
+        return [{"path": "tuning.weights", "message": "must be an object"}]
+
+    errors: list[dict] = []
+    for facet in sorted(weights):
+        path = f"tuning.weights.{facet}"
+        if facet not in tuning.WEIGHT_FACETS:
+            known = ", ".join(tuning.WEIGHT_FACETS)
+            errors.append(
+                {"path": path, "message": f"is not a known facet, expected one of: {known}"}
+            )
+            continue
+        if not _is_number(weights[facet]):
+            errors.append({"path": path, "message": "must be a number"})
+        elif not tuning.MIN_WEIGHT <= weights[facet] <= tuning.MAX_WEIGHT:
+            errors.append(
+                {
+                    "path": path,
+                    "message": f"must be between {tuning.MIN_WEIGHT} and {tuning.MAX_WEIGHT}",
+                }
+            )
+
+    # Every facet at zero scores every candidate at zero, and build_pool drops
+    # a candidate scoring zero — so every pool would come out empty. Caught
+    # here because the symptom (a storefront with no recommendations anywhere)
+    # gives no hint of the cause.
+    if not errors and weights:
+        resolved = tuning.resolve({"weights": weights})["weights"]
+        if all(value == 0 for value in resolved.values()):
+            errors.append(
+                {
+                    "path": "tuning.weights",
+                    "message": "at least one facet must be above zero, or every pool is empty",
+                }
+            )
+
+    return errors
+
+
+def _check_number(given: dict, field: str, low: float, high: float) -> list[dict]:
+    if field not in given:
+        return []
+    value = given[field]
+    path = f"tuning.{field}"
+    if not _is_number(value):
+        return [{"path": path, "message": "must be a number"}]
+    if not low <= value <= high:
+        return [{"path": path, "message": f"must be between {low} and {high}"}]
+    return []
+
+
+def _is_number(value: object) -> bool:
+    """
+    True for an int or float, but not a bool.
+
+    bool is a subclass of int, so an unguarded check reads
+    `popularity_weight: true` as a weight of 1.0.
+    """
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
 def _is_int(value: object) -> bool:

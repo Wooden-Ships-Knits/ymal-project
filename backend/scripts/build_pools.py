@@ -18,7 +18,7 @@ import json
 import statistics
 import sys
 
-from ymal import settings, similarity
+from ymal import settings, similarity, tuning
 
 OUT_DIR = settings.DATA_DIR / "phase3"
 
@@ -63,6 +63,12 @@ def show_one(rows: list[dict], pools: dict, title: str) -> None:
 
 
 def main() -> None:
+    # Before anything reads a weight. The console's saved tuning overrides
+    # settings.py for this run; with nothing saved, or with Shopify
+    # unreachable, the defaults in settings.py are used and it says so.
+    changed = tuning.load_and_apply()
+    print(f"  {tuning.describe(changed)}")
+
     rows = load_features()
     print(f"Eligible products: {len(rows)}")
 
@@ -81,6 +87,12 @@ def main() -> None:
                 "depth": settings.POOL_DEPTH,
                 "require_same_season": settings.REQUIRE_SAME_SEASON,
                 "weights": settings.SIMILARITY_WEIGHTS,
+                # Recorded so a pool file can be read back against the
+                # settings that produced it. Without this, "why does this look
+                # different from yesterday" has no answer on disk.
+                "popularity_weight": settings.POPULARITY_WEIGHT,
+                "idf_power": settings.IDF_POWER,
+                "tuning_overrides": changed,
                 "pools": pools,
             },
             indent=2,
@@ -101,6 +113,7 @@ def main() -> None:
     print(f"  empty pools     : {empty}")
     print(f"  thin (under 6)  : {thin}")
     print(f"  popularity      : {'on' if units else 'off (no units.json)'}")
+    print(f"  {tuning.describe(changed)}")
     print(f"\n  -> {out}")
 
     if "--show" in sys.argv:

@@ -16,7 +16,17 @@ from fastapi import Body, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from ymal import config_schema, config_store, db, events, registry, runner, settings
+from ymal import (
+    config_schema,
+    config_store,
+    db,
+    events,
+    preview,
+    registry,
+    runner,
+    settings,
+    tuning,
+)
 
 load_dotenv(settings.REPO_ROOT / ".env", override=True)
 
@@ -167,6 +177,140 @@ def post_undo(x_ymal_token: str = Header(default="")) -> dict:
 
     # Same split as GET: the restored document is a stored one, stamps and all.
     return {"ok": True, **_split_stamps(restored)}
+
+
+# ---------------------------------------------------------------------------
+# Tuning — the ranking knobs, editable from the console.
+#
+# Stored inside the same ymal.config document as placements, so it inherits the
+# validator, the previous-version copy and undo. These routes exist rather than
+# making the console PUT the whole config because the tuning screen has no
+# business holding, or being able to lose, the placements.
+# ---------------------------------------------------------------------------
+
+@app.get("/api/tuning")
+def get_tuning() -> dict:
+    """What is saved, what the defaults are, and what values are allowed."""
+    try:
+        result = config_store.read()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Could not read tuning: {exc}")
+
+    saved = (result["config"] or {}).get("tuning") or {}
+    return {
+        "saved": saved,
+        "effective": tuning.resolve(saved),
+        "defaults": tuning.DEFAULTS,
+        "facets": list(tuning.WEIGHT_FACETS),
+        "limits": {
+            "popularity_weight": [
+                tuning.MIN_POPULARITY_WEIGHT,
+                tuning.MAX_POPULARITY_WEIGHT,
+            ],
+            "idf_power": [tuning.MIN_IDF_POWER, tuning.MAX_IDF_POWER],
+            "weight": [tuning.MIN_WEIGHT, tuning.MAX_WEIGHT],
+        },
+        "updated_at": (result["config"] or {}).get("updated_at"),
+    }
+
+
+@app.put("/api/tuning")
+def put_tuning(
+    payload: dict = Body(...),
+    x_ymal_token: str = Header(default=""),
+) -> JSONResponse:
+    """
+    Replace the tuning block, leaving placements exactly as they are.
+
+    Validated as part of a whole config rather than on its own, so there is one
+    validator and the error paths the console renders are the same either way.
+    """
+    require_token(x_ymal_token)
+
+    try:
+        stored = config_store.read()["config"] or {}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Could not read tuning: {exc}")
+
+    config = _split_stamps(stored)["config"]
+    config.setdefault("version", config_schema.CURRENT_VERSION)
+    config.setdefault("enabled", True)
+    config.setdefault("placements", {})
+
+    given = payload.get("tuning")
+    if given is None:
+        # An explicit "go back to the code defaults", which is not the same as
+        # saving a copy of them: a stored value would then survive a later
+        # change to settings.py.
+        config.pop("tuning", None)
+    else:
+        config["tuning"] = given
+
+    errors = config_schema.validate(config)
+    if errors:
+        return JSONResponse(status_code=422, content={"errors": errors})
+
+    try:
+        written = config_store.write(config, updated_by="web-team")
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Could not save: {exc}")
+
+    return JSONResponse(
+        status_code=200,
+        content={
+            "ok": True,
+            "tuning": written.get("tuning") or {},
+            "effective": tuning.resolve(written.get("tuning")),
+            "updated_at": written["updated_at"],
+        },
+    )
+
+
+@app.get("/api/tuning/products")
+def get_tuning_products() -> list[dict]:
+    """The anchors a preview may be run against, one per style."""
+    try:
+        return preview.styles()
+    except preview.NotBuilt as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+
+
+@app.post("/api/tuning/preview")
+def post_tuning_preview(payload: dict = Body(...)) -> dict:
+    """
+    Rank one product under an unsaved tuning.
+
+    No token: it writes nothing, publishes nothing and reads only files the
+    pipeline already produced. Validated all the same, because an out-of-range
+    weight should be reported by the same message the save would give rather
+    than silently previewing something that cannot be saved.
+    """
+    product_id = payload.get("product_id")
+    if not product_id:
+        raise HTTPException(status_code=422, detail="product_id is required")
+
+    given = payload.get("tuning") or {}
+    errors = config_schema.validate(
+        {
+            "version": config_schema.CURRENT_VERSION,
+            "enabled": True,
+            "placements": {},
+            "tuning": given,
+        }
+    )
+    if errors:
+        return JSONResponse(status_code=422, content={"errors": errors})
+
+    limit = payload.get("limit") or 10
+    if not isinstance(limit, int) or not 1 <= limit <= 30:
+        raise HTTPException(status_code=422, detail="limit must be 1-30")
+
+    try:
+        return preview.rank(str(product_id), given, limit=limit)
+    except preview.NotBuilt as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 @app.get("/api/blocks")
