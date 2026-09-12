@@ -22,6 +22,17 @@
   var ENDPOINT = 'https://ymal.pt-infashion.com/api/events';
   var SESSION_KEY = 'ymal:session';
 
+  // The body IS json. The content type says text/plain so that this stays a
+  // CORS "simple request" and the browser sends NO preflight.
+  //
+  // application/json is not on the CORS safelist, so it forces an OPTIONS
+  // round trip first - and a beacon fired while the page is unloading loses
+  // that race often enough to matter. The API parses the body by hand and does
+  // not care what the header says.
+  //
+  // DO NOT "correct" this to application/json.
+  var CONTENT_TYPE = 'text/plain;charset=UTF-8';
+
   // Events are batched and flushed on a timer rather than sent one by one: a
   // row of six products fires six impressions at once, and six requests to say
   // one thing is wasteful.
@@ -55,13 +66,13 @@
 
     try {
       if (navigator.sendBeacon) {
-        navigator.sendBeacon(ENDPOINT, new Blob([body], { type: 'application/json' }));
+        navigator.sendBeacon(ENDPOINT, new Blob([body], { type: CONTENT_TYPE }));
       } else {
         // Older browsers: keepalive lets the request outlive the page.
         fetch(ENDPOINT, {
           method: 'POST',
           body: body,
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': CONTENT_TYPE },
           keepalive: true,
           mode: 'cors'
         }).catch(function () {});

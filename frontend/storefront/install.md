@@ -214,6 +214,64 @@ What is recorded: which block, which page, which product, its position in the
 row, and a random session id the browser generates for itself. No cookie, no
 identifier that outlives the tab, nothing traceable to a person.
 
+### The endpoint must be reachable WITHOUT the console's password
+
+This is the step that was missed on 2026-09-12, and it recorded nothing for as
+long as it went unnoticed. The VM's nginx puts HTTP basic auth in front of
+`ymal.pt-infashion.com` so the console is not public. That auth also covered
+`/api/events`, and a shopper's browser has no password - so every beacon got a
+401 before it ever reached the API. Nothing failed visibly: the block rendered,
+the console showed no error, and Analytics simply stayed at zero.
+
+Add an exact-match location to the VM's nginx server block. `location =` has
+higher priority than a prefix match, so it wins wherever it is placed:
+
+```nginx
+location = /api/events {
+    auth_basic off;
+    proxy_pass http://127.0.0.1:8083;
+    proxy_set_header Host              $host;
+    proxy_set_header X-Real-IP         $remote_addr;
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+Then `sudo nginx -t && sudo systemctl reload nginx`.
+
+Everything else stays behind the password. This is the only unauthenticated
+write in the project: the endpoint validates every event against a fixed shape
+and reduces it to known columns before storage, precisely so that being open
+costs nothing more than junk rows. Adding `limit_req` in front of it is
+reasonable if that ever becomes a problem.
+
+Check it from a machine that has never seen the password:
+
+```bash
+curl -i -X POST https://ymal.pt-infashion.com/api/events \
+  -H 'Content-Type: text/plain' \
+  -d '{"events":[]}'
+```
+
+**202 is correct. 401 means the location block is missing or not reloaded.**
+
+### The beacon sends text/plain, and must keep doing so
+
+`ymal-track.js` sends JSON with `Content-Type: text/plain`. That looks wrong and
+is deliberate: `application/json` is not on the CORS safelist, so the browser
+must send a preflight `OPTIONS` first, and a beacon fired while the page is
+unloading loses that race often enough to matter. `text/plain` keeps it a simple
+request with no preflight. The API parses the body by hand and ignores the
+header.
+
+### The CORS allowlist must name the real domain
+
+`YMAL_STOREFRONT_ORIGINS` in `.env`, or the default in `app/main.py`. It said
+`woodenships.com` for a while; the shop is `wooden-ships.com`, **with a
+hyphen**, and one missing character was enough for the browser to refuse every
+beacon. It is not a wildcard on purpose - otherwise any page on the internet
+could post events into this shop's analytics.
+
 Purchases work differently. Clicking a product in a YMAL row writes a cart
 attribute naming the block; Shopify carries that through checkout onto the
 order, and `scripts/attribute_orders.py` reads it back from orders the pipeline

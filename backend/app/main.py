@@ -8,11 +8,12 @@ ymal/config_store.py. Nothing here decides anything.
 Run:  cd backend && uvicorn app.main:app --reload
 """
 
+import json
 import os
 import secrets
 
 from dotenv import load_dotenv
-from fastapi import Body, FastAPI, Header, HTTPException
+from fastapi import Body, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -52,7 +53,11 @@ STOREFRONT_ORIGINS = [
     o.strip()
     for o in os.getenv(
         "YMAL_STOREFRONT_ORIGINS",
-        "https://www.woodenships.com,https://woodenships.com",
+        # wooden-SHIPS, with the hyphen. The first version of this list said
+        # "woodenships.com", a domain that does not exist, so the browser
+        # refused every beacon before it left the page and tracking recorded
+        # nothing at all. Verified against the live shop: www.wooden-ships.com.
+        "https://www.wooden-ships.com,https://wooden-ships.com",
     ).split(",")
     if o.strip()
 ]
@@ -414,7 +419,7 @@ def post_run(
 
 
 @app.post("/api/events")
-def post_events(payload: dict = Body(...)) -> JSONResponse:
+async def post_events(request: Request) -> JSONResponse:
     """
     Record storefront tracking events.
 
@@ -426,7 +431,22 @@ def post_events(payload: dict = Body(...)) -> JSONResponse:
     A partly-bad batch stores its good events rather than failing whole: the
     browser sends by beacon and has no way to retry, so rejecting everything
     would lose real data over one malformed row.
+
+    PARSED BY HAND RATHER THAN WITH Body(...), so the content type does not
+    matter. sendBeacon must send `text/plain` to stay a CORS "simple request":
+    `application/json` is not on the safelist, so the browser has to send a
+    preflight OPTIONS first, and a beacon fired while the page is unloading
+    frequently loses that race. Declaring a JSON body would have made FastAPI
+    reject the very requests this endpoint exists to receive.
     """
+    raw = await request.body()
+    try:
+        payload = json.loads(raw or b"{}")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Body must be JSON.")
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Body must be a JSON object.")
+
     good, problems = events.clean_batch(payload.get("events"))
 
     try:
