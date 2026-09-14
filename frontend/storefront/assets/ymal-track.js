@@ -186,6 +186,21 @@
    */
   var lastAddSeen = 0;
 
+  function recordAdd(click, handle) {
+    queueEvent('add_to_cart', {
+      block: click.block,
+      page_type: click.page_type,
+      anchor: click.anchor,
+      handle: handle,
+      // The row that caused this is on the previous page, so there is no
+      // position to report.
+      position: null
+    });
+    // Sent at once rather than waiting for the batch timer: the page may be
+    // about to navigate to the cart.
+    send();
+  }
+
   function onCartAdd(event) {
     var variantId = event && event.detail && event.detail.variantId;
     if (!variantId) return;
@@ -198,6 +213,20 @@
 
     var click = lastClick();
     if (!click) return;
+
+    // On a product page the handle is in the URL, so the add can be recorded
+    // synchronously. That matters: with the theme's "after add to cart" set to
+    // `page`, it navigates to the cart 300ms later (main.js, the ProductForm
+    // submit handler), and an in-flight /cart.js would lose the race.
+    //
+    // Quick buy has no such hurry - it opens in place and the page stays put -
+    // so falling back to a lookup there is safe.
+    var fromUrl = window.location.pathname.match(/\/products\/([^/?#]+)/);
+    if (fromUrl) {
+      if (fromUrl[1] !== click.handle) return;
+      recordAdd(click, click.handle);
+      return;
+    }
 
     fetch('/cart.js', { credentials: 'same-origin' })
       .then(function (res) { return res.ok ? res.json() : null; })
@@ -212,15 +241,7 @@
           }
         }
         if (!added || added.handle !== click.handle) return;
-
-        queueEvent('add_to_cart', {
-          block: click.block,
-          page_type: click.page_type,
-          anchor: click.anchor,
-          handle: added.handle,
-          position: null
-        });
-        send();
+        recordAdd(click, added.handle);
       })
       .catch(function () {
         /* tracking must never break a storefront */
