@@ -38,6 +38,7 @@ over the original, so the theme keeps a working `product-list` either way.
 | `snippets/ymal-card.liquid` | the card used inside that section |
 | `snippets/ymal-recently-viewed.liquid` | Recently Viewed on a product or home page |
 | `snippets/ymal-recently-viewed-cart.liquid` | Recently Viewed in the cart drawer |
+| `snippets/ymal-recently-viewed-recorder.liquid` | **recording** Recently Viewed history - required for every placement |
 | `templates/product.ymal-card.liquid` | Recently Viewed card fetch |
 | `templates/product.ymal-card-compact.liquid` | Recently Viewed card in the cart drawer |
 | `assets/ymal-recently-viewed.js` | Recently Viewed |
@@ -181,6 +182,43 @@ product that sold out in between renders nothing.
 
 Ships on its own. No backend, no metafields, no config - the one block that can
 go live before anything else exists.
+
+### Recording and displaying are separate - install the recorder first
+
+A shopper's history is written on **product pages**, because that is the only
+place a product is viewed. It is read wherever the block is **displayed**. Those
+are different snippets, and it is easy to install only the second:
+
+| Snippet | Records? | Displays? |
+|---|---|---|
+| `ymal-recently-viewed-recorder` | yes | no |
+| `ymal-recently-viewed` (with `anchor`) | yes | yes, a row on the page |
+| `ymal-recently-viewed-cart` | **no** | yes, in the cart drawer |
+
+**Install the cart-drawer block alone and it shows nothing, forever** - nothing
+is ever recorded for it to read. It fails the same way every block in this
+project has failed: silently, with a perfectly empty-looking drawer.
+
+So the recorder goes in `layout/theme.liquid`, just before `</body>`, guarded to
+product pages:
+
+```liquid
+{%- if template.name == 'product' -%}
+  {%- render 'ymal-recently-viewed-recorder', product: product -%}
+{%- endif -%}
+```
+
+`product: product` is not optional. `render` gives a snippet its own scope, so
+without it the snippet sees no product and silently records nothing.
+
+Recording here rather than inside a product section means history builds from
+every product page no matter where Recently Viewed is shown - and moving the
+display later (the homepage, a second drawer) needs no thought about recording.
+Inspired By Your Views builds on the same history.
+
+It is safe to also place the display snippet on a product page. Both load
+`ymal-recently-viewed.js`, and the script runs only once per page, so nothing is
+recorded twice and no card appears twice.
 
 It stores `{handle, id, ts}` for twenty products in `localStorage` and nothing
 else, and never leaves the device. Title, price, image and availability are

@@ -1,0 +1,46 @@
+{%- comment -%}
+  YMAL — Recently Viewed RECORDER. Records the product being viewed; renders
+  nothing.
+
+  Usage, in layout/theme.liquid just before </body>:
+
+    {%- if template.name == 'product' -%}
+      {%- render 'ymal-recently-viewed-recorder', product: product -%}
+    {%- endif -%}
+
+  WHY THIS EXISTS
+
+  Recently Viewed has two halves that live in different places. RECORDING has
+  to happen on a product page: that is the only place a shopper views one. But
+  the web team wanted it DISPLAYED only in the cart drawer, and the cart
+  drawer's snippet never records - it only reads.
+
+  The display snippet (ymal-recently-viewed.liquid) records as a side effect of
+  rendering a visible row. Using it for recording alone would have put a second
+  recommendation row on every product page, directly beside the Featured row,
+  competing for the same attention. This snippet is the recording half on its
+  own, so where Recently Viewed is SHOWN can change without anyone having to
+  think about where it is RECORDED.
+
+  It is also what Inspired By Your Views will build on.
+
+  SAFE ALONGSIDE THE DISPLAY SNIPPET
+
+  If ymal-recently-viewed.liquid is later placed on a product page as well, both
+  load ymal-recently-viewed.js. The script guards against running twice, so the
+  product is recorded once and no card is appended twice.
+
+  `product` must be passed explicitly: `render` gives a snippet its own scope,
+  and without it this would silently record nothing.
+{%- endcomment -%}
+
+{%- if product -%}
+  {%- comment -%}
+    Handle and id only. Title, price and image are fetched fresh wherever the
+    list is displayed, so nothing stored in the shopper's browser can go stale.
+  {%- endcomment -%}
+  <script type="application/json" id="ymal-current-product">
+    {"handle": {{ product.handle | json }}, "id": {{ product.id | json }}}
+  </script>
+  <script src="{{ 'ymal-recently-viewed.js' | asset_url }}" defer></script>
+{%- endif -%}

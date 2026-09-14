@@ -15,6 +15,14 @@
 (function () {
   'use strict';
 
+  // Run once per page. Both the recorder snippet and the display snippet load
+  // this file, and a page with both would otherwise record the product twice
+  // and append every card twice - the second <script src> for the same file
+  // still executes. ymal-recently-viewed-cart.js guards the same way, per
+  // section.
+  if (window.__ymalRecentlyViewed) return;
+  window.__ymalRecentlyViewed = true;
+
   var KEY = 'ymal:viewed';
   var MAX_STORED = 20;      // deep enough to survive filtering, cheap to keep
   var CARD_VIEW = 'ymal-card';
