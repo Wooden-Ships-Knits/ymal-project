@@ -26,9 +26,18 @@ BLOCK_IDS = (
     "recently_viewed",
 )
 
+# The nine from docs/config-contract.md section 5, plus two the theme can
+# genuinely produce.
+#
+# `page` because a block may be placed on any Shopify page, and `unknown`
+# because the theme maps every template it does not recognise to that rather
+# than passing Shopify's own name through. An unlisted value is REJECTED, and
+# rejection is invisible to a shopper - a block on the wrong kind of page would
+# record nothing and look exactly like a block nobody scrolled to.
 PAGE_TYPES = (
     "product", "home", "cart", "collection", "search",
     "not_found", "blog", "account", "thank_you",
+    "page", "unknown",
 )
 
 # A batch is one beacon. Generous enough for a page with several blocks, small

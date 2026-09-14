@@ -22,6 +22,19 @@
   var ENDPOINT = 'https://ymal.pt-infashion.com/api/events';
   var SESSION_KEY = 'ymal:session';
 
+  // The last YMAL card clicked, kept across page loads.
+  //
+  // Clicking a recommendation NAVIGATES to the product page, so the add to
+  // cart happens on a different pageview with no YMAL row on it. Without this
+  // there is nothing left to attribute the add to, which is why add_to_cart
+  // was flat zero while clicks worked.
+  var CLICK_KEY = 'ymal:lastclick';
+
+  // How long a click may still explain an add. Long enough to read the page
+  // and pick a size; short enough that an add an hour later is not credited to
+  // a recommendation the shopper has forgotten.
+  var ATTRIBUTION_MS = 30 * 60 * 1000;
+
   // The body IS json. The content type says text/plain so that this stays a
   // CORS "simple request" and the browser sends NO preflight.
   //
@@ -103,6 +116,34 @@
     }
   }
 
+  function rememberClick(detail) {
+    if (!detail.handle) return;
+    try {
+      window.sessionStorage.setItem(CLICK_KEY, JSON.stringify({
+        block: detail.block,
+        page_type: detail.page_type,
+        anchor: detail.anchor || null,
+        handle: detail.handle,
+        ts: Date.now()
+      }));
+    } catch (e) {
+      /* private browsing throws; add_to_cart is simply not attributed */
+    }
+  }
+
+  function lastClick() {
+    try {
+      var raw = window.sessionStorage.getItem(CLICK_KEY);
+      if (!raw) return null;
+      var click = JSON.parse(raw);
+      if (!click || !click.handle) return null;
+      if (Date.now() - click.ts > ATTRIBUTION_MS) return null;
+      return click;
+    } catch (e) {
+      return null;
+    }
+  }
+
   // The block scripts emit "ymal_impression" and "ymal_click"; strip the
   // prefix so the stored type is the plain event name.
   window.ymalTrack = function (name, detail) {
@@ -121,8 +162,72 @@
       });
       return;
     }
+    // Remembered here rather than in the section's script, so the widget file
+    // needs no change and any future block gets this for free.
+    if (type === 'click') rememberClick(detail || {});
     queueEvent(type, detail);
   };
+
+  /*
+   * Add to cart.
+   *
+   * The theme dispatches `on:cart:add` on its product form, bubbling, carrying
+   * only detail.variantId - see the CartForm/ProductForm component in main.js.
+   * A variant id is not enough: we need the product handle to know whether
+   * this is the product the shopper clicked in a YMAL row. /cart.js has it,
+   * and the item is definitely there because the add has just succeeded.
+   *
+   * This is deliberately NOT a fetch interceptor. The theme gives us a real
+   * event, and wrapping window.fetch on a live storefront to infer the same
+   * thing would be guessing at someone else's internals.
+   *
+   * Only adds that match a recent YMAL click are recorded. An add from the
+   * product page reached any other way is not ours to claim.
+   */
+  var lastAddSeen = 0;
+
+  function onCartAdd(event) {
+    var variantId = event && event.detail && event.detail.variantId;
+    if (!variantId) return;
+
+    // The theme can fire this more than once for one add (form submit plus a
+    // drawer refresh). One add is one event.
+    var now = Date.now();
+    if (now - lastAddSeen < 1500) return;
+    lastAddSeen = now;
+
+    var click = lastClick();
+    if (!click) return;
+
+    fetch('/cart.js', { credentials: 'same-origin' })
+      .then(function (res) { return res.ok ? res.json() : null; })
+      .then(function (cart) {
+        if (!cart || !cart.items) return;
+
+        var added = null;
+        for (var i = 0; i < cart.items.length; i++) {
+          if (String(cart.items[i].variant_id) === String(variantId)) {
+            added = cart.items[i];
+            break;
+          }
+        }
+        if (!added || added.handle !== click.handle) return;
+
+        queueEvent('add_to_cart', {
+          block: click.block,
+          page_type: click.page_type,
+          anchor: click.anchor,
+          handle: added.handle,
+          position: null
+        });
+        send();
+      })
+      .catch(function () {
+        /* tracking must never break a storefront */
+      });
+  }
+
+  document.addEventListener('on:cart:add', onCartAdd);
 
   // Anything still queued when the page goes away. visibilitychange rather
   // than unload, which mobile browsers often skip entirely.

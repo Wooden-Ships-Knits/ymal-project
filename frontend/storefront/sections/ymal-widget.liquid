@@ -44,6 +44,18 @@
       assign ymal_page_type = 'blog'
     when 'customers/login', 'customers/account', 'customers/register'
       assign ymal_page_type = 'account'
+    when 'product', 'cart', 'collection', 'search', 'blog', 'page'
+      comment
+        Already the right name. Listed so the else below can catch everything
+        else rather than passing Shopify's own template names through.
+      endcomment
+    else
+      comment
+        The API rejects a page_type it does not know, and a rejected event is
+        invisible - so anything unrecognised is reported as `unknown` rather
+        than silently dropped.
+      endcomment
+      assign ymal_page_type = 'unknown'
   endcase
 
   case ymal_source
