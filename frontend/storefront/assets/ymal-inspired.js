@@ -316,7 +316,12 @@
 
     // Do nothing until the shopper scrolls near it. Up to five source fetches
     // and a handful of cards should not compete with the product page loading.
-    if (!('IntersectionObserver' in root)) {
+    //
+    // Watch the section's wrapper, never the row itself: the row is `hidden`
+    // until it has cards, and a display:none element never intersects
+    // anything - observing it directly meant the row waited forever.
+    var watched = section.parentElement;
+    if (!('IntersectionObserver' in root) || !watched) {
       build(section);
       return;
     }
@@ -327,7 +332,7 @@
         build(section);
       });
     }, { rootMargin: '0px 0px 600px 0px' });
-    io.observe(section);
+    io.observe(watched);
   }
 
   function init() {
