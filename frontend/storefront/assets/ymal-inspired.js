@@ -211,6 +211,8 @@
   function render(section, cards) {
     var grid = section.querySelector('[data-ymal-items]');
     if (!grid) return [];
+    // The theme's carousel only moves children marked as slides.
+    var carousel = section.querySelector('carousel-slider');
 
     cards.forEach(function (card, index) {
       var holder = document.createElement('template');
@@ -219,10 +221,31 @@
       if (!node) return;
       node.setAttribute('data-ymal-handle', card.handle);
       node.setAttribute('data-ymal-position', String(index + 1));
-      grid.appendChild(node);
+      if (carousel) {
+        var slide = document.createElement('div');
+        slide.className = 'slider__item';
+        slide.appendChild(node);
+        grid.appendChild(slide);
+      } else {
+        grid.appendChild(node);
+      }
     });
 
     return cards.map(function (card) { return card.handle; });
+  }
+
+  // The theme's <carousel-slider> set itself up while the page parsed, when
+  // this row had no slides, and switched itself off. refresh() is its own
+  // re-initialise hook. It measures card widths, so the row must already be
+  // visible when this runs.
+  function refreshCarousel(section) {
+    var carousel = section.querySelector('carousel-slider');
+    if (!carousel || typeof carousel.refresh !== 'function') return;
+    try {
+      carousel.refresh();
+    } catch (e) {
+      /* without the carousel the cards still show, just not as a slider */
+    }
   }
 
   function wireTracking(section, handles, pageType, anchor) {
@@ -304,6 +327,7 @@
       // Never a heading with nothing under it.
       if (!handles.length) return;
       section.hidden = false;
+      refreshCarousel(section);
       wireTracking(section, handles, pageType, current);
     }).catch(function () {
       /* a recommendation row is never worth breaking a product page over */

@@ -47,18 +47,80 @@
   data-ymal-slots="{{ section.settings.products_to_show }}"
   hidden
 >
-  <div class="container{% if section.settings.full_width %} container--no-max{% endif %}">
-    <h2 class="hometitle h4 align-center">{{ section.settings.title | escape }}</h2>
-    <div class="collection-listing">
+  {%- comment -%}
+    Carousel markup copied from ymal-widget.liquid, minus the theme's
+    data-cc-animate reveal: that animation is armed on page load, and this row
+    is still hidden then, so its cards would never fade in.
+
+    The theme's <carousel-slider> sets itself up once, as the page parses, and
+    finds no slides here. assets/ymal-inspired.js calls its refresh() after the
+    cards are in, which is the theme's own hook for "slides have changed".
+  {%- endcomment -%}
+  {%- assign ymal_carousel = section.settings.enable_carousel -%}
+  <div class="container{% if ymal_carousel %} container--not-mobile{% endif %}{% if section.settings.full_width %} container--no-max{% endif %}">
+    {%- if ymal_carousel -%}
+      <carousel-slider class="carousel block collection-slider">
+    {%- endif -%}
+    <h2 class="hometitle h4 align-center has-paging{% if ymal_carousel %} slider-nav{% endif %}">
+      {%- if ymal_carousel -%}
+        <button name="prev" class="slider-nav__btn has-ltr-icon">
+          <span class="visually-hidden">{{ 'general.slider.previous' | t }}</span>
+          {% render 'icon-chevron-left' %}
+        </button>
+      {%- endif -%}
+      <span class="has-paging__title">{{ section.settings.title | escape }}</span>
+      {%- if ymal_carousel -%}
+        <button name="next" class="slider-nav__btn has-ltr-icon">
+          <span class="visually-hidden">{{ 'general.slider.next' | t }}</span>
+          {% render 'icon-chevron-right' %}
+        </button>
+      {%- endif -%}
+    </h2>
+    <div class="collection-listing{% if ymal_carousel %} slider {% if section.settings.full_width %}slider--edge-peek{% endif %} slider--mobile-container-pad slider--no-scrollbar{% endif %}">
       <div
-        class="product-grid product-grid--per-row-{{ section.settings.grid }} product-grid--per-row-mob-{{ settings.prod_thumb_mob_per_row }}"
+        class="product-grid product-grid--per-row-{{ section.settings.grid }} product-grid--per-row-mob-{{ settings.prod_thumb_mob_per_row }}{% if ymal_carousel %} slider__grid product-grid--carousel{% endif %}"
         data-ymal-items
       ></div>
     </div>
+    {%- if ymal_carousel -%}
+      </carousel-slider>
+    {%- endif -%}
   </div>
 </div>
 
 <script src="{{ 'ymal-inspired.js' | asset_url }}" defer></script>
+
+<style>
+  {%- comment -%}
+    The arrow styles from ymal-widget.liquid, scoped to this section so the row
+    looks right on a page without a YMAL row too.
+  {%- endcomment -%}
+  #shopify-section-{{ section.id }} .slider-nav__btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 5;
+    background-color: rgba(0, 0, 0, 0.5);
+    border: none;
+    color: white;
+    padding: 10px;
+    cursor: pointer;
+  }
+  #shopify-section-{{ section.id }} .slider-nav__btn.has-ltr-icon {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  #shopify-section-{{ section.id }} .slider-nav__btn[name="prev"] { left: -50px; }
+  #shopify-section-{{ section.id }} .slider-nav__btn[name="next"] { right: -60px; }
+  @media (max-width: 767px) {
+    #shopify-section-{{ section.id }} .slider-nav__btn[name="prev"] { left: -5px; }
+    #shopify-section-{{ section.id }} .slider-nav__btn[name="next"] { right: -5px; }
+  }
+  #shopify-section-{{ section.id }} .slider-nav__btn:hover {
+    background-color: rgba(0, 0, 0, 0.8);
+  }
+</style>
 
 {% schema %}
 {
@@ -92,6 +154,12 @@
       "max": 5,
       "step": 1,
       "default": 4
+    },
+    {
+      "type": "checkbox",
+      "id": "enable_carousel",
+      "label": "Enable carousel",
+      "default": true
     },
     {
       "type": "checkbox",
