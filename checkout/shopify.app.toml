@@ -1,0 +1,46 @@
+# YMAL — Shopify app configuration.
+#
+# Linked to the EXISTING YMAL app (client_id below). That same app's credentials
+# power the production pipeline via the client_credentials grant, so this file
+# is deliberately conservative.
+#
+# The extension-only template shipped sample config that YMAL does not have: a
+# FAQ metaobject, an "FAQ" product metafield shown on every product in admin,
+# an admin API access-mode change, a Sidekick summary, and App Home / App Tools
+# sample extensions. A deploy would have created all of it in the live store.
+# Removed before this ever deployed.
+
+client_id = "3fb7e0036a76ebe343c058e46dbfd921"
+name = "YMAL "
+application_url = "https://ymal.pt-infashion.com/"
+embedded = true
+
+[build]
+# Set false, but DO NOT rely on it. Shopify CLI 4.8's `deploy --help` has no
+# extensions-only mode, and its --allow-deletes flag covers "removing extensions
+# and configuration" - so a deploy may well push this file's configuration too.
+#
+# The real protection is that every value in this file mirrors the live app
+# (pulled by `config link` on 2026-09-15), so the configuration diff should be
+# empty. Verify that on every deploy: run `shopify app deploy --no-release`
+# first, read the add/update/remove summary the CLI prints, and release only
+# if nothing but the intended extension changed.
+include_config_on_deploy = false
+
+# FALSE on purpose. When true, `shopify app dev` rewrites the live app's URL to
+# a temporary tunnel.
+automatically_update_urls_on_dev = false
+
+[webhooks]
+api_version = "2026-01"
+
+[access_scopes]
+# Mirrors the live app exactly. This must stay true: if a deploy includes
+# configuration, a scope missing here would be REMOVED from the app the
+# pipeline depends on.
+scopes = "read_all_orders,read_inventory,read_locations,read_orders,read_products,write_products,read_publications"
+optional_scopes = [ ]
+use_legacy_install_flow = false
+
+[auth]
+redirect_urls = [ ]
