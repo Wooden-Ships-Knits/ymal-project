@@ -91,7 +91,45 @@ test.describe('seededOrder', () => {
   });
 });
 
+test.describe('uniqueStyles', () => {
+  test.it('keeps only the first colorway of each style', () => {
+    // Two viewed products recommending different colorways of one jersey
+    // filled the row with that jersey.
+    const styles = { a: 'JERSEY', b: 'CREW', c: 'JERSEY', d: 'JERSEY', e: 'CARDIGAN' };
+    assert.deepEqual(ibyv.uniqueStyles(letters('abcde'), styles), letters('abe'));
+  });
+
+  test.it('treats a product with no known style as its own style', () => {
+    // A template from before styles were sent: nothing is dropped.
+    assert.deepEqual(ibyv.uniqueStyles(letters('abc'), { a: 'JERSEY' }), letters('abc'));
+    assert.deepEqual(ibyv.uniqueStyles(letters('abc'), undefined), letters('abc'));
+  });
+
+  test.it('does not mutate its input', () => {
+    const input = letters('abc');
+    ibyv.uniqueStyles(input, { a: 'X', b: 'X', c: 'X' });
+    assert.deepEqual(input, letters('abc'));
+  });
+});
+
 test.describe('plan', () => {
+  test.it('shows one colorway per style, the one the visit shuffle put first', () => {
+    const styles = { a: 'JERSEY', b: 'JERSEY', c: 'JERSEY', d: 'CREW', e: 'CREW', f: 'CARDIGAN' };
+    const planned = ibyv.plan({
+      sources: [letters('abcd'), letters('ef')],
+      perSource: 4,
+      excluded: new Set(),
+      seed: 'visit-1',
+      styles,
+    });
+    const ordered = ibyv.seededOrder(letters('abcdef'), 'visit-1');
+    const firstOf = (style) => ordered.find((h) => styles[h] === style);
+
+    assert.equal(planned.length, 3);
+    assert.deepEqual([...planned].sort(), [firstOf('JERSEY'), firstOf('CREW'), firstOf('CARDIGAN')].sort());
+    assert.deepEqual(planned, ordered.filter((h) => planned.includes(h)));
+  });
+
   test.it('combines, excludes and orders in one step', () => {
     const planned = ibyv.plan({
       sources: [letters('abcd'), letters('cdef')],

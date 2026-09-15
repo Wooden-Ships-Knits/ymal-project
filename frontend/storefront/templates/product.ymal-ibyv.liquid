@@ -3,7 +3,8 @@
 
   Fetched as /products/<handle>?view=ymal-ibyv. Returns JSON and nothing else:
 
-    {"handles": ["first-eligible", "second", "third", "fourth"]}
+    {"handles": ["first-eligible", "second", "third", "fourth"],
+     "styles":  ["FIRST STYLE", "SECOND STYLE", "THIRD STYLE", "FOURTH STYLE"]}
 
   The FIRST FOUR products of this product's Featured list that would actually
   appear in its YMAL row - the same rule ymal-widget.liquid applies before it
@@ -19,6 +20,13 @@
   that appear on YMAL", and a stored list's first four often include products
   the row would never show.
 
+  `styles` runs parallel to `handles`: the style each product belongs to, so
+  the row can show one colorway per style. A style is its TITLE, trimmed and
+  upper-cased - the same key the backend counts style sales under
+  (similarity.style_of). Handles cannot stand in for it: one style's colorways
+  carry different handle patterns (custom-jersey-1-2-characters-cotton-... and
+  customizable-number-jersey-cotton-... are the same sweater).
+
   Liquid, not the browser, because only Liquid can read the metafield and the
   live product objects it references.
 {%- endcomment -%}
@@ -27,10 +35,10 @@
 {%- liquid
   assign ymal_limit = 4
   assign ymal_count = 0
--%}
-{"handles": [
-{%- for ymal_item in product.metafields.ymal.featured.value -%}
-  {%- liquid
+  assign ymal_handles = ''
+  assign ymal_styles = ''
+
+  for ymal_item in product.metafields.ymal.featured.value
     if ymal_count >= ymal_limit
       break
     endif
@@ -46,9 +54,16 @@
     if ymal_item.title contains '*SALE*'
       continue
     endif
-  -%}
-  {%- if ymal_count > 0 -%},{%- endif -%}
-  {{- ymal_item.handle | json -}}
-  {%- assign ymal_count = ymal_count | plus: 1 -%}
-{%- endfor -%}
-]}
+
+    if ymal_count > 0
+      assign ymal_handles = ymal_handles | append: ','
+      assign ymal_styles = ymal_styles | append: ','
+    endif
+    assign ymal_handle_json = ymal_item.handle | json
+    assign ymal_style_json = ymal_item.title | strip | upcase | json
+    assign ymal_handles = ymal_handles | append: ymal_handle_json
+    assign ymal_styles = ymal_styles | append: ymal_style_json
+    assign ymal_count = ymal_count | plus: 1
+  endfor
+-%}
+{"handles": [{{ ymal_handles }}], "styles": [{{ ymal_styles }}]}

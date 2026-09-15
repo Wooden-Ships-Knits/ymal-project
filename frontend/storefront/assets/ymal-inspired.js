@@ -10,6 +10,7 @@
  *     -> /products/<h>?view=ymal-ibyv   first 4 that would appear in its YMAL row
  *     -> combine, drop duplicates, drop viewed + in cart + this product
  *     -> order by a seed that lives for the visit
+ *     -> one colorway per style
  *     -> /products/<h>?view=ymal-block  the theme's own product card
  *
  * WHY THIS PRODUCT IS NOT A SOURCE. On a product page the recorder has just
@@ -88,9 +89,26 @@
       });
   }
 
+  // One card per style. A style's colorways are separate products with
+  // separate handles, and two viewed products often recommend different
+  // colorways of the same sweater - which filled the row with one jersey.
+  // Runs AFTER ordering, so the colorway kept is whichever the visit's shuffle
+  // put first, and that stays the same for the whole visit. A handle with no
+  // known style counts as a style of its own.
+  function uniqueStyles(handles, styles) {
+    var seen = Object.create(null);
+    return handles.filter(function (handle) {
+      var key = (styles && styles[handle]) || handle;
+      if (seen[key]) return false;
+      seen[key] = true;
+      return true;
+    });
+  }
+
   function plan(options) {
     var pool = candidates(options.sources, options.perSource);
-    return seededOrder(exclude(pool, options.excluded), options.seed);
+    var ordered = seededOrder(exclude(pool, options.excluded), options.seed);
+    return uniqueStyles(ordered, options.styles);
   }
 
   var api = {
@@ -98,6 +116,7 @@
     candidates: candidates,
     exclude: exclude,
     seededOrder: seededOrder,
+    uniqueStyles: uniqueStyles,
     plan: plan,
     PER_SOURCE: PER_SOURCE,
     SOURCES: SOURCES
@@ -153,15 +172,21 @@
       .catch(function () { return ''; });
   }
 
+  // { handles, styles } - styles[i] is the style of handles[i]. A template
+  // from before styles were added has no `styles`, and every product then
+  // counts as its own style, which is how the row behaved before.
   function sourceFor(handle) {
     return getText('/products/' + encodeURIComponent(handle) + '?view=ymal-ibyv')
       .then(function (text) {
         try {
           var data = JSON.parse(text);
-          return Array.isArray(data.handles) ? data.handles : [];
+          return {
+            handles: Array.isArray(data.handles) ? data.handles : [],
+            styles: Array.isArray(data.styles) ? data.styles : []
+          };
         } catch (e) {
           // Deleted, unpublished or renamed product - no source, not an error.
-          return [];
+          return { handles: [], styles: [] };
         }
       });
   }
@@ -312,12 +337,21 @@
       Promise.all(sourceHandles.map(sourceFor)),
       cartHandles()
     ]).then(function (results) {
+      var sources = results[0];
+      var styles = {};
+      sources.forEach(function (source) {
+        source.handles.forEach(function (handle, i) {
+          if (source.styles[i]) styles[handle] = source.styles[i];
+        });
+      });
+
       var excluded = new Set(viewed.concat(results[1], [current]));
       var ordered = plan({
-        sources: results[0],
+        sources: sources.map(function (source) { return source.handles; }),
         perSource: PER_SOURCE,
         excluded: excluded,
-        seed: visitSeed()
+        seed: visitSeed(),
+        styles: styles
       });
       if (!ordered.length) return null;
       return fillCards(ordered, slots);
