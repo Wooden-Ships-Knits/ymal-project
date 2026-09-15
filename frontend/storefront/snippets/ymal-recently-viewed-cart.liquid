@@ -20,7 +20,15 @@
   handle stored three weeks ago still shows today's price and stock.
 {%- endcomment -%}
 
-<div class="ymal-rv" data-ymal-block="recently_viewed"
+{%- comment -%}
+  No data-ymal-block="recently_viewed" here, deliberately. That attribute is
+  what ymal-recently-viewed.js (loaded on every product page by the recorder)
+  looks for to FILL a block - so with it, that script also stuffed its own
+  grid cards into this drawer block and counted a second impression whenever
+  the drawer opened. This block is found by class + data-ymal-page instead,
+  and belongs to ymal-recently-viewed-cart.js alone.
+{%- endcomment -%}
+<div class="ymal-rv"
      data-ymal-page="cart"
      data-ymal-slots="{{ slots | default: 3 }}"
      hidden>

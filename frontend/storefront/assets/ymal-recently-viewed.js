@@ -171,8 +171,14 @@
       }
     }
 
+    // Never the cart drawer's block: ymal-recently-viewed-cart.js owns that
+    // one, with its own compact cards and cart-aware refresh. Filling it here
+    // as well appended grid cards into the drawer and counted every drawer
+    // opening twice. (The cart snippet no longer carries data-ymal-block, so
+    // this is the second of two guards - it covers a drawer snippet copied
+    // before that change.)
     document
-      .querySelectorAll('[data-ymal-block="recently_viewed"]')
+      .querySelectorAll('[data-ymal-block="recently_viewed"]:not([data-ymal-page="cart"])')
       .forEach(render);
   }
 

@@ -26,13 +26,17 @@
     owns the markup. It needs the ids anyway to add to the cart, and building
     the control in one place keeps the drawer and any future placement
     consistent.
+
+    `| json | escape`, in double quotes: `json` does not escape an apostrophe,
+    so a variant title like "Men's L" inside a single-quoted attribute ended
+    the attribute early and the card's JSON failed to parse.
   {%- endcomment -%}
   <div class="ymal-rv__card"
-       data-handle="{{ product.handle }}"
-       data-url="{{ product.url }}"
-       data-variants='{{ product.variants | map: 'id' | json }}'
-       data-variant-titles='{{ product.variants | map: 'title' | json }}'
-       data-variant-available='{{ product.variants | map: 'available' | json }}'>
+       data-handle="{{ product.handle | escape }}"
+       data-url="{{ product.url | escape }}"
+       data-variants="{{ product.variants | map: 'id' | json | escape }}"
+       data-variant-titles="{{ product.variants | map: 'title' | json | escape }}"
+       data-variant-available="{{ product.variants | map: 'available' | json | escape }}">
     <a class="ymal-rv__link" href="{{ product.url }}">
       {%- if product.featured_media -%}
         <img class="ymal-rv__img"

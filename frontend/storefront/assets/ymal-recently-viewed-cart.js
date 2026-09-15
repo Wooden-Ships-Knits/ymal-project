@@ -12,15 +12,38 @@
  * than being built here, so the eligibility gate runs in Liquid where the live
  * product is - sold out, *SALE* and fixed-stock products render as nothing and
  * are skipped, and prices are always today's.
+ *
+ * KEEPING UP WITH THE CART. Rendered once at page load, the block went stale
+ * the moment the cart changed: add the sweater you are looking at and the
+ * drawer opened with that same sweater under Recently Viewed. It now re-renders
+ * whenever the theme reports a cart change, and reads the cart from /cart.js.
+ * (It used to collect every /products/ link on the page, which also swept up
+ * the YMAL rows, the menu and anything else linking to a product.)
+ *
+ * ADDING FROM THE BLOCK tells the theme with the theme's own on:cart:change
+ * event, so the cart list, subtotal and header count update like any other add
+ * - and the same event re-renders this block without the product just added.
  */
 (function () {
   'use strict';
 
+  // Loaded by a snippet inside the drawer; run once however often it appears.
+  if (window.__ymalRecentlyViewedCart) return;
+  window.__ymalRecentlyViewedCart = true;
+
   var KEY = 'ymal:viewed';
   var CARD_VIEW = 'ymal-card-compact';
+  var BLOCK = 'recently_viewed';
   // Fetch more than are shown, because the gate rejects some and a drawer with
   // one card in it looks like a bug.
   var OVERFETCH = 4;
+
+  // Symmetry's names. on:cart:change is fired after any cart update the theme
+  // makes; on:cart:after-merge once the drawer's markup has caught up;
+  // on:cart:add by the product form. Listening to all three costs one debounced
+  // render and does not depend on which path a given add took.
+  var CART_EVENTS = ['on:cart:change', 'on:cart:after-merge', 'on:cart:add'];
+  var SELECTOR = '.ymal-rv[data-ymal-page="cart"]';
 
   function read() {
     try {
@@ -34,17 +57,16 @@
     }
   }
 
+  // Never recommend something already in the cart - the drawer is showing it
+  // three inches above. A failed read shows the history unfiltered rather than
+  // nothing.
   function cartHandles() {
-    // Never recommend something already in the cart. The drawer is showing it
-    // three inches above.
-    var handles = [];
-    document.querySelectorAll('a[href*="/products/"]').forEach(function (a) {
-      var drawer = a.closest('[data-ymal-block]');
-      if (drawer) return;
-      var match = a.getAttribute('href').match(/\/products\/([^/?#]+)/);
-      if (match) handles.push(match[1]);
-    });
-    return handles;
+    return fetch('/cart.js', { credentials: 'same-origin', cache: 'no-store' })
+      .then(function (res) { return res.ok ? res.json() : { items: [] }; })
+      .then(function (cart) {
+        return (cart.items || []).map(function (item) { return item.handle; });
+      })
+      .catch(function () { return []; });
   }
 
   function fetchCard(handle) {
@@ -71,7 +93,23 @@
     });
   }
 
-  function buildControl(card, onAdded) {
+  // The cart attribute that attributes a later purchase to this block - the
+  // same one every other YMAL row writes.
+  function attribute() {
+    return fetch('/cart/update.js', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ attributes: { 'YMAL block': BLOCK } })
+    }).catch(function () {});
+  }
+
+  function notifyTheme() {
+    document.dispatchEvent(
+      new CustomEvent('on:cart:change', { bubbles: true, cancelable: false })
+    );
+  }
+
+  function buildControl(card) {
     var ids = JSON.parse(card.getAttribute('data-variants') || '[]');
     var titles = JSON.parse(card.getAttribute('data-variant-titles') || '[]');
     var available = JSON.parse(card.getAttribute('data-variant-available') || '[]');
@@ -112,12 +150,11 @@
 
       addToCart(id, 1)
         .then(function () {
-          track('ymal_add_to_cart', {
-            block: 'recently_viewed',
-            page_type: 'cart',
-            handle: handle
-          });
-          onAdded(handle);
+          track('ymal_add_to_cart', { block: BLOCK, page_type: 'cart', handle: handle });
+          // Attribute before the theme re-reads the cart, then let it refresh.
+          // Its on:cart:change also re-renders this block, which drops the
+          // product just added and brings in the next one.
+          return attribute().then(notifyTheme);
         })
         .catch(function () {
           button.disabled = false;
@@ -129,107 +166,145 @@
     return { button: wrap, select: select };
   }
 
+  function drawerOf(section) {
+    return section.closest('cart-drawer, .drawer');
+  }
+
+  function drawerIsOpen(section) {
+    var drawer = drawerOf(section);
+    // Not inside a drawer (a cart page, say): it is on screen when rendered.
+    return !drawer || drawer.hasAttribute('open');
+  }
+
+  // Once per opening of the drawer, and only while it is open. Counting at page
+  // load recorded an impression on every page view, drawer opened or not; and
+  // counting each re-render counted one opening two or three times, because a
+  // single add fires several cart events. Either would flatter every click rate
+  // built on it.
+  function impression(section) {
+    var shown = section.__ymalShown || [];
+    if (!shown.length || section.__ymalSeen) return;
+    section.__ymalSeen = true;
+    track('ymal_impression', { block: BLOCK, page_type: 'cart', handles: shown });
+  }
+
+  // Watches the drawer's own `open` attribute rather than the theme's open
+  // event, so it works however the drawer was opened - cart icon, an add, or
+  // the theme's own script - and whether or not that event reaches document.
+  function watchDrawer(section) {
+    var drawer = drawerOf(section);
+    if (!drawer || drawer.__ymalWatched || !('MutationObserver' in window)) return;
+    drawer.__ymalWatched = true;
+
+    new MutationObserver(function () {
+      var open = drawer.hasAttribute('open');
+      each(function (s) {
+        if (!drawer.contains(s)) return;
+        if (!open) {
+          s.__ymalSeen = false;
+          return;
+        }
+        // An add opens the drawer a moment before this block has re-rendered
+        // without the product just added. Counting now would record the old
+        // cards; the render counts it instead when it lands.
+        if (pending || s.__ymalBusy) return;
+        impression(s);
+      });
+    }).observe(drawer, { attributes: true, attributeFilter: ['open'] });
+  }
+
   function render(section) {
     var list = section.querySelector('[data-ymal-items]');
     if (!list) return;
 
+    // Cart events arrive in bursts, and each render is several fetches. Only
+    // the newest render may touch the block.
+    var generation = (section.__ymalGeneration || 0) + 1;
+    section.__ymalGeneration = generation;
+    section.__ymalBusy = true;
+
     var slots = parseInt(section.getAttribute('data-ymal-slots'), 10) || 3;
-    var inCart = cartHandles();
+    var viewed = read()
+      .map(function (p) { return p && p.handle; })
+      .filter(Boolean);
 
-    var handles = read()
-      .map(function (p) { return p.handle; })
-      .filter(function (h) { return inCart.indexOf(h) === -1; })
-      .slice(0, slots * OVERFETCH);
-
-    if (!handles.length) return;
-
-    Promise.all(handles.map(fetchCard)).then(function (cards) {
-      var shown = [];
-
-      cards.forEach(function (html, i) {
-        if (!html || shown.length >= slots) return;
-
-        var holder = document.createElement('div');
-        holder.innerHTML = html;
-        var card = holder.querySelector('.ymal-rv__card');
-        if (!card) return;
-
-        var control = buildControl(card, function (handle) {
-          // Replaced, not removed: the row keeps its length so the drawer does
-          // not jump, and the shopper gets another suggestion in its place.
-          replace(section, card, handle);
-        });
-        if (!control) return;
-
-        if (control.select) card.querySelector('.ymal-rv__meta').appendChild(control.select);
-        card.appendChild(control.button);
-
-        list.appendChild(card);
-        shown.push(handles[i]);
-      });
-
-      if (!shown.length) return;
-      section.hidden = false;
-
-      track('ymal_impression', {
-        block: 'recently_viewed',
-        page_type: 'cart',
-        handles: shown
-      });
-    });
-  }
-
-  // Pulls the next eligible product that is not already on screen.
-  function replace(section, card, addedHandle) {
-    var list = section.querySelector('[data-ymal-items]');
-    var onScreen = Array.prototype.map.call(
-      list.querySelectorAll('.ymal-rv__card'),
-      function (c) { return c.getAttribute('data-handle'); }
-    );
-    var inCart = cartHandles();
-
-    var next = read()
-      .map(function (p) { return p.handle; })
-      .filter(function (h) {
-        return h !== addedHandle &&
-               onScreen.indexOf(h) === -1 &&
-               inCart.indexOf(h) === -1;
-      })[0];
-
-    if (!next) {
-      // Nothing left to offer. Drop the card, and hide the whole block if it
-      // was the last one - an empty heading is worse than no block.
-      card.remove();
-      if (!list.querySelector('.ymal-rv__card')) section.hidden = true;
+    if (!viewed.length) {
+      section.hidden = true;
+      section.__ymalBusy = false;
       return;
     }
 
-    fetchCard(next).then(function (html) {
-      if (!html) { card.remove(); return; }
-      var holder = document.createElement('div');
-      holder.innerHTML = html;
-      var fresh = holder.querySelector('.ymal-rv__card');
-      if (!fresh) { card.remove(); return; }
+    cartHandles()
+      .then(function (inCart) {
+        var handles = viewed
+          .filter(function (h) { return inCart.indexOf(h) === -1; })
+          .slice(0, slots * OVERFETCH);
+        return Promise.all(handles.map(fetchCard)).then(function (cards) {
+          return { handles: handles, cards: cards };
+        });
+      })
+      .then(function (result) {
+        if (section.__ymalGeneration !== generation) return;
 
-      var control = buildControl(fresh, function (handle) {
-        replace(section, fresh, handle);
+        // Built off-screen and swapped in at once, so a re-render never shows
+        // a half-empty block.
+        var fragment = document.createDocumentFragment();
+        var shown = [];
+
+        result.cards.forEach(function (html, i) {
+          if (!html || shown.length >= slots) return;
+
+          var holder = document.createElement('div');
+          holder.innerHTML = html;
+          var card = holder.querySelector('.ymal-rv__card');
+          if (!card) return;
+
+          var control = buildControl(card);
+          if (!control) return;
+
+          if (control.select) card.querySelector('.ymal-rv__meta').appendChild(control.select);
+          card.appendChild(control.button);
+
+          fragment.appendChild(card);
+          shown.push(result.handles[i]);
+        });
+
+        while (list.firstChild) list.removeChild(list.firstChild);
+        list.appendChild(fragment);
+
+        section.__ymalShown = shown;
+        section.__ymalBusy = false;
+        // An empty heading is worse than no block.
+        section.hidden = shown.length === 0;
+        if (shown.length && drawerIsOpen(section)) impression(section);
+      })
+      .catch(function () {
+        if (section.__ymalGeneration === generation) section.__ymalBusy = false;
       });
-      if (!control) { card.remove(); return; }
+  }
 
-      if (control.select) fresh.querySelector('.ymal-rv__meta').appendChild(control.select);
-      fresh.appendChild(control.button);
-      card.replaceWith(fresh);
-    });
+  function each(fn) {
+    document.querySelectorAll(SELECTOR).forEach(fn);
+  }
+
+  // Declared before watchDrawer's observer can fire; null when no render is
+  // waiting to start.
+  var pending = null;
+  function renderAllSoon() {
+    clearTimeout(pending);
+    pending = setTimeout(function () {
+      pending = null;
+      each(render);
+    }, 150);
   }
 
   function init() {
-    document
-      .querySelectorAll('.ymal-rv[data-ymal-page="cart"]')
-      .forEach(function (section) {
-        if (section.dataset.ymalReady) return;
-        section.dataset.ymalReady = '1';
-        render(section);
-      });
+    each(function (section) {
+      if (section.dataset.ymalReady) return;
+      section.dataset.ymalReady = '1';
+      watchDrawer(section);
+      render(section);
+    });
   }
 
   if (document.readyState === 'loading') {
@@ -238,8 +313,7 @@
     init();
   }
 
-  // The drawer is often re-rendered when the cart changes, which replaces the
-  // block with a fresh empty one. Re-initialise when that happens.
-  document.addEventListener('cart:updated', init);
-  document.addEventListener('cart:refresh', init);
+  CART_EVENTS.forEach(function (name) {
+    document.addEventListener(name, renderAllSoon);
+  });
 })();
