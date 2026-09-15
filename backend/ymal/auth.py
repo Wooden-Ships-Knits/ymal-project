@@ -2,8 +2,21 @@
 Shopify authentication.
 
 Exchanges the app's client credentials for an Admin API access token using the
-client_credentials grant. The token is cached for the life of the process, so
-get_headers() is safe to call per-request without re-exchanging each time.
+client_credentials grant, and keeps it fresh.
+
+THE TOKEN EXPIRES. The grant returns expires_in: 86399 - twenty-four hours. This
+module originally cached the first token for the life of the process and never
+refreshed it. The api container is long-running, so twenty-four hours after
+`docker compose up` every console screen that reads Shopify failed with
+"401 Unauthorized" until the container was restarted. Found 2026-09-15 on the
+Ranking tab.
+
+The nightly job never showed it: `docker compose run --rm api` is a fresh
+process, and a fresh process gets a fresh token.
+
+So the token is refreshed REFRESH_MARGIN_SECONDS before it expires, and
+shopify.graphql() also retries once with a new token if Shopify refuses one
+early (revoked, secret rotated, clock skew).
 
 Env vars, read from .env at the repo root:
     SHOPIFY_CLIENT_ID
@@ -11,6 +24,7 @@ Env vars, read from .env at the repo root:
 """
 
 import os
+import time
 
 import requests
 from dotenv import load_dotenv
@@ -21,13 +35,31 @@ load_dotenv(settings.REPO_ROOT / ".env", override=True)
 
 TOKEN_URL = f"https://{settings.SHOP}/admin/oauth/access_token"
 
+# Refresh this long before expiry, so a request never races the deadline.
+REFRESH_MARGIN_SECONDS = 5 * 60
+
+# Used only if Shopify omits expires_in. Deliberately SHORT: assuming a token
+# lives forever is exactly the bug this module had.
+DEFAULT_LIFETIME_SECONDS = 60 * 60
+
 _cached_token: str | None = None
+_token_expires_at: float = 0.0
+
+
+def _is_fresh() -> bool:
+    return bool(_cached_token) and time.time() < _token_expires_at - REFRESH_MARGIN_SECONDS
 
 
 def get_token(force_refresh: bool = False) -> str:
-    """Return an Admin API access token, exchanging credentials on first call."""
-    global _cached_token
-    if _cached_token and not force_refresh:
+    """
+    Return a valid Admin API access token.
+
+    Reuses the cached token while it has more than REFRESH_MARGIN_SECONDS left,
+    otherwise exchanges the credentials for a new one. `force_refresh` skips
+    the cache - used after Shopify refuses a token it should have accepted.
+    """
+    global _cached_token, _token_expires_at
+    if not force_refresh and _is_fresh():
         return _cached_token
 
     client_id = os.getenv("SHOPIFY_CLIENT_ID")
@@ -58,7 +90,10 @@ def get_token(force_refresh: bool = False) -> str:
             f"{response.text}"
         )
 
-    _cached_token = response.json()["access_token"]
+    body = response.json()
+    _cached_token = body["access_token"]
+    lifetime = body.get("expires_in") or DEFAULT_LIFETIME_SECONDS
+    _token_expires_at = time.time() + float(lifetime)
     return _cached_token
 
 
