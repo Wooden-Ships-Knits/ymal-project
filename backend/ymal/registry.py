@@ -71,6 +71,20 @@ BLOCKS = [
         "default_heading": "Recently Viewed",
         "default_slots": 4,
     },
+    {
+        "id": "inspired_by_views",
+        "label": "Inspired By Your Views",
+        "description": (
+            "The top 4 Featured products of the shopper's last 5 viewed products, "
+            "minus anything already viewed or in the cart, shuffled once per visit."
+        ),
+        # Built from the shopper's history, not from the product on the page, so
+        # it is placeable like Recently Viewed rather than restricted like
+        # Featured. The web team places it on product pages.
+        "requires_anchor": False,
+        "default_heading": "Inspired By Your Views",
+        "default_slots": 4,
+    },
 ]
 
 # `anchor` marks a template that has a product to be "about". Only `product`

@@ -1,0 +1,53 @@
+{%- comment -%}
+  YMAL — the theme's own product card, for rows built in the browser.
+
+  Fetched as /products/<handle>?view=ymal-block. Returns one `product-block` and
+  nothing else - the SAME card the server-rendered YMAL row uses, so a row
+  assembled in the browser (Inspired By Your Views) looks like every other
+  product row on the site and follows the theme when it is restyled.
+
+  Why not snippets/ymal-card.liquid: that bespoke card has no styles anywhere in
+  the theme any more. They lived in the original custom widget, which was
+  replaced by a copy of the theme's product-list section. Reusing it would have
+  rendered a bare unstyled list.
+
+  Carries the same eligibility gate as every other YMAL card. An ineligible
+  product renders as an empty string and the script skips it - stock and
+  *SALE* can change between the source list being fetched and this card being
+  fetched, so the check is repeated here rather than trusted.
+
+  no_quick_buy_markup: the theme wires quick buy on page load, and a card
+  injected later would show a button that does nothing. The card still links
+  to the product.
+{%- endcomment -%}
+
+{% layout none %}
+{%- liquid
+  assign ymal_is_sale = false
+  if product.title contains '*SALE*'
+    assign ymal_is_sale = true
+  endif
+
+  if product.available and product.metafields.ymal.eligible.value and ymal_is_sale == false
+    comment
+      The same aspect-ratio mapping ymal-widget.liquid uses, for one card. The
+      fixed shapes are theme settings; "natural" and "tallest" fall back to the
+      product's own image, since there is no row here to measure against.
+    endcomment
+    if settings.prod_thumb_shape == 'portrait-23'
+      assign ymal_ratio = 0.67
+    elsif settings.prod_thumb_shape == 'portrait-45'
+      assign ymal_ratio = 0.8
+    elsif settings.prod_thumb_shape == 'square'
+      assign ymal_ratio = 1.0
+    elsif settings.prod_thumb_shape == 'landscape-54'
+      assign ymal_ratio = 1.25
+    elsif settings.prod_thumb_shape == 'landscape-32'
+      assign ymal_ratio = 1.50
+    else
+      assign ymal_ratio = product.featured_media.preview_image.aspect_ratio | default: 1.0
+    endif
+
+    render 'product-block', product: product, custom_aspect_ratio: ymal_ratio, no_swiping: true, no_quick_buy_markup: true
+  endif
+-%}

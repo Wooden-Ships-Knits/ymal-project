@@ -1,5 +1,5 @@
 /*
- * The five blocks. Mirrors the backend: adding one here without adding it in
+ * The six blocks. Mirrors the backend: adding one here without adding it in
  * ymal/blocks/ produces a page that configures something nothing computes, so
  * the console warns rather than silently offering it.
  */
@@ -45,6 +45,15 @@ export const BLOCKS = [
     description: "The shopper's own history. Lives in their browser, not on our server.",
     requiresAnchor: false,
     defaultHeading: 'Recently Viewed',
+    defaultSlots: 4,
+  },
+  {
+    id: 'inspired_by_views',
+    label: 'Inspired By Your Views',
+    description:
+      "The top 4 Featured products of the shopper's last 5 viewed products, minus anything already viewed or in the cart, shuffled once per visit.",
+    requiresAnchor: false,
+    defaultHeading: 'Inspired By Your Views',
     defaultSlots: 4,
   },
 ]

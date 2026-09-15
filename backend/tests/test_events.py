@@ -198,3 +198,11 @@ class TestAddToCart:
             "position": None,
             "anchor": None,
         }) == []
+
+
+def test_inspired_by_views_is_an_accepted_block():
+    """
+    The allowlist rejects unknown blocks silently from the shopper's side, so a
+    block missing from it records nothing and looks like a block nobody saw.
+    """
+    assert events.validate(event(block="inspired_by_views", page_type="product")) == []

@@ -7,13 +7,14 @@ which is authoritative.
 from ymal import registry
 
 
-def test_five_blocks():
+def test_six_blocks():
     assert registry.block_ids() == {
         "featured",
         "trending",
         "top_selling",
         "new_arrivals",
         "recently_viewed",
+        "inspired_by_views",
     }
 
 
@@ -64,3 +65,13 @@ def test_product_and_home_are_the_v1_templates():
 def test_default_slots_match_the_contract():
     assert registry.block_by_id("featured")["default_slots"] == 6
     assert registry.block_by_id("recently_viewed")["default_slots"] == 4
+    assert registry.block_by_id("inspired_by_views")["default_slots"] == 4
+
+
+def test_inspired_by_views_needs_no_anchor():
+    """
+    It is built from the shopper's history, not from the product on the page,
+    so it is placeable like Recently Viewed rather than restricted like Featured.
+    """
+    assert registry.block_by_id("inspired_by_views")["requires_anchor"] is False
+    assert registry.block_allowed_on("inspired_by_views", "product") is True

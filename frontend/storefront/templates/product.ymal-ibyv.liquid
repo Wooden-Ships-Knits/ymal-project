@@ -1,0 +1,54 @@
+{%- comment -%}
+  YMAL — Inspired By Your Views, source list.
+
+  Fetched as /products/<handle>?view=ymal-ibyv. Returns JSON and nothing else:
+
+    {"handles": ["first-eligible", "second", "third", "fourth"]}
+
+  The FIRST FOUR products of this product's Featured list that would actually
+  appear in its YMAL row - the same rule ymal-widget.liquid applies before it
+  renders a card:
+
+    - not this product itself
+    - available to buy right now
+    - ymal.eligible is true (replenishable at Bali To Produce, not fixed stock)
+    - no *SALE* marker in the title
+
+  Skipped products do not count toward the four. That is the point of doing it
+  here rather than taking featured[0..3]: the web team's rule is "the first 4
+  that appear on YMAL", and a stored list's first four often include products
+  the row would never show.
+
+  Liquid, not the browser, because only Liquid can read the metafield and the
+  live product objects it references.
+{%- endcomment -%}
+
+{% layout none %}
+{%- liquid
+  assign ymal_limit = 4
+  assign ymal_count = 0
+-%}
+{"handles": [
+{%- for ymal_item in product.metafields.ymal.featured.value -%}
+  {%- liquid
+    if ymal_count >= ymal_limit
+      break
+    endif
+    if ymal_item.id == product.id
+      continue
+    endif
+    unless ymal_item.available
+      continue
+    endunless
+    unless ymal_item.metafields.ymal.eligible.value
+      continue
+    endunless
+    if ymal_item.title contains '*SALE*'
+      continue
+    endif
+  -%}
+  {%- if ymal_count > 0 -%},{%- endif -%}
+  {{- ymal_item.handle | json -}}
+  {%- assign ymal_count = ymal_count | plus: 1 -%}
+{%- endfor -%}
+]}

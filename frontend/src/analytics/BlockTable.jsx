@@ -24,6 +24,9 @@ const ALL_BLOCKS = [
   'top_selling',
   'new_arrivals',
   'recently_viewed',
+  // Hardcoded, so a block missing here records events that never appear in the
+  // table - silent in the same way a block missing from the API allowlist is.
+  'inspired_by_views',
 ]
 
 export default function BlockTable({ blocks, revenue }) {

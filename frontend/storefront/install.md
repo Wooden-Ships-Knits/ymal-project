@@ -236,6 +236,73 @@ different lists. Every store works this way, Wiser almost certainly included.
 | Product deleted or handle renamed | The fetch fails, the script skips it. |
 | Nothing survives | Section stays hidden. |
 
+## Inspired By Your Views
+
+A row built from the shopper's own browsing: the first 4 Featured products of
+each of their last 5 viewed products, minus anything already viewed or in the
+cart, shuffled once per visit. Product pages only.
+
+### Requires the Recently Viewed recorder
+
+The row is built from the history `snippets/ymal-recently-viewed-recorder.liquid`
+writes - see *Recently Viewed, specifically*. **Without the recorder in
+`theme.liquid`, this row stays hidden forever**, with nothing on the page to say
+why. Install that first.
+
+### Files
+
+| File | Into | What it does |
+|---|---|---|
+| `ymal-inspired.js` | `assets/` | builds and renders the row |
+| `ymal-inspired.liquid` | `sections/` | the section added in the theme editor |
+| `product.ymal-ibyv.liquid` | `templates/` | a product's first 4 Featured that would actually appear |
+| `product.ymal-block.liquid` | `templates/` | the theme's own product card, with the eligibility gate |
+
+**Do not copy** `frontend/storefront/package.json` or `frontend/storefront/tests/`.
+They exist only so `node --test` can run the row's logic, and mean nothing to
+Shopify.
+
+Then in the theme editor, on the product template: **Add section -> YMAL
+Inspired By Your Views**. It is restricted to product templates, so it will not
+be offered anywhere else.
+
+### What it does, precisely
+
+1. Takes the last 5 viewed products, **not counting the one on this page** - its
+   Featured top 4 is what the YMAL row on the same page already shows.
+2. For each, fetches `?view=ymal-ibyv`: the first 4 of its Featured list that
+   pass the same gate as the YMAL row (in stock, eligible, no `*SALE*`, not
+   itself). Skipped products do not count toward the four.
+3. Combines them, dropping duplicates, anything in the shopper's viewing
+   history, anything in the cart, and this product.
+4. Orders them by a seed kept in `sessionStorage`: the same order on every page
+   of a visit, a new order next visit, and products already on show keep their
+   relative order when browsing adds more.
+5. Fetches cards via `?view=ymal-block` until the row is full, and unhides the
+   section only if at least one survived.
+
+It does nothing until the shopper scrolls within about 600px of it, so it never
+competes with the product page itself loading.
+
+### Why the theme's product card, not `snippets/ymal-card.liquid`
+
+`ymal-card` has no styles anywhere in the theme any more. They lived in the
+original custom widget, which was replaced by a copy of the theme's own
+`product-list` section. A row built from it renders as a bare list.
+`product.ymal-block.liquid` renders `product-block` - the card every other
+product row uses - so this row looks like the rest of the site and follows the
+theme when it is restyled. Quick buy is left off: the theme wires it on page
+load, and a card injected later would show a button that does nothing.
+
+### Tracking
+
+Block id `inspired_by_views`. Impressions when half the row is on screen,
+clicks, and the `YMAL block` cart attribute, so orders and revenue are
+attributed. Add to cart is recorded by `ymal-track.js` with no extra code.
+
+The block id is registered in the API allowlist and the console's Analytics
+table. A block missing from either records nothing or shows nothing - silently.
+
 ## Tracking
 
 Copy `assets/ymal-track.js` into the theme and load it once, in

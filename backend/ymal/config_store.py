@@ -147,6 +147,9 @@ def published_block_ids() -> set[str]:
     # the console warning this feeds.
     published = {key for key in PUBLISHED_BLOCK_KEYS if shop.get(key) is not None}
     published.add("recently_viewed")
+    # Nothing of its own to publish either: it reads each product's existing
+    # Featured list. As available as Recently Viewed is.
+    published.add("inspired_by_views")
     return published
 
 

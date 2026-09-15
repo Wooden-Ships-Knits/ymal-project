@@ -1,0 +1,109 @@
+{%- comment -%}
+  YMAL — Inspired By Your Views.
+
+  Add in the theme editor on the product template: Add section ->
+  "YMAL Inspired By Your Views".
+
+  Renders an empty, hidden row. assets/ymal-inspired.js fills it from the
+  shopper's browsing history and unhides it only if something survived, so a
+  first-time visitor sees nothing at all rather than an empty heading.
+
+  REQUIRES the Recently Viewed recorder on the theme
+  (snippets/ymal-recently-viewed-recorder.liquid, rendered in theme.liquid). It
+  is the only thing that writes the history this row is built from - without it
+  the row stays hidden forever, and nothing says why.
+
+  The grid markup mirrors ymal-widget.liquid's so the theme's own styles apply.
+{%- endcomment -%}
+{%- liquid
+  comment
+    Derived, not a setting - the same mapping ymal-widget.liquid uses, and for
+    the same reason: a dropdown someone must set correctly on every placement
+    will be wrong somewhere, and mislabelled events cannot be corrected later.
+  endcomment
+  assign ymal_page_type = template.name | default: 'unknown'
+  case ymal_page_type
+    when 'index'
+      assign ymal_page_type = 'home'
+    when '404'
+      assign ymal_page_type = 'not_found'
+    when 'article'
+      assign ymal_page_type = 'blog'
+    when 'customers/login', 'customers/account', 'customers/register'
+      assign ymal_page_type = 'account'
+    when 'product', 'cart', 'collection', 'search', 'blog', 'page'
+      comment
+        Already the right name.
+      endcomment
+    else
+      assign ymal_page_type = 'unknown'
+  endcase
+-%}
+<div
+  class="section-id-{{ section.id }} collection-slider-row ymal-ibyv"
+  data-ymal-ibyv
+  data-ymal-page="{{ ymal_page_type | escape }}"
+  data-ymal-current="{{ product.handle | escape }}"
+  data-ymal-slots="{{ section.settings.products_to_show }}"
+  hidden
+>
+  <div class="container{% if section.settings.full_width %} container--no-max{% endif %}">
+    <h2 class="hometitle h4 align-center">{{ section.settings.title | escape }}</h2>
+    <div class="collection-listing">
+      <div
+        class="product-grid product-grid--per-row-{{ section.settings.grid }} product-grid--per-row-mob-{{ settings.prod_thumb_mob_per_row }}"
+        data-ymal-items
+      ></div>
+    </div>
+  </div>
+</div>
+
+<script src="{{ 'ymal-inspired.js' | asset_url }}" defer></script>
+
+{% schema %}
+{
+  "name": "YMAL Inspired By Your Views",
+  "class": "section-product-grid",
+  "enabled_on": {
+    "templates": ["product"]
+  },
+  "settings": [
+    {
+      "type": "text",
+      "id": "title",
+      "label": "Heading",
+      "default": "Inspired By Your Views"
+    },
+    {
+      "type": "range",
+      "id": "products_to_show",
+      "label": "Products to show",
+      "min": 2,
+      "max": 12,
+      "step": 1,
+      "default": 4,
+      "info": "Built from the top 4 Featured products of the shopper's last 5 viewed products. Shows fewer when fewer qualify, and hides entirely when none do. Requires the Recently Viewed recorder in theme.liquid."
+    },
+    {
+      "type": "range",
+      "id": "grid",
+      "label": "Products per row",
+      "min": 2,
+      "max": 5,
+      "step": 1,
+      "default": 4
+    },
+    {
+      "type": "checkbox",
+      "id": "full_width",
+      "label": "Full page width",
+      "default": false
+    }
+  ],
+  "presets": [
+    {
+      "name": "YMAL Inspired By Your Views"
+    }
+  ]
+}
+{% endschema %}

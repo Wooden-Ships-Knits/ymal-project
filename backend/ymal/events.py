@@ -24,6 +24,10 @@ BLOCK_IDS = (
     "top_selling",
     "new_arrivals",
     "recently_viewed",
+    # Must be listed, or every event it sends is rejected - silently from the
+    # shopper's side, which makes a block nobody can see indistinguishable from
+    # a block nobody scrolled to.
+    "inspired_by_views",
 )
 
 # The nine from docs/config-contract.md section 5, plus two the theme can
