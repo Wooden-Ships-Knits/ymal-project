@@ -1,0 +1,36 @@
+# YMAL — Recently Viewed, in checkout.
+#
+# Merchant-placed: the block appears in the checkout editor's block list and the
+# web team drops it where Wiser's upsell used to sit, in the Order summary.
+#
+# api_access is what lets the block ask the Storefront API for today's title,
+# price, image and stock. It reads nothing else: the list of products comes off
+# the cart, written by the storefront (assets/ymal-recently-viewed.js).
+#
+# No network_access: this block never talks to the YMAL backend. Checkout
+# impressions and adds are therefore NOT in the dashboard yet - see README.
+api_version = "2026-01"
+
+[[extensions]]
+name = "YMAL Recently Viewed"
+handle = "ymal-recently-viewed"
+type = "ui_extension"
+
+  [[extensions.targeting]]
+  module = "./src/Checkout.jsx"
+  target = "purchase.checkout.block.render"
+
+  [extensions.capabilities]
+  api_access = true
+
+  [extensions.settings]
+
+    [[extensions.settings.fields]]
+    key = "heading"
+    type = "single_line_text_field"
+    name = "Heading"
+
+    [[extensions.settings.fields]]
+    key = "products_to_show"
+    type = "number_integer"
+    name = "Products to show"

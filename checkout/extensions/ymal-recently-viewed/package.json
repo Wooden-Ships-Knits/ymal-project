@@ -1,0 +1,10 @@
+{
+  "name": "ymal-recently-viewed",
+  "private": true,
+  "version": "1.0.0",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@shopify/ui-extensions": "2026.1.x",
+    "preact": "^10.10.x"
+  }
+}

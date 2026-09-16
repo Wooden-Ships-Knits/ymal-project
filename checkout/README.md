@@ -143,3 +143,44 @@ It runs `git init` and `git checkout -b main` on the new project. Inside an
 existing repo those resolve to that repo, which already has `main`, and init
 fails. This project was created outside any repo and moved in without its own
 `.git`.
+
+## Recently Viewed in checkout
+
+`extensions/ymal-recently-viewed/` — the block that replaces Wiser Checkout
+Upsell in the Order summary. Built 2026-09-16, NOT deployed.
+
+    src/Checkout.jsx           the block (Preact + Polaris web components, 2026-01)
+    shopify.extension.toml     target purchase.checkout.block.render, api_access
+
+**Oldest first**, and that is the point of it. Every other placement leads with
+the most recent product; by checkout those are the ones the shopper passed over,
+so this one starts from the oldest the browser still remembers.
+
+**How the list gets there.** A checkout extension is sandboxed on another
+origin: no localStorage, no Liquid, no metafields. The storefront writes the
+viewed product ids onto the cart as the attribute `YMAL viewed`
+(`assets/ymal-recently-viewed.js`), newest first, eligible products only -
+eligibility is decided at view time in `snippets/ymal-recently-viewed-recorder.liquid`,
+where the metafield can still be read. The block reverses that list.
+
+**Checked here, because it can change between viewing and checking out:** the
+product still exists and is published, is in stock, is not already in the order,
+and is not another colorway of a style already in the order.
+
+### Before it can work on the live store
+
+1. The live theme needs the current `ymal-recently-viewed.js` and the recorder
+   snippet - older copies write no attribute, and the block stays empty.
+2. Deploy: `npx shopify app deploy --no-release` first, READ the add/update/
+   remove summary (see the warnings at the top of this file), then release.
+   The CLI assigns the extension's `uid` on first deploy.
+3. In the checkout editor, add the block where Wiser's upsell was, and hide
+   or remove Wiser Checkout Upsell.
+
+### Known gap
+
+No `network_access`, so this block never reaches the YMAL backend: checkout
+impressions and adds do NOT appear in the dashboard. Purchases still do - every
+add writes the `YMAL block` line attribute, which the nightly order pass reads
+back, with the value `recently_viewed_checkout` to keep it apart from the cart
+drawer's.
