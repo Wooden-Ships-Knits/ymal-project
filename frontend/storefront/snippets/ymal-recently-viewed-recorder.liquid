@@ -36,11 +36,27 @@
 
 {%- if product -%}
   {%- comment -%}
-    Handle and id only. Title, price and image are fetched fresh wherever the
-    list is displayed, so nothing stored in the shopper's browser can go stale.
+    Handle, id, and whether this product may be recommended at all. Title,
+    price and image are fetched fresh wherever the list is displayed, so
+    nothing stored in the shopper's browser can go stale.
+
+    `eligible` is recorded here because the CHECKOUT block cannot work it out
+    for itself: a checkout extension runs in a sandbox with no Liquid and no
+    access to this metafield. The same gate every other block applies -
+    replenishable at Bali To Produce, and no *SALE* marker in the title - is
+    therefore decided here, at view time, and travels with the product.
   {%- endcomment -%}
+  {%- liquid
+    assign ymal_eligible = false
+    if product.metafields.ymal.eligible.value
+      assign ymal_eligible = true
+    endif
+    if product.title contains '*SALE*'
+      assign ymal_eligible = false
+    endif
+  -%}
   <script type="application/json" id="ymal-current-product">
-    {"handle": {{ product.handle | json }}, "id": {{ product.id | json }}}
+    {"handle": {{ product.handle | json }}, "id": {{ product.id | json }}, "eligible": {{ ymal_eligible | json }}}
   </script>
   <script src="{{ 'ymal-recently-viewed.js' | asset_url }}" defer></script>
 {%- endif -%}
