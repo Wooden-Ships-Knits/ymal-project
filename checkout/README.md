@@ -171,9 +171,21 @@ and is not another colorway of a style already in the order.
 
 1. The live theme needs the current `ymal-recently-viewed.js` and the recorder
    snippet - older copies write no attribute, and the block stays empty.
-2. Deploy: `npx shopify app deploy --no-release` first, READ the add/update/
-   remove summary (see the warnings at the top of this file), then release.
-   The CLI assigns the extension's `uid` on first deploy.
+2. Deploy. On this machine the path needs spelling out, because the CLI
+   resolves the ~/ymal-checkout symlink back to a Drive path with parentheses
+   in it and then cannot find the config:
+
+       cd ~/ymal-checkout
+       npx shopify app deploy --no-release --path "$HOME/ymal-checkout"
+       npx shopify app release --version=<version> --path "$HOME/ymal-checkout"
+
+   `--no-release` creates a version without making it live, and needs no
+   confirmation flag. `--force` does not exist in CLI 4.8.
+
+   Every deploy now pushes the app CONFIGURATION too - see the note in
+   shopify.app.toml. Verify it still matches the live app first.
+
+   Version ymal-4, created 2026-09-16, is this extension. Not released.
 3. In the checkout editor, add the block where Wiser's upsell was, and hide
    or remove Wiser Checkout Upsell.
 

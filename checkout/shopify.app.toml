@@ -15,17 +15,18 @@ name = "YMAL "
 application_url = "https://ymal.pt-infashion.com/"
 embedded = true
 
-[build]
-# Set false, but DO NOT rely on it. Shopify CLI 4.8's `deploy --help` has no
-# extensions-only mode, and its --allow-deletes flag covers "removing extensions
-# and configuration" - so a deploy may well push this file's configuration too.
+# CONFIGURATION IS ALWAYS INCLUDED ON DEPLOY. Shopify CLI 4.8 removed the
+# include_config_on_deploy field on 2026-09-16 and deleted it from this file:
+# every deploy now pushes the values above to the live app.
 #
-# The real protection is that every value in this file mirrors the live app
-# (pulled by `config link` on 2026-09-15), so the configuration diff should be
-# empty. Verify that on every deploy: run `shopify app deploy --no-release`
-# first, read the add/update/remove summary the CLI prints, and release only
-# if nothing but the intended extension changed.
-include_config_on_deploy = false
+# The protection is that they mirror the live app exactly. Verified on
+# 2026-09-16 by pulling the app's configuration into a scratch folder
+# (`shopify app config link --client-id ... --path /tmp/...`) and diffing:
+# identical, including access_scopes, which the production pipeline's
+# client_credentials token depends on.
+#
+# Re-check that way before any deploy that follows an app settings change.
+[build]
 
 # FALSE on purpose. When true, `shopify app dev` rewrites the live app's URL to
 # a temporary tunnel.
