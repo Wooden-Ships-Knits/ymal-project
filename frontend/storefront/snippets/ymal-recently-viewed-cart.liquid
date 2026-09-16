@@ -65,10 +65,22 @@
     font:inherit; font-size:13px; line-height:1;
   }
   .ymal-rv__arrow[hidden]{display:none}
-  .ymal-rv__items{display:flex; flex-direction:column; gap:8px}
+  /* One card at a time, slid sideways. Scroll snap does the swiping itself,
+     so a touch drag needs no script - the arrows only scroll by one card. */
+  .ymal-rv__items{
+    display:flex; flex-direction:row; gap:8px;
+    overflow-x:auto; overscroll-behavior-x:contain;
+    scroll-snap-type:x mandatory; scroll-behavior:smooth;
+    scrollbar-width:none; -ms-overflow-style:none;
+  }
+  .ymal-rv__items::-webkit-scrollbar{display:none}
+  @media (prefers-reduced-motion:reduce){
+    .ymal-rv__items{scroll-behavior:auto}
+  }
 
   /* One row per product: image, then name and price, then the control. */
   .ymal-rv__card{
+    flex:0 0 100%; scroll-snap-align:start; box-sizing:border-box;
     display:flex; gap:11px; align-items:center;
     background:#fff; border:1px solid rgba(0,0,0,.1); padding:9px;
   }

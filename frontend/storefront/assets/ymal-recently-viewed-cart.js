@@ -213,6 +213,35 @@
     }).observe(drawer, { attributes: true, attributeFilter: ['open'] });
   }
 
+  // One card at a time: the strip is a scroll-snap row, so a swipe needs no
+  // script. The arrows step it by exactly one card, and stay hidden when there
+  // is only one - a control that cannot do anything.
+  function wireArrows(section) {
+    var list = section.querySelector('[data-ymal-items]');
+    var prev = section.querySelector('[data-ymal-prev]');
+    var next = section.querySelector('[data-ymal-next]');
+    if (!list || !prev || !next) return;
+
+    var many = (section.__ymalShown || []).length > 1;
+    prev.hidden = !many;
+    next.hidden = !many;
+
+    // Listeners survive a re-render: the buttons live in the snippet's markup,
+    // only the cards below them are replaced.
+    if (section.__ymalArrows) return;
+    section.__ymalArrows = true;
+
+    function step(direction) {
+      var card = list.querySelector('.ymal-rv__card');
+      // Card width plus the gap in the snippet's CSS.
+      var by = card ? card.getBoundingClientRect().width + 8 : list.clientWidth;
+      list.scrollBy({ left: direction * by, behavior: 'smooth' });
+    }
+
+    prev.addEventListener('click', function () { step(-1); });
+    next.addEventListener('click', function () { step(1); });
+  }
+
   function render(section) {
     var list = section.querySelector('[data-ymal-items]');
     if (!list) return;
@@ -276,6 +305,7 @@
         section.__ymalBusy = false;
         // An empty heading is worse than no block.
         section.hidden = shown.length === 0;
+        wireArrows(section);
         if (shown.length && drawerIsOpen(section)) impression(section);
       })
       .catch(function () {
