@@ -170,8 +170,16 @@ function Extension() {
   }
 
   return (
-    <s-section heading={heading}>
+    <s-section>
       <s-stack direction="block" gap="base">
+        {/* The heading is rendered here rather than passed to s-section, which
+            styles it as a small left-aligned label. There is no font-size
+            control in checkout: the size follows the store's checkout
+            typography settings. */}
+        <s-stack direction="block" alignItems="center">
+          <s-heading>{heading}</s-heading>
+        </s-stack>
+
         {failed ? (
           <s-banner tone="critical">That product could not be added. Please try again.</s-banner>
         ) : null}
