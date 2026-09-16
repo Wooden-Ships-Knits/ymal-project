@@ -8,6 +8,94 @@ team, not just by engineers.
 
 ---
 
+## v1.3 — 2026-09-16
+
+Three new places to be recommended something, and the end of Wiser's hold on
+the cart.
+
+### Inspired By Your Views
+
+A second row on the product page, built from what the shopper has actually
+been looking at rather than from the product in front of them: the top four
+Featured products of each of their last five viewed products, minus everything
+they have already seen or put in the cart. Shuffled once per visit, so the row
+is the same on every page of that visit but different on the next one, and it
+slides sideways like the YMAL row.
+
+One colorway per style. Neighbouring products often recommend different shades
+of the same sweater, and a shopper browsing football knits got a row that was
+mostly one jersey.
+
+It shows nothing at all to a first-time visitor, by design.
+
+### Recently Viewed, in the cart drawer
+
+Now one card at a time, swiped or stepped with the arrows, and it keeps up
+with the cart: adding a product removes it from the row and pulls in the next,
+whether it was added from the product page or from the row itself. Adding from
+the row now also updates the cart total and the header count, which it did not
+before.
+
+### Recently Viewed, in checkout
+
+Replaces the Wiser upsell block that sat in the order summary. Three products,
+**oldest first** — by checkout, the recent ones are what the shopper just
+decided against, so the sweater they looked at earlier is the one worth showing
+again. It skips anything sold out, already in the order, or another colorway of
+a style already in the order.
+
+Checkout cannot see the shopper's browsing history: it runs sealed off from the
+storefront. The list therefore travels on the cart itself, as the attribute
+"YMAL viewed" — which is why product ids now appear in the order's Additional
+details in the admin, beside the "YMAL block" marker that was already there.
+
+Its views and clicks do NOT reach the Analytics tab yet. Purchases made from it
+are still attributed.
+
+### The cart drawer is the theme's again
+
+The drawer shoppers saw belonged to Wiser, and any block we put in the theme's
+own drawer was invisible to them. The theme's drawer was switched off, its cart
+icon carried Wiser's marker, and Wiser's script caught the click. All three were
+undone on the theme, and Wiser's app embed turned off with them, which also
+removes its widgets, quick view and popup from that theme.
+
+### Fixes worth naming
+
+**The console lost Shopify access a day after every deploy.** The access token
+lasts 24 hours and was fetched once at startup. It is now refreshed before it
+expires, and a request that still comes back unauthorised is retried once with a
+fresh token. The Ranking tab failing the morning after a deploy was this.
+
+**Inspired By Your Views never appeared at all.** The row waits until the
+shopper scrolls near it before loading, but it was watching itself to decide
+that — and it stays hidden until it has cards to show. A hidden element is never
+"near", so it waited forever.
+
+**Add to cart was recorded for nothing.** Events from a page the list did not
+recognise were dropped, and the page type was read from a value that was never
+set, so everything arrived labelled "unknown".
+
+### After updating
+
+1. `git pull && docker compose up -d --build` on the VM, and change the nightly
+   cron line from `pipeline` to `api`. Until then the dashboard rejects events
+   from Inspired By Your Views.
+2. Copy to the live theme: `assets/ymal-inspired.js`,
+   `assets/ymal-recently-viewed.js`, `assets/ymal-recently-viewed-cart.js`,
+   `snippets/ymal-recently-viewed-recorder.liquid`,
+   `snippets/ymal-recently-viewed-cart.liquid`,
+   `sections/ymal-inspired.liquid`, `templates/product.ymal-ibyv.liquid`,
+   `templates/product.ymal-block.liquid`,
+   `templates/product.ymal-card-compact.liquid`, and the recorder line in
+   `layout/theme.liquid`.
+3. Add the "YMAL Inspired By Your Views" section to the product template.
+4. Checkout block: `npx shopify app deploy` then `release` from
+   `~/ymal-checkout`, then add "YMAL Recently Viewed" in the checkout editor.
+   See `checkout/README.md` — the app configuration ships with every deploy.
+
+---
+
 ## v1.2 — 2026-09-12
 
 ### Tracking was installed and recorded nothing
