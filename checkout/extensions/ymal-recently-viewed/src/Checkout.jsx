@@ -176,60 +176,58 @@ function Extension() {
           <s-banner tone="critical">That product could not be added. Please try again.</s-banner>
         ) : null}
 
-        {offers.map(({ product, sellable }, index) => {
+        {offers.map(({ product, sellable }) => {
           const variant = sellable[0];
 
           return (
-            <s-stack key={product.id} direction="block" gap="base">
-              {index > 0 ? <s-divider></s-divider> : null}
-
-              {/* Thumbnail beside a column that holds everything else, so a long
-                  product title never pushes the Add button onto its own line. */}
-              <s-grid gridTemplateColumns="auto 1fr" gap="base" alignItems="start">
+            <s-box key={product.id} border="base" borderRadius="base" padding="base">
+              {/* Image, details and the button share one row; the size picker
+                  spans the full width beneath them, so a long product title
+                  never pushes the button onto its own line. */}
+              <s-grid gridTemplateColumns="auto 1fr auto" gap="base" alignItems="start">
                 <s-product-thumbnail
                   src={product.featuredImage ? product.featuredImage.url : ''}
                   alt={product.title}
                   size="base"
                 ></s-product-thumbnail>
 
-                <s-stack direction="block" gap="small-300">
+                <s-stack direction="block" gap="small-500">
                   <s-text>{product.title}</s-text>
                   <s-text tone="neutral">
                     {i18n.formatCurrency(Number(variant.price.amount), {
                       currency: variant.price.currencyCode
                     })}
                   </s-text>
-
-                  <s-grid gridTemplateColumns="1fr auto" gap="small-300" alignItems="end">
-                    {sellable.length > 1 ? (
-                      <s-select
-                        label="Size"
-                        name={'ymal-variant-' + numericId(product.id)}
-                        ref={(element) => {
-                          selects.current.set(product.id, element);
-                        }}
-                      >
-                        {sellable.map((v) => (
-                          <s-option key={v.id} value={v.id}>
-                            {v.title}
-                          </s-option>
-                        ))}
-                      </s-select>
-                    ) : (
-                      <s-text tone="neutral">{variant.title}</s-text>
-                    )}
-
-                    <s-button
-                      onClick={() => add(product.id, variant.id)}
-                      loading={adding === product.id}
-                      disabled={Boolean(adding)}
-                    >
-                      Add
-                    </s-button>
-                  </s-grid>
                 </s-stack>
+
+                <s-button
+                  variant="primary"
+                  onClick={() => add(product.id, variant.id)}
+                  loading={adding === product.id}
+                  disabled={Boolean(adding)}
+                >
+                  Add
+                </s-button>
+
+                {sellable.length > 1 ? (
+                  <s-grid-item gridColumn="span 3">
+                    <s-select
+                      label="Size"
+                      name={'ymal-variant-' + numericId(product.id)}
+                      ref={(element) => {
+                        selects.current.set(product.id, element);
+                      }}
+                    >
+                      {sellable.map((v) => (
+                        <s-option key={v.id} value={v.id}>
+                          {v.title}
+                        </s-option>
+                      ))}
+                    </s-select>
+                  </s-grid-item>
+                ) : null}
               </s-grid>
-            </s-stack>
+            </s-box>
           );
         })}
       </s-stack>
