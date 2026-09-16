@@ -170,12 +170,12 @@ function Extension() {
   }
 
   return (
-    <s-section>
-      <s-stack direction="block" gap="base">
-        {/* The heading is rendered here rather than passed to s-section, which
-            styles it as a small left-aligned label. There is no font-size
-            control in checkout: the size follows the store's checkout
-            typography settings. */}
+    <s-stack direction="block" gap="base">
+        {/* No s-section wrapper, and the heading is not passed as a section
+            heading: each of those nests it one level deeper, and a heading's
+            size comes from its nesting level. Nothing else about the size is
+            ours to set - checkout extensions have no font-size control, so
+            beyond this it follows the store's checkout typography settings. */}
         <s-stack direction="block" alignItems="center">
           <s-heading>{heading}</s-heading>
         </s-stack>
@@ -238,7 +238,6 @@ function Extension() {
             </s-box>
           );
         })}
-      </s-stack>
-    </s-section>
+    </s-stack>
   );
 }
