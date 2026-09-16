@@ -14,6 +14,7 @@ api_version = "2026-01"
 [[extensions]]
 name = "YMAL Recently Viewed"
 handle = "ymal-recently-viewed"
+uid = "b62e182b-e2bf-5a21-bc63-f2024acef1f100ea0946"
 type = "ui_extension"
 
   [[extensions.targeting]]
