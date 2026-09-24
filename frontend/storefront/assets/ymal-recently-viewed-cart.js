@@ -93,13 +93,16 @@
     });
   }
 
-  // The cart attribute that attributes a later purchase to this block - the
-  // same one every other YMAL row writes.
-  function attribute() {
+  // The cart attributes that attribute a later purchase to this block - the
+  // same ones every other YMAL row writes. The handle is what lets the order
+  // pass separate "this order involved YMAL" from "YMAL sold this".
+  function attribute(handle) {
     return fetch('/cart/update.js', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ attributes: { 'YMAL block': BLOCK } })
+      body: JSON.stringify({
+        attributes: { 'YMAL block': BLOCK, 'YMAL product': handle }
+      })
     }).catch(function () {});
   }
 
@@ -154,7 +157,7 @@
           // Attribute before the theme re-reads the cart, then let it refresh.
           // Its on:cart:change also re-renders this block, which drops the
           // product just added and brings in the next one.
-          return attribute().then(notifyTheme);
+          return attribute(handle).then(notifyTheme);
         })
         .catch(function () {
           button.disabled = false;

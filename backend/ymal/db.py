@@ -56,6 +56,16 @@ CREATE TABLE IF NOT EXISTS attributed_orders (
 );
 CREATE INDEX IF NOT EXISTS attributed_orders_block_idx
   ON attributed_orders (block, created_at);
+
+-- Added later, so ALTERs rather than columns above: an existing install must
+-- keep its rows. `total` is the WHOLE order - the honest headline for "orders
+-- that involved YMAL". `direct_total` is only the recommended product's own
+-- lines, and is 0 when the shopper bought something else entirely, which is
+-- the stricter claim: "YMAL sold this".
+ALTER TABLE attributed_orders
+  ADD COLUMN IF NOT EXISTS direct_total NUMERIC(12, 2) NOT NULL DEFAULT 0;
+ALTER TABLE attributed_orders
+  ADD COLUMN IF NOT EXISTS direct_product TEXT;
 """
 
 
@@ -176,7 +186,12 @@ def revenue(days: int = 30) -> list[dict]:
     with connection() as conn:
         rows = conn.execute(
             """
-            SELECT block, COUNT(*), COALESCE(SUM(total), 0), MAX(currency)
+            SELECT block,
+                   COUNT(*),
+                   COALESCE(SUM(total), 0),
+                   COUNT(*) FILTER (WHERE direct_total > 0),
+                   COALESCE(SUM(direct_total), 0),
+                   MAX(currency)
               FROM attributed_orders
              WHERE created_at >= now() - make_interval(days => %s)
              GROUP BY block
@@ -186,8 +201,17 @@ def revenue(days: int = 30) -> list[dict]:
         ).fetchall()
 
     return [
-        {"block": b, "orders": n, "revenue": float(total), "currency": currency}
-        for b, n, total, currency in rows
+        {
+            "block": b,
+            "orders": n,
+            "revenue": float(total),
+            # The strict pair: orders that actually contained the recommended
+            # product, and what those products themselves sold for.
+            "direct_orders": direct_n,
+            "direct_revenue": float(direct_total),
+            "currency": currency,
+        }
+        for b, n, total, direct_n, direct_total, currency in rows
     ]
 
 
@@ -224,6 +248,11 @@ def totals(days: int) -> dict:
                 COALESCE(SUM(total) FILTER (WHERE created_at >= w.this_start), 0)     AS revenue,
                 COALESCE(SUM(total) FILTER (WHERE created_at >= w.prev_start
                                               AND created_at <  w.this_start), 0)     AS prev_revenue,
+                COUNT(*) FILTER (WHERE created_at >= w.this_start
+                                   AND direct_total > 0)                              AS direct_orders,
+                COALESCE(SUM(direct_total) FILTER (WHERE created_at >= w.this_start), 0) AS direct_revenue,
+                COALESCE(SUM(direct_total) FILTER (WHERE created_at >= w.prev_start
+                                                     AND created_at <  w.this_start), 0) AS prev_direct_revenue,
                 MAX(currency)                                                         AS currency
               FROM attributed_orders, windows w
             )
@@ -236,7 +265,8 @@ def totals(days: int) -> dict:
         return {}
 
     (impressions, clicks, adds, prev_impressions, prev_clicks, prev_adds,
-     orders, revenue, prev_revenue, currency) = row
+     orders, revenue, prev_revenue, direct_orders, direct_revenue,
+     prev_direct_revenue, currency) = row
 
     return {
         "impressions": impressions,
@@ -244,6 +274,10 @@ def totals(days: int) -> dict:
         "add_to_cart": adds,
         "orders": orders,
         "revenue": float(revenue),
+        # Same orders, counted strictly: only those that contained the product
+        # the shopper was recommended, and only that product's value.
+        "direct_orders": direct_orders,
+        "direct_revenue": float(direct_revenue),
         "currency": currency or "",
         "click_rate": round(clicks / impressions, 4) if impressions else None,
         # Wiser calls this "conversion rate" and computes it clicks-to-sales,
@@ -254,6 +288,7 @@ def totals(days: int) -> dict:
             "clicks": _change(clicks, prev_clicks),
             "add_to_cart": _change(adds, prev_adds),
             "revenue": _change(revenue, prev_revenue),
+            "direct_revenue": _change(direct_revenue, prev_direct_revenue),
         },
     }
 

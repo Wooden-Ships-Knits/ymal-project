@@ -318,13 +318,22 @@
 
         // Attribution for the purchase, carried through checkout onto the order.
         // Read back by the nightly order pass, so no webhook and no session
-        // join is needed. Deliberately a plain block name: the shopper can see
-        // this on their own order.
+        // join is needed. Deliberately plain names: the shopper can see these
+        // on their own order.
+        //
+        // The HANDLE is what separates the two revenue figures on the console.
+        // The block alone says "this order involved YMAL" - it counts even
+        // when the shopper clicked here and then bought something else. The
+        // handle lets the order pass also ask the stricter question: was the
+        // product we recommended actually in the order, and what did it sell
+        // for.
         try {
           fetch("/cart/update.js", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ attributes: { "YMAL block": block } })
+            body: JSON.stringify({
+              attributes: { "YMAL block": block, "YMAL product": handle }
+            })
           }).catch(function () {});
         } catch (e) {
           /* Attribution is never worth breaking a storefront over. */

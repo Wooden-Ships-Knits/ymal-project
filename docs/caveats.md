@@ -290,3 +290,33 @@ A style with many colorways does have a real advantage - `build_pool` takes the
 best-scoring colorway of each style, so a twelve-colorway style gets twelve
 attempts to match each anchor while a one-colorway style gets one. That is worth
 knowing, and is not the same as the pools collapsing onto the bestsellers.
+
+## 9. Two revenue figures, and which one to quote
+
+The Analytics screen reports revenue twice, because one number on its own is
+either too generous or too mean and there is no way to tell which from the
+figure alone.
+
+**Revenue** is last-touch and whole-order. A click on a YMAL card writes a
+marker onto the cart; it rides through checkout onto the order; the nightly
+pass reads it back. Whatever that order was worth - including tax and shipping,
+including products the shopper found on their own - counts. A shopper can click
+a recommendation, ignore it, buy something else, and be counted in full. This
+is the convention upsell apps report, and it answers "orders that involved
+YMAL".
+
+**Direct** is the strict reading. The storefront also writes the handle of the
+product the shopper clicked, and the order pass keeps only the lines holding
+that product, at their discounted price. Orders where they bought something
+else contribute nothing. It answers "YMAL sold this".
+
+Neither is causal. Both count shoppers who would have bought anyway; only a
+holdout measures the lift, which is Phase 7.
+
+Quote **direct** to anyone asking what the feature earns, and **revenue** only
+when comparing against another app's numbers, which will have been counted the
+generous way.
+
+Direct figures start from the day the storefront began writing the product
+handle (2026-09-24). Orders before that have no direct figure and read as 0,
+which is why the two columns diverge sharply at that boundary.

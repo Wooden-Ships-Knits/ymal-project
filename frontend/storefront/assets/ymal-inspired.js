@@ -303,14 +303,21 @@
         position: Number(card.getAttribute('data-ymal-position'))
       });
 
-      // The cart attribute that attributes a later purchase to this block -
-      // the same one every other YMAL row writes. ymal-track.js remembers the
-      // click itself, so add to cart is recorded without anything here.
+      // The cart attributes that attribute a later purchase to this block -
+      // the same ones every other YMAL row writes. ymal-track.js remembers the
+      // click itself, so add to cart is recorded without anything here. The
+      // handle is what lets the order pass tell "this order involved YMAL"
+      // from "YMAL sold this".
       try {
         fetch('/cart/update.js', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ attributes: { 'YMAL block': BLOCK } })
+          body: JSON.stringify({
+            attributes: {
+              'YMAL block': BLOCK,
+              'YMAL product': card.getAttribute('data-ymal-handle')
+            }
+          })
         }).catch(function () {});
       } catch (e) {
         /* attribution is never worth breaking a storefront over */
