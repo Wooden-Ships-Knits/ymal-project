@@ -149,8 +149,10 @@ fails. This project was created outside any repo and moved in without its own
 `extensions/ymal-recently-viewed/` — the block that replaces Wiser Checkout
 Upsell in the Order summary. Built 2026-09-16, NOT deployed.
 
-    src/Checkout.jsx           the block (Preact + Polaris web components, 2026-01)
-    shopify.extension.toml     target purchase.checkout.block.render, api_access
+    src/offers.js              the list and the rules, shared by both blocks
+    src/Checkout.jsx           the checkout block (Preact + Polaris, 2026-01)
+    src/ThankYou.jsx           the Thank you block
+    shopify.extension.toml     both block targets, api_access
 
 **Oldest first**, and that is the point of it. Every other placement leads with
 the most recent product; by checkout those are the ones the shopper passed over,
@@ -189,10 +191,21 @@ and is not another colorway of a style already in the order.
 3. In the checkout editor, add the block where Wiser's upsell was, and hide
    or remove Wiser Checkout Upsell.
 
+### The Thank you block
+
+Same list, same rules, one difference that is not an omission: **no Add
+button**. Thank you page targets have read access only - the order is complete
+and Shopify allows no mutation from there - so each card links to the product
+instead. The ask changes with it: checkout asks "one more before you pay",
+this asks "worth a look next time".
+
+It is placed the same way, in the checkout and accounts editor, on the Thank
+you page rather than in checkout.
+
 ### Known gap
 
-No `network_access`, so this block never reaches the YMAL backend: checkout
-impressions and adds do NOT appear in the dashboard. Purchases still do - every
+No `network_access`, so neither block reaches the YMAL backend: checkout and
+Thank you impressions and clicks do NOT appear in the dashboard. Purchases still do - every
 add writes the `YMAL block` line attribute, which the nightly order pass reads
 back, with the value `recently_viewed_checkout` to keep it apart from the cart
 drawer's.

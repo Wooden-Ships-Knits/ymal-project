@@ -1,57 +1,27 @@
 /*
  * YMAL — Recently Viewed, in checkout.
  *
- * OLDEST FIRST, on purpose. Everywhere else Recently Viewed leads with the most
- * recent product. By checkout the recent ones are what the shopper just decided
- * against - the sweater they looked at an hour ago is the one worth showing
- * again.
+ * The list and the rules live in ./offers.js, shared with the Thank you block.
+ * What is specific here is that the order is not placed yet, so a product can
+ * still be ADDED to it - the whole point of the block at this moment.
  *
- * WHERE THE LIST COMES FROM. A checkout extension is sandboxed on another
- * origin: no localStorage, no Liquid, no metafields. The storefront writes the
- * shopper's viewed product ids onto the cart as the attribute "YMAL viewed"
- * (assets/ymal-recently-viewed.js), newest first, and only ids that passed the
- * eligibility gate at view time - replenishable, not *SALE*.
- *
- * WHAT IS CHECKED HERE. Everything that can go stale between viewing and
- * checking out, and everything that depends on the cart:
- *   - the product still exists and is published
- *   - it is in stock right now, and so is the variant being offered
- *   - it is not already in this order
- *   - no other colorway of the same style is in this order either; a second
- *     Cocoon Wrap in another shade reads as a mistake, not a suggestion
+ * Checked here because it can change between viewing and checking out: the
+ * product still exists and is published, is in stock right now, is not already
+ * in the order, and is not another colorway of a style already in it.
  */
 import '@shopify/ui-extensions/preact';
 import { render } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
+import {
+  chooseOffers,
+  DEFAULT_SLOTS,
+  lookupIds,
+  numericId,
+  PRODUCTS_QUERY
+} from './offers.js';
 
 export default function extension() {
   render(<Extension />, document.body);
-}
-
-const ATTRIBUTE = 'YMAL viewed';
-const DEFAULT_SLOTS = 3;
-// Ask for more than are shown: sold out, deleted and already-in-cart products
-// all drop out below, and a row that thins to one card looks like a fault.
-const LOOKUP_LIMIT = 12;
-
-function productGid(id) {
-  return 'gid://shopify/Product/' + String(id).trim();
-}
-
-function numericId(gid) {
-  return String(gid).split('/').pop();
-}
-
-function sellableOf(product) {
-  return ((product.variants && product.variants.nodes) || []).filter(
-    (variant) => variant.availableForSale
-  );
-}
-
-function styleOf(product) {
-  // A style is its title, the same key the backend counts style sales under.
-  // Colorways of one sweater are separate products sharing a title.
-  return (product.title || '').trim().toUpperCase();
 }
 
 function Extension() {
@@ -66,44 +36,19 @@ function Extension() {
   // the element itself, so choosing a size never re-renders the row.
   const selects = useRef(new Map());
 
-  const viewed = (attributes.find((a) => a.key === ATTRIBUTE) || {}).value || '';
+  // The effect's dependency: re-run only when the list itself changes.
+  const viewed = JSON.stringify(lookupIds(attributes));
 
   useEffect(() => {
     let current = true;
-    const ids = viewed
-      .split(',')
-      .map((id) => id.trim())
-      .filter(Boolean)
-      .reverse()                 // oldest first
-      .slice(0, LOOKUP_LIMIT)
-      .map(productGid);
+    const ids = lookupIds(attributes);
 
     if (!ids.length) {
       setProducts([]);
       return undefined;
     }
 
-    query(
-      `query ($ids: [ID!]!) {
-        nodes(ids: $ids) {
-          ... on Product {
-            id
-            title
-            availableForSale
-            featuredImage { url altText }
-            variants(first: 20) {
-              nodes {
-                id
-                title
-                availableForSale
-                price { amount currencyCode }
-              }
-            }
-          }
-        }
-      }`,
-      { variables: { ids } }
-    )
+    query(PRODUCTS_QUERY, { variables: { ids } })
       .then(({ data }) => {
         if (!current || !data) return;
         // `nodes` preserves the order asked for, so the oldest stays first.
@@ -122,32 +67,7 @@ function Extension() {
   const slots = Number(settings.current.products_to_show) || DEFAULT_SLOTS;
   const heading = settings.current.heading || 'Recently viewed';
 
-  const inCartProducts = {};
-  const inCartStyles = {};
-  lines.forEach((line) => {
-    const product = line.merchandise && line.merchandise.product;
-    if (!product) return;
-    inCartProducts[numericId(product.id)] = true;
-    inCartStyles[(product.title || '').trim().toUpperCase()] = true;
-  });
-
-  const seenStyles = {};
-  const offers = products
-    .filter((product) => {
-      if (!product.availableForSale) return false;
-      if (inCartProducts[numericId(product.id)]) return false;
-
-      const style = styleOf(product);
-      if (inCartStyles[style] || seenStyles[style]) return false;
-      if (!sellableOf(product).length) return false;
-
-      // One colorway per style, keeping the oldest - the order is already the
-      // order they were viewed in.
-      seenStyles[style] = true;
-      return true;
-    })
-    .slice(0, slots)
-    .map((product) => ({ product, sellable: sellableOf(product) }));
+  const offers = chooseOffers(products, lines, slots);
 
   if (!offers.length) return null;
 
