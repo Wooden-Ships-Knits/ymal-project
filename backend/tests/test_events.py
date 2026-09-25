@@ -206,3 +206,24 @@ def test_inspired_by_views_is_an_accepted_block():
     block missing from it records nothing and looks like a block nobody saw.
     """
     assert events.validate(event(block="inspired_by_views", page_type="product")) == []
+
+
+def test_an_ab_label_is_a_known_block():
+    # The same block placed twice, to compare positions. Both read the same
+    # published list; only the name they report differs.
+    assert events.known_block("top_selling_a")
+    assert events.known_block("top_selling_b")
+    assert events.known_block("featured_a")
+
+
+def test_an_ab_label_on_an_unknown_block_is_still_unknown():
+    assert not events.known_block("wiser_upsell_a")
+    assert not events.known_block("_a")
+    assert not events.known_block(None)
+
+
+def test_only_a_and_b_are_labels():
+    # Not a general "anything with a suffix" rule: c, 1, -test would all be
+    # silent typos that record events nobody ever finds.
+    assert not events.known_block("top_selling_c")
+    assert not events.known_block("top_selling_1")

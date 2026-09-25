@@ -444,3 +444,24 @@ shopping".
 It records under its own block name, `cart_popup`, so the Analytics tab can
 tell it apart from the Featured row it reads from. That name must be in the
 API's allowlist - it is, from v1.4 - or every event is rejected silently.
+
+## Comparing two positions (the A/B label)
+
+To ask "does Top Selling do better above the fold or below it", add the YMAL
+section twice, set both to the same source, and set **A/B label** to A on one
+and B on the other.
+
+Both placements read the same published list and show the same products. Only
+the name they report changes, so Analytics gets two rows - `top selling a` and
+`top selling b` - and the click rates are comparable.
+
+The rows appear on their own; nothing needs adding to the console.
+
+**It compares positions, not audiences.** Every shopper sees both placements,
+so this cannot tell you what Top Selling is worth overall, only which position
+gets used more. A shopper who would have clicked the lower one anyway is
+counted as a click for the upper one. For "is this block worth having at all",
+the honest instrument is a holdout, which is Phase 7.
+
+Only `_a` and `_b` are accepted. `top_selling_c` is rejected like any unknown
+block - silently, from the shopper's side - so stick to two.

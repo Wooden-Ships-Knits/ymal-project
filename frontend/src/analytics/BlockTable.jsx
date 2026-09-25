@@ -44,7 +44,15 @@ export default function BlockTable({ blocks, revenue }) {
   // Every block is listed whether or not it has been seen, so the report has
   // its full shape from the first day and a block with no traffic is visibly
   // absent rather than silently missing from the table.
-  const rows = ALL_BLOCKS.map(
+  // A/B placements ("top_selling_a") are not in the list above: they are the
+  // same block under two names, created in the theme editor without touching
+  // this file. Anything measured that the list does not know is appended, or
+  // the web team would run a comparison whose rows never appear.
+  const extra = [...new Set([...Object.keys(measured), ...Object.keys(byBlock)])]
+    .filter((id) => !ALL_BLOCKS.includes(id))
+    .sort()
+
+  const rows = [...ALL_BLOCKS, ...extra].map(
     (id) =>
       measured[id] || {
         block: id,

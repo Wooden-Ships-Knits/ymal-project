@@ -34,6 +34,25 @@ BLOCK_IDS = (
     "cart_popup",
 )
 
+# An A/B label the web team can put on a placement in the theme editor, to
+# compare the SAME block in two positions: "top_selling_a" above the fold,
+# "top_selling_b" below it. Both read the same published list; only the name
+# they report differs, so Analytics can tell the two placements apart.
+#
+# Accepted as a suffix rather than as eight more ids, so a new block gets its
+# A/B pair without anyone remembering to add them here - the failure mode when
+# they forget is an event rejected in silence.
+AB_SUFFIXES = ("_a", "_b")
+
+
+def known_block(block: str | None) -> bool:
+    if block in BLOCK_IDS:
+        return True
+    for suffix in AB_SUFFIXES:
+        if isinstance(block, str) and block.endswith(suffix):
+            return block[: -len(suffix)] in BLOCK_IDS
+    return False
+
 # The nine from docs/config-contract.md section 5, plus two the theme can
 # genuinely produce.
 #
@@ -66,7 +85,7 @@ def validate(event: object) -> list[str]:
     if event.get("type") not in EVENT_TYPES:
         problems.append(f"type must be one of: {', '.join(EVENT_TYPES)}")
 
-    if event.get("block") not in BLOCK_IDS:
+    if not known_block(event.get("block")):
         problems.append("block is not a known block")
 
     if event.get("page_type") not in PAGE_TYPES:

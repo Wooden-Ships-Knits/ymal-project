@@ -26,6 +26,23 @@
   assign ymal_source = section.settings.ymal_source | default: 'collection'
 
   comment
+    The name this placement REPORTS, which is the source plus an optional A/B
+    label. The list itself is untouched: "Top Selling A" above the fold and
+    "Top Selling B" further down read the same published list and show the same
+    products - only their rows in Analytics differ, which is what makes the two
+    positions comparable.
+
+    Both placements are seen by the same shopper, so this compares POSITIONS,
+    not audiences. It is not a controlled test and the console does not pretend
+    otherwise.
+  endcomment
+  assign ymal_block = ymal_source
+  assign ymal_ab = section.settings.ab_label | default: 'none'
+  unless ymal_ab == 'none'
+    assign ymal_block = ymal_source | append: '_' | append: ymal_ab
+  endunless
+
+  comment
     Which kind of page this is, for tracking. DERIVED, not a setting: a
     dropdown someone has to set correctly on every placement is a dropdown
     that will be wrong somewhere, and the events it mislabels cannot be
@@ -260,7 +277,7 @@
       var root = document.getElementById("shopify-section-{{ section.id }}");
       if (!root || typeof window.ymalTrack !== "function") return;
 
-      var block = {{ ymal_source | json }};
+      var block = {{ ymal_block | json }};
       var pageType = {{ ymal_page_type | json }};
       var anchor = {{ anchor_product.handle | default: '' | json }};
 
@@ -442,6 +459,27 @@
       "id": "source_collection",
       "label": "Collection to mirror",
       "info": "Used only when \"Products from\" is set to a collection."
+    },
+    {
+      "type": "select",
+      "id": "ab_label",
+      "label": "A/B label",
+      "options": [
+        {
+          "value": "none",
+          "label": "None"
+        },
+        {
+          "value": "a",
+          "label": "A"
+        },
+        {
+          "value": "b",
+          "label": "B"
+        }
+      ],
+      "default": "none",
+      "info": "For comparing the SAME block in two positions. Label one placement A and the other B, and Analytics reports them as separate rows (\"top selling a\"). Both show identical products. Every shopper sees both, so this compares positions, not audiences."
     },
     {
       "type": "range",
