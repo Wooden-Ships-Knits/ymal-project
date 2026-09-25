@@ -445,23 +445,45 @@ It records under its own block name, `cart_popup`, so the Analytics tab can
 tell it apart from the Featured row it reads from. That name must be in the
 API's allowlist - it is, from v1.4 - or every event is rejected silently.
 
-## Comparing two positions (the A/B label)
+## Running an A/B test
 
-To ask "does Top Selling do better above the fold or below it", add the YMAL
-section twice, set both to the same source, and set **A/B label** to A on one
-and B on the other.
+To ask "does Top Selling earn more above the fold or below it", add the YMAL
+section twice with the same source, and set **A/B test group** to *Group A* on
+one and *Group B* on the other.
 
-Both placements read the same published list and show the same products. Only
-the name they report changes, so Analytics gets two rows - `top selling a` and
-`top selling b` - and the click rates are comparable.
+Each shopper is assigned a group at random on their first visit, remembered in
+their browser, and only ever sees that placement. The other one is removed
+before it can record anything, so nobody is counted as having seen both.
 
-The rows appear on their own; nothing needs adding to the console.
+Both read the same published list and show the same products. Only the name
+they report changes, so Analytics gets two rows - `top selling a` and
+`top selling b` - and their click rates are comparable. The rows appear on
+their own; nothing needs adding to the console.
 
-**It compares positions, not audiences.** Every shopper sees both placements,
-so this cannot tell you what Top Selling is worth overall, only which position
-gets used more. A shopper who would have clicked the lower one anyway is
-counted as a click for the upper one. For "is this block worth having at all",
-the honest instrument is a holdout, which is Phase 7.
+Set both back to **Off** when the test ends, or the block stays hidden from
+half your shoppers.
 
-Only `_a` and `_b` are accepted. `top_selling_c` is rejected like any unknown
-block - silently, from the shopper's side - so stick to two.
+### Read it honestly
+
+Judge it on **click rate**, not revenue. At Top Selling's traffic - 42,000
+views and 154 clicks a month - each arm sees half of that, and orders are far
+too few to compare: 10 a month means 5 per arm.
+
+Roughly what the traffic can prove, per block:
+
+| Difference in click rate | Time to detect |
+| --- | --- |
+| +50% | about 30 days |
+| +30% | about 11 weeks |
+| +20% | about 5 months |
+
+So run it four weeks minimum and treat anything under about +50% as "no
+signal" rather than as a result. On **Featured**, with 124,000 views a month,
+the same question answers roughly three times faster.
+
+And it compares PLACEMENTS, not whether the block is worth having: everyone in
+both arms sees a block. The honest instrument for that is a holdout, which is
+Phase 7.
+
+Only `_a` and `_b` are accepted. A typo like `top_selling_c` is rejected as an
+unknown block - silently, from the shopper's side - so stick to two.

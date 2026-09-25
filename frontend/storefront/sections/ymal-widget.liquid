@@ -26,18 +26,20 @@
   assign ymal_source = section.settings.ymal_source | default: 'collection'
 
   comment
-    The name this placement REPORTS, which is the source plus an optional A/B
-    label. The list itself is untouched: "Top Selling A" above the fold and
-    "Top Selling B" further down read the same published list and show the same
-    products - only their rows in Analytics differ, which is what makes the two
-    positions comparable.
+    A/B: the name this placement REPORTS, and who sees it.
 
-    Both placements are seen by the same shopper, so this compares POSITIONS,
-    not audiences. It is not a controlled test and the console does not pretend
-    otherwise.
+    Set a placement to group A and another to group B, and each shopper is
+    assigned to one group on their first visit and only ever sees that one.
+    Both read the same published list and show the same products, so the only
+    difference between the two rows in Analytics is the placement itself -
+    which is what makes them comparable.
+
+    Each shopper sees one, both groups run over the same days, so a promotion
+    or a good week lands on both arms equally. Running A one week and B the
+    next would not: the weeks differ in ways nobody can subtract afterwards.
   endcomment
   assign ymal_block = ymal_source
-  assign ymal_ab = section.settings.ab_label | default: 'none'
+  assign ymal_ab = section.settings.ab_group | default: 'none'
   unless ymal_ab == 'none'
     assign ymal_block = ymal_source | append: '_' | append: ymal_ab
   endunless
@@ -110,7 +112,59 @@
   endif
 -%}
 {%- if ymal_source == 'collection' or ymal_eligible_count > 0 -%}
-<div class="section-id-{{ section.id }} collection-slider-row {% if section.settings.color_scheme != 'default' %}use-color-scheme use-color-scheme--{{ section.settings.color_scheme }}{% endif %}">
+{%- if ymal_ab != 'none' -%}
+  {%- comment -%}
+    Assigns the shopper a group once and remembers it, then stamps it on <html>
+    so the CSS below can hide the other group with no flicker - a block that
+    appears and then vanishes is worse than either arm of the test.
+
+    Inline and parsed here rather than in an asset: a deferred file runs after
+    the page has been laid out, which is exactly the flicker this avoids.
+
+    The mismatched section is also REMOVED before its own tracking script runs,
+    so it records no impression. Hiding it alone would have counted every
+    shopper as having seen both placements, which would flatten the very
+    difference the test is looking for.
+  {%- endcomment -%}
+  <script>
+    (function () {
+      var KEY = 'ymal:ab';
+      var root = document.documentElement;
+      var bucket = root.getAttribute('data-ymal-ab');
+
+      if (!bucket) {
+        try {
+          bucket = window.localStorage.getItem(KEY);
+          if (bucket !== 'a' && bucket !== 'b') {
+            bucket = Math.random() < 0.5 ? 'a' : 'b';
+            window.localStorage.setItem(KEY, bucket);
+          }
+        } catch (e) {
+          // Storage refused: still split, just not stable across visits. A
+          // shopper who cannot be remembered is better counted somewhere than
+          // shown both placements.
+          bucket = Math.random() < 0.5 ? 'a' : 'b';
+        }
+        root.setAttribute('data-ymal-ab', bucket);
+      }
+
+      if (bucket !== {{ ymal_ab | json }}) {
+        document.addEventListener('DOMContentLoaded', function () {
+          var el = document.getElementById('shopify-section-{{ section.id }}');
+          if (el) el.remove();
+        });
+      }
+    })();
+  </script>
+
+  <style>
+    html[data-ymal-ab="a"] #shopify-section-{{ section.id }}.ymal-ab-b,
+    html[data-ymal-ab="b"] #shopify-section-{{ section.id }}.ymal-ab-a {
+      display: none !important;
+    }
+  </style>
+{%- endif -%}
+<div class="section-id-{{ section.id }} collection-slider-row {% unless ymal_ab == 'none' %}ymal-ab-{{ ymal_ab }} {% endunless %}{% if section.settings.color_scheme != 'default' %}use-color-scheme use-color-scheme--{{ section.settings.color_scheme }}{% endif %}">
   <div class="container{% if section.settings.enable_carousel %} container--not-mobile{% endif %}{% if section.settings.full_width %} container--no-max{% endif %}">
     {%- if section.settings.enable_carousel -%}
       <carousel-slider class="carousel block collection-slider">
@@ -462,24 +516,24 @@
     },
     {
       "type": "select",
-      "id": "ab_label",
-      "label": "A/B label",
+      "id": "ab_group",
+      "label": "A/B test group",
       "options": [
         {
           "value": "none",
-          "label": "None"
+          "label": "Off - show to everyone"
         },
         {
           "value": "a",
-          "label": "A"
+          "label": "Group A - half of shoppers"
         },
         {
           "value": "b",
-          "label": "B"
+          "label": "Group B - the other half"
         }
       ],
       "default": "none",
-      "info": "For comparing the SAME block in two positions. Label one placement A and the other B, and Analytics reports them as separate rows (\"top selling a\"). Both show identical products. Every shopper sees both, so this compares positions, not audiences."
+      "info": "For comparing this block in two places. Add the section twice with the same source, set one to A and the other to B: each shopper is assigned a group on their first visit and only sees that one. Analytics reports them separately (\"top selling a\"). Leave Off unless a test is running."
     },
     {
       "type": "range",
