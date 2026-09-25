@@ -7,7 +7,7 @@ which is authoritative.
 from ymal import registry
 
 
-def test_six_blocks():
+def test_seven_blocks():
     assert registry.block_ids() == {
         "featured",
         "trending",
@@ -15,6 +15,7 @@ def test_six_blocks():
         "new_arrivals",
         "recently_viewed",
         "inspired_by_views",
+        "cart_popup",
     }
 
 

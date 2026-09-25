@@ -192,7 +192,11 @@ def test_published_block_ids_reports_recently_viewed_even_with_no_metafields(cal
     # Inspired By Your Views also has nothing of its own to publish: it reads
     # each product's existing Featured list, so it is as "published" as
     # Recently Viewed is.
-    assert config_store.published_block_ids() == {"recently_viewed", "inspired_by_views"}
+    assert config_store.published_block_ids() == {
+        "recently_viewed",
+        "inspired_by_views",
+        "cart_popup",
+    }
 
 
 def test_published_block_ids_includes_a_block_with_a_metafield(calls):
@@ -209,5 +213,6 @@ def test_published_block_ids_includes_a_block_with_a_metafield(calls):
     assert config_store.published_block_ids() == {
         "recently_viewed",
         "inspired_by_views",
+        "cart_popup",
         "trending",
     }

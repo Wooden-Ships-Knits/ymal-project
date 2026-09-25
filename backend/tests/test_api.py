@@ -145,10 +145,10 @@ def test_undo_without_a_previous_config_returns_409(client, monkeypatch):
     assert response.status_code == 409
 
 
-def test_blocks_lists_six_with_publish_state(client):
+def test_blocks_lists_every_block_with_publish_state(client):
     blocks = client.get("/api/blocks").json()
 
-    assert len(blocks) == 6
+    assert len(blocks) == 7
     by_id = {b["id"]: b for b in blocks}
     assert by_id["recently_viewed"]["list_published"] is True
     assert by_id["inspired_by_views"]["list_published"] is True
@@ -164,7 +164,7 @@ def test_blocks_still_answers_when_shopify_is_unreachable(client, monkeypatch):
 
     blocks = client.get("/api/blocks").json()
 
-    assert len(blocks) == 6
+    assert len(blocks) == 7
     assert all(b["list_published"] is False for b in blocks)
 
 

@@ -28,6 +28,10 @@ BLOCK_IDS = (
     # shopper's side, which makes a block nobody can see indistinguishable from
     # a block nobody scrolled to.
     "inspired_by_views",
+    # The add-to-cart popup. Its own id rather than sharing "featured": it
+    # reads the same list, but it is a different moment and a different ask,
+    # and one row in the table cannot say which of them earned the click.
+    "cart_popup",
 )
 
 # The nine from docs/config-contract.md section 5, plus two the theme can

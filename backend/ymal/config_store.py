@@ -150,6 +150,9 @@ def published_block_ids() -> set[str]:
     # Nothing of its own to publish either: it reads each product's existing
     # Featured list. As available as Recently Viewed is.
     published.add("inspired_by_views")
+    # Reads the added product's own Featured list, so it has nothing of its own
+    # to publish either.
+    published.add("cart_popup")
     return published
 
 

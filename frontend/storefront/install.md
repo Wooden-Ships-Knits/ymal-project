@@ -43,6 +43,8 @@ over the original, so the theme keeps a working `product-list` either way.
 | `templates/product.ymal-card-compact.liquid` | Recently Viewed card in the cart drawer |
 | `assets/ymal-recently-viewed.js` | Recently Viewed |
 | `assets/ymal-recently-viewed-cart.js` | Recently Viewed in the cart drawer |
+| `snippets/ymal-cart-popup.liquid` | the add to cart popup |
+| `assets/ymal-cart-popup.js` | the add to cart popup |
 | `assets/ymal-track.js` | analytics AND purchase attribution |
 
 ### DO NOT copy: `sections/product-list.liquid`
@@ -402,3 +404,43 @@ reporting the moment it lands.
 
 Events carry `block` and the page type. Without those two fields the Analytics
 tab has nothing to group by.
+
+
+## The add to cart popup
+
+Opens the moment a shopper adds anything, offering up to three products from
+the added product's Featured list - which the nightly pass orders by what
+shoppers buy in the SAME order, not by what looks similar.
+
+Install:
+
+1. `assets/ymal-cart-popup.js` and `snippets/ymal-cart-popup.liquid`.
+2. `templates/product.ymal-card-compact.liquid`, if the cart drawer block is
+   not already installed. The popup renders the same compact cards.
+3. In `layout/theme.liquid`, just before `</body>`, on every page:
+
+   ```liquid
+   {%- render 'ymal-cart-popup' -%}
+   ```
+
+   Every page, not only product pages: a collection page's quick buy adds to
+   the cart too, and the popup has to exist before the add happens.
+
+### Turn the drawer off first
+
+The theme opens the cart drawer after every add. Two overlays at once is not a
+decision anyone made, so before installing this, set **Theme settings → Cart →
+After adding to cart** to *Show a notification* (or to nothing at all). The
+popup's own buttons cover what the drawer offered: "View cart" and "Keep
+shopping".
+
+### What it will not do
+
+- Offer another colorway of the sweater just added. They have bought it.
+- Offer anything already in the cart, sold out, fixed-stock or `*SALE*`.
+- Open at all with fewer than two products to show. One product in a box reads
+  as something that failed to load.
+
+It records under its own block name, `cart_popup`, so the Analytics tab can
+tell it apart from the Featured row it reads from. That name must be in the
+API's allowlist - it is, from v1.4 - or every event is rejected silently.

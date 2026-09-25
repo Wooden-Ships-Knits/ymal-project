@@ -56,6 +56,15 @@ export const BLOCKS = [
     defaultHeading: 'Inspired By Your Views',
     defaultSlots: 4,
   },
+  {
+    id: 'cart_popup',
+    label: 'Add to Cart Popup',
+    description:
+      'Shown the moment a product is added: the Featured list of the product just added, ordered by what shoppers actually buy in the same order.',
+    requiresAnchor: false,
+    defaultHeading: 'Pairs well with',
+    defaultSlots: 3,
+  },
 ]
 
 export const blockById = (id) => BLOCKS.find((b) => b.id === id)

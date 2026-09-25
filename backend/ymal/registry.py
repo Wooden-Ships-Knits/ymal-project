@@ -85,6 +85,20 @@ BLOCKS = [
         "default_heading": "Inspired By Your Views",
         "default_slots": 4,
     },
+    {
+        "id": "cart_popup",
+        "label": "Add to Cart Popup",
+        "description": (
+            "Shown the moment a product is added: the Featured list of the product "
+            "just added, which the nightly pass orders by what shoppers actually "
+            "buy in the same order."
+        ),
+        # The anchor is whatever was just added, which the storefront knows and
+        # we never have to be told.
+        "requires_anchor": False,
+        "default_heading": "Pairs well with",
+        "default_slots": 3,
+    },
 ]
 
 # `anchor` marks a template that has a product to be "about". Only `product`
