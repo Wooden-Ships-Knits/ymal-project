@@ -9,7 +9,7 @@
   page's quick buy, and the popup has to exist before the add happens.
 
   Optional:
-    heading: 'Pairs well with'   what the popup calls the row
+    heading: 'You may also like'  what the popup calls the row
     slots:   3                   how many products to offer
 
   Renders an empty, hidden dialog. assets/ymal-cart-popup.js fills it from
@@ -66,7 +66,7 @@
       <button type="button" class="ymal-pop__close" data-ymal-close aria-label="Close">&times;</button>
     </div>
 
-    <h2 class="ymal-pop__title" id="ymal-pop-title">{{ heading | default: 'Pairs well with' }}</h2>
+    <h2 class="ymal-pop__title" id="ymal-pop-title">{{ heading | default: 'You may also like' }}</h2>
 
     <div class="ymal-pop__items" data-ymal-items></div>
 
@@ -83,7 +83,7 @@
   .ymal-pop[hidden]{display:none !important}
   .ymal-pop__scrim{position:absolute; inset:0; background:rgba(0,0,0,.45)}
   .ymal-pop__panel{
-    position:relative; z-index:1; width:100%; max-width:420px;
+    position:relative; z-index:1; width:100%; max-width:560px;
     max-height:86vh; overflow-y:auto;
     background:#fff; padding:18px 18px 16px;
     box-shadow:0 10px 40px rgba(0,0,0,.2);
@@ -102,7 +102,21 @@
     margin:14px 0 10px; font-size:13px; letter-spacing:.09em;
     text-transform:uppercase; opacity:.7;
   }
-  .ymal-pop__items{display:flex; flex-direction:column; gap:8px}
+  /* Three across, each with the full portrait photo - the same shape as the
+     cards in a YMAL row, rather than the drawer's small crop. */
+  .ymal-pop__items{display:grid; grid-template-columns:repeat(3, 1fr); gap:10px}
+
+  /* A phone cannot fit three portrait cards side by side without shrinking
+     them to stamps, so the row scrolls instead, one and a bit in view. */
+  @media (max-width: 600px){
+    .ymal-pop__items{
+      grid-template-columns:repeat(3, 72%);
+      overflow-x:auto; scroll-snap-type:x mandatory;
+      scrollbar-width:none; -ms-overflow-style:none;
+    }
+    .ymal-pop__items::-webkit-scrollbar{display:none}
+    .ymal-pop .ymal-rv__card{scroll-snap-align:start}
+  }
   .ymal-pop__actions{display:flex; gap:8px; margin-top:16px}
   .ymal-pop__keep, .ymal-pop__cart{
     flex:1; text-align:center; padding:11px 14px; cursor:pointer;
@@ -112,25 +126,33 @@
   .ymal-pop__keep{background:#fff; color:#000; border:1px solid rgba(0,0,0,.25)}
   .ymal-pop__cart{background:#000; color:#fff; border:1px solid #000}
 
-  /* The cards are the cart drawer's, so its styles carry the popup too - but
-     the drawer's snippet may not be on the page, so the few rules the card
-     needs are repeated here. Same values; changing one means changing both. */
+  /* The card markup is the cart drawer's - the same compact template - but it
+     is laid out as a column here rather than a row, so no second template is
+     needed to show the photo properly. */
   .ymal-pop .ymal-rv__card{
-    display:flex; gap:11px; align-items:center;
-    background:#fff; border:1px solid rgba(0,0,0,.1); padding:9px;
+    display:flex; flex-direction:column; gap:6px; align-items:stretch;
+    background:#fff; border:0; padding:0; min-width:0;
   }
-  .ymal-pop .ymal-rv__img{width:52px; height:66px; object-fit:cover; display:block; flex:0 0 52px}
-  .ymal-pop .ymal-rv__meta{flex:1; min-width:0; display:flex; flex-direction:column; gap:2px}
-  .ymal-pop .ymal-rv__name{font-size:12px; line-height:1.25; text-decoration:none; color:inherit}
-  .ymal-pop .ymal-rv__price{font-size:12px; opacity:.7}
+  .ymal-pop .ymal-rv__img{
+    width:100%; height:auto; aspect-ratio:3/4; object-fit:cover; display:block; flex:none;
+  }
+  .ymal-pop .ymal-rv__meta{width:100%; min-width:0; display:flex; flex-direction:column; gap:3px}
+  .ymal-pop .ymal-rv__name{
+    font-size:11px; line-height:1.3; text-transform:uppercase; letter-spacing:.02em;
+    text-decoration:none; color:inherit;
+    /* Two lines reserved, so the Add buttons stay level across three cards
+       whose names are rarely the same length. */
+    min-height:2.6em;
+  }
+  .ymal-pop .ymal-rv__price{font-size:11.5px; opacity:.7}
   .ymal-pop .ymal-rv__variant{
-    font:inherit; font-size:11px; max-width:100%;
-    margin-top:4px; padding:3px 4px; border:1px solid rgba(0,0,0,.15);
+    font:inherit; font-size:10.5px; width:100%; max-width:100%;
+    margin-top:2px; padding:4px; border:1px solid rgba(0,0,0,.18);
   }
   .ymal-pop .ymal-rv__add{
-    padding:7px 13px; cursor:pointer; white-space:nowrap;
+    width:100%; padding:8px 4px; cursor:pointer;
     background:#000; color:#fff; border:0;
-    font:inherit; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase;
+    font:inherit; font-size:9.5px; letter-spacing:.08em; text-transform:uppercase;
   }
   .ymal-pop .ymal-rv__add[disabled]{opacity:.5; cursor:default}
 
