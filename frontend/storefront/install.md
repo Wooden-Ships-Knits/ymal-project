@@ -44,6 +44,7 @@ over the original, so the theme keeps a working `product-list` either way.
 | `assets/ymal-recently-viewed.js` | Recently Viewed |
 | `assets/ymal-recently-viewed-cart.js` | Recently Viewed in the cart drawer |
 | `snippets/ymal-cart-popup.liquid` | the add to cart popup |
+| `templates/product.ymal-popup.liquid` | the popup's source list |
 | `assets/ymal-cart-popup.js` | the add to cart popup |
 | `assets/ymal-track.js` | analytics AND purchase attribution |
 
@@ -414,7 +415,9 @@ shoppers buy in the SAME order, not by what looks similar.
 
 Install:
 
-1. `assets/ymal-cart-popup.js` and `snippets/ymal-cart-popup.liquid`.
+1. `assets/ymal-cart-popup.js`, `snippets/ymal-cart-popup.liquid` and
+   `templates/product.ymal-popup.liquid` (a product template, type **liquid**,
+   named `ymal-popup`).
 2. `templates/product.ymal-card-compact.liquid`, if the cart drawer block is
    not already installed. The popup renders the same compact cards.
 3. In `layout/theme.liquid`, just before `</body>`, on every page:
@@ -433,6 +436,13 @@ decision anyone made, so before installing this, set **Theme settings â†’ Cart â
 After adding to cart** to *Show a notification* (or to nothing at all). The
 popup's own buttons cover what the drawer offered: "View cart" and "Keep
 shopping".
+
+### What it offers
+
+Not the top of the Featured list: the first eight are what the YMAL row on the
+product page already showed, and the shopper has just scrolled past them. The
+popup starts at position nine, takes twelve, shuffles them, and shows three -
+so adding twice does not show the same panel twice.
 
 ### What it will not do
 

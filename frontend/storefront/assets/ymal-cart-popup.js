@@ -7,7 +7,8 @@
  *
  *   on:cart:add (the theme's own event)
  *     -> /cart.js                          what was added: handle, title
- *     -> /products/<h>?view=ymal-ibyv      that product's Featured list
+ *     -> /products/<h>?view=ymal-popup     its Featured list FROM POSITION 9
+ *     -> shuffle, then the first 3 that survive the rules
  *     -> /products/<h>?view=ymal-card-compact   a card for each
  *
  * WHY THE FEATURED LIST. The nightly pass orders it by co-purchase - what
@@ -15,6 +16,12 @@
  * 16.5% to 29.4% on a year of held-out baskets. For "you just added this", that
  * is the right question; "looks similar" is the wrong one, and would offer a
  * second sweater almost identical to the one already in the bag.
+ *
+ * PAST THE ROW, AND SHUFFLED. The template skips the first eight - the ones the
+ * YMAL row already showed, which the shopper has just scrolled past - and the
+ * twelve it returns are shuffled on every open. Same product, different three
+ * each time, which is what the web team asked for and what keeps a shopper who
+ * adds twice from seeing the same panel twice.
  *
  * NOT ANOTHER COLORWAY of what they just added: they have bought that sweater.
  * One card per style, nothing already in the cart, and nothing at all if fewer
@@ -33,40 +40,62 @@
   // Pure - tested in frontend/storefront/tests/ymal-cart-popup.test.js
   // ---------------------------------------------------------------------------
 
+  // Fisher-Yates, on a copy. `random` is injectable so the tests can pin an
+  // order; the browser passes Math.random.
+  function shuffle(items, random) {
+    var out = items.slice();
+    for (var i = out.length - 1; i > 0; i--) {
+      var j = Math.floor((random || Math.random)() * (i + 1));
+      var swap = out[i];
+      out[i] = out[j];
+      out[j] = swap;
+    }
+    return out;
+  }
+
   /*
    * Which of a product's Featured list to offer.
    *
-   *   source   { handles, styles } from the ymal-ibyv template, in order
+   *   source   { handles, styles } from the ymal-popup template - already past
+   *            the first eight, which the row on the page showed
    *   added    { handle, style } the product just added
    *   inCart   handles already in the cart, the added one included
    *   slots    how many to show
+   *   random   omit for Math.random; pass null to keep the given order
    */
-  function offers(source, added, inCart, slots) {
+  function offers(source, added, inCart, slots, random) {
     var handles = (source && source.handles) || [];
     var styles = (source && source.styles) || [];
+
+    var candidates = handles.map(function (handle, i) {
+      // A handle with no style counts as its own, which is how this behaved
+      // before the template sent styles at all.
+      return { handle: handle, style: styles[i] || handle };
+    });
+
+    // Shuffled BEFORE the rules, not after: filtering first and shuffling the
+    // survivors would still show the same three products in a different order.
+    if (random !== null) candidates = shuffle(candidates, random);
+
     var seen = Object.create(null);
     var out = [];
 
     if (added && added.style) seen[added.style] = true;
 
-    handles.forEach(function (handle, i) {
+    candidates.forEach(function (candidate) {
       if (out.length >= slots) return;
-      if (!handle || handle === (added && added.handle)) return;
-      if ((inCart || []).indexOf(handle) !== -1) return;
+      if (!candidate.handle || candidate.handle === (added && added.handle)) return;
+      if ((inCart || []).indexOf(candidate.handle) !== -1) return;
+      if (seen[candidate.style]) return;
 
-      // A handle with no style counts as its own, which is how this behaved
-      // before the template sent styles at all.
-      var style = styles[i] || handle;
-      if (seen[style]) return;
-
-      seen[style] = true;
-      out.push(handle);
+      seen[candidate.style] = true;
+      out.push(candidate.handle);
     });
 
     return out;
   }
 
-  var api = { offers: offers, MINIMUM: MINIMUM, BLOCK: BLOCK };
+  var api = { offers: offers, shuffle: shuffle, MINIMUM: MINIMUM, BLOCK: BLOCK };
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (typeof document === 'undefined') return;
 
@@ -139,7 +168,7 @@
   }
 
   function sourceFor(handle) {
-    return getText('/products/' + encodeURIComponent(handle) + '?view=ymal-ibyv')
+    return getText('/products/' + encodeURIComponent(handle) + '?view=ymal-popup')
       .then(function (text) {
         try {
           return JSON.parse(text);

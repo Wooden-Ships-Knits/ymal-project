@@ -1,0 +1,64 @@
+{%- comment -%}
+  YMAL — the add to cart popup's source list.
+
+  Fetched as /products/<handle>?view=ymal-popup. Returns JSON and nothing else:
+
+    {"handles": ["ninth", "tenth", ...], "styles": ["NINTH STYLE", ...]}
+
+  DELIBERATELY SKIPS THE FIRST 8. Those are what the YMAL row on the product
+  page already showed, and the shopper has just walked past them on the way to
+  adding this product. The popup's job is to widen the choice, not to repeat
+  the row one scroll later - so it offers from position 9 onward.
+
+  Counted in ELIGIBLE products, the same ones the row would render: not this
+  product, available, ymal.eligible, no *SALE*. A skipped product does not use
+  up one of the eight, or the popup would start somewhere different from where
+  the row ended.
+
+  The pool is 30 deep, so there is room: 12 are returned, and the script
+  shuffles them and shows 3.
+{%- endcomment -%}
+
+{% layout none %}
+{%- liquid
+  assign ymal_skip = 8
+  assign ymal_limit = 12
+  assign ymal_seen = 0
+  assign ymal_count = 0
+  assign ymal_handles = ''
+  assign ymal_styles = ''
+
+  for ymal_item in product.metafields.ymal.featured.value
+    if ymal_count >= ymal_limit
+      break
+    endif
+    if ymal_item.id == product.id
+      continue
+    endif
+    unless ymal_item.available
+      continue
+    endunless
+    unless ymal_item.metafields.ymal.eligible.value
+      continue
+    endunless
+    if ymal_item.title contains '*SALE*'
+      continue
+    endif
+
+    assign ymal_seen = ymal_seen | plus: 1
+    if ymal_seen <= ymal_skip
+      continue
+    endif
+
+    if ymal_count > 0
+      assign ymal_handles = ymal_handles | append: ','
+      assign ymal_styles = ymal_styles | append: ','
+    endif
+    assign ymal_handle_json = ymal_item.handle | json
+    assign ymal_style_json = ymal_item.title | strip | upcase | json
+    assign ymal_handles = ymal_handles | append: ymal_handle_json
+    assign ymal_styles = ymal_styles | append: ymal_style_json
+    assign ymal_count = ymal_count | plus: 1
+  endfor
+-%}
+{"handles": [{{ ymal_handles }}], "styles": [{{ ymal_styles }}]}

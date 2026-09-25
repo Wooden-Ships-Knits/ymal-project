@@ -12,10 +12,10 @@
     heading: 'Pairs well with'   what the popup calls the row
     slots:   3                   how many products to offer
 
-  Renders an empty, hidden dialog. assets/ymal-cart-popup.js fills it from the
-  added product's Featured list - which the nightly pass orders by what
-  shoppers buy in the SAME order - and opens it only if at least two products
-  survive the cart, colorway and stock rules.
+  Renders an empty, hidden dialog. assets/ymal-cart-popup.js fills it from
+  templates/product.ymal-popup.liquid - the added product's Featured list from
+  position NINE, past what the row on the page already showed - shuffles them,
+  and opens only if at least two survive the cart, colorway and stock rules.
 
   REPLACES THE CART DRAWER OPENING. The theme is set to open the drawer after
   every add; two overlays at once is not a decision anyone made. Set
@@ -23,8 +23,8 @@
   (or nothing) before installing this, or the drawer will slide out underneath
   it.
 
-  The cards are the compact ones the drawer uses, so
-  templates/product.ymal-card-compact.liquid has to be on the theme too.
+  Needs two templates on the theme: product.ymal-popup.liquid for the list, and
+  product.ymal-card-compact.liquid for the cards, which are the drawer's.
 {%- endcomment -%}
 {%- liquid
   comment
