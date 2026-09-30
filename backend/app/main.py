@@ -15,6 +15,8 @@ import threading
 import time
 
 from dotenv import load_dotenv
+from datetime import timedelta
+
 from fastapi import Body, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -510,17 +512,34 @@ async def post_events(request: Request) -> JSONResponse:
 
 
 @app.get("/api/analytics")
-def get_analytics(days: int = 30) -> dict:
-    """Per-block performance for the console's Analytics screen."""
+def get_analytics(
+    days: int = 30, start: str | None = None, end: str | None = None
+) -> dict:
+    """
+    Per-block performance for the console's Analytics screen.
+
+    Either a rolling window - `days`, what the preset buttons send - or a pair
+    of calendar dates, `start` and `end`, both included. Dates win when both
+    are given.
+    """
     days = max(1, min(days, 365))
     try:
+        # Fails here rather than four queries deep, so a mistyped date is a 400
+        # naming the problem instead of a 502 naming nothing.
+        first, last = db.window(days, start, end)
         return {
             "days": days,
-            "totals": db.totals(days),
-            "daily": db.daily(days),
-            "blocks": db.summary(days),
-            "revenue": db.revenue(days),
+            "start": first.date().isoformat(),
+            # Inclusive in the answer, as the console asked for it: the query
+            # is half-open internally, which is an implementation detail.
+            "end": (last.date() - timedelta(days=1)).isoformat(),
+            "totals": db.totals(days, start, end),
+            "daily": db.daily(days, start, end),
+            "blocks": db.summary(days, start, end),
+            "revenue": db.revenue(days, start, end),
         }
+    except db.BadRange as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     except db.NoDatabase:
         raise HTTPException(
             status_code=503, detail="Tracking storage is not configured."

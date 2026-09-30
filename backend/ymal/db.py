@@ -17,6 +17,7 @@ one that fails, because nobody notices until the Analytics screen is empty.
 
 import os
 from contextlib import contextmanager
+from datetime import datetime, timedelta, timezone
 
 import psycopg
 import psycopg.conninfo
@@ -143,7 +144,51 @@ def insert_events(rows: list[dict]) -> int:
     return len(rows)
 
 
-def summary(days: int = 30) -> list[dict]:
+class BadRange(ValueError):
+    """A date range the console asked for that cannot be honoured."""
+
+
+def window(
+    days: int | None = None,
+    start: str | None = None,
+    end: str | None = None,
+) -> tuple[datetime, datetime]:
+    """
+    The half-open range every analytics query runs over: start <= t < end.
+
+    Two ways to ask. `days` is the rolling window the preset buttons use -
+    "the last 30 days" means from this moment, not from midnight, which is why
+    the number moves during the day. `start`/`end` are calendar dates, and the
+    END DATE IS INCLUDED: someone picking 1 to 15 September means both days.
+
+    Dates are read as UTC, which is also what the stored timestamps are. For a
+    shop in New York that puts a boundary at 8pm local, so a single day picked
+    on its own is not quite that day. Whole weeks and months, which is what
+    this is used for, are off by those few hours at each end and no more.
+    """
+    if start or end:
+        if not (start and end):
+            raise BadRange("a custom range needs both a start and an end date")
+        try:
+            first = datetime.strptime(start, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            last = datetime.strptime(end, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        except ValueError:
+            raise BadRange("dates must be written as YYYY-MM-DD")
+        if last < first:
+            raise BadRange("the end date is before the start date")
+        # Half-open, so the end day counts in full rather than stopping at its
+        # midnight - "1 to 1 September" is one whole day, not nothing.
+        last = last + timedelta(days=1)
+        if (last - first).days > 366:
+            raise BadRange("a range may not be longer than a year")
+        return first, last
+
+    span = max(1, min(int(days or 30), 365))
+    now = datetime.now(timezone.utc)
+    return now - timedelta(days=span), now
+
+
+def summary(days: int = 30, start=None, end=None) -> list[dict]:
     """
     Per block: impressions, clicks, adds, and the rates between them.
 
@@ -159,11 +204,11 @@ def summary(days: int = 30) -> list[dict]:
                    COUNT(*) FILTER (WHERE type = 'click')       AS clicks,
                    COUNT(*) FILTER (WHERE type = 'add_to_cart') AS adds
               FROM events
-             WHERE created_at >= now() - make_interval(days => %s)
+             WHERE created_at >= %s AND created_at < %s
              GROUP BY block
              ORDER BY clicks DESC
             """,
-            (days,),
+            window(days, start, end),
         ).fetchall()
 
     out = []
@@ -181,7 +226,7 @@ def summary(days: int = 30) -> list[dict]:
     return out
 
 
-def revenue(days: int = 30) -> list[dict]:
+def revenue(days: int = 30, start=None, end=None) -> list[dict]:
     """Attributed orders per block, from the nightly order pass."""
     with connection() as conn:
         rows = conn.execute(
@@ -193,11 +238,11 @@ def revenue(days: int = 30) -> list[dict]:
                    COALESCE(SUM(direct_total), 0),
                    MAX(currency)
               FROM attributed_orders
-             WHERE created_at >= now() - make_interval(days => %s)
+             WHERE created_at >= %s AND created_at < %s
              GROUP BY block
              ORDER BY SUM(total) DESC NULLS LAST
             """,
-            (days,),
+            window(days, start, end),
         ).fetchall()
 
     return [
@@ -215,28 +260,32 @@ def revenue(days: int = 30) -> list[dict]:
     ]
 
 
-def totals(days: int) -> dict:
+def totals(days: int = 30, start=None, end=None) -> dict:
     """
     The headline numbers, and the same numbers for the period before, so the
     console can show which way each is moving.
 
     Compared against the IMMEDIATELY PRECEDING window of the same length, not
     against a fixed date. "Last 30 days versus the 30 before" is the only
-    comparison that holds its meaning as time passes.
+    comparison that holds its meaning as time passes - and for a custom range
+    it is the same length again, ending where this one starts.
     """
+    this_start, this_end = window(days, start, end)
+    prev_start = this_start - (this_end - this_start)
     with connection() as conn:
         row = conn.execute(
             """
             WITH windows AS (
               SELECT
-                now() - make_interval(days => %(days)s)     AS this_start,
-                now() - make_interval(days => %(days)s * 2) AS prev_start
+                %(this_start)s::timestamptz AS this_start,
+                %(this_end)s::timestamptz   AS this_end,
+                %(prev_start)s::timestamptz AS prev_start
             ),
             ev AS (
               SELECT
-                COUNT(*) FILTER (WHERE type='impression'  AND created_at >= w.this_start) AS impressions,
-                COUNT(*) FILTER (WHERE type='click'       AND created_at >= w.this_start) AS clicks,
-                COUNT(*) FILTER (WHERE type='add_to_cart' AND created_at >= w.this_start) AS adds,
+                COUNT(*) FILTER (WHERE type='impression'  AND created_at >= w.this_start AND created_at < w.this_end) AS impressions,
+                COUNT(*) FILTER (WHERE type='click'       AND created_at >= w.this_start AND created_at < w.this_end) AS clicks,
+                COUNT(*) FILTER (WHERE type='add_to_cart' AND created_at >= w.this_start AND created_at < w.this_end) AS adds,
                 COUNT(*) FILTER (WHERE type='impression'  AND created_at >= w.prev_start AND created_at < w.this_start) AS prev_impressions,
                 COUNT(*) FILTER (WHERE type='click'       AND created_at >= w.prev_start AND created_at < w.this_start) AS prev_clicks,
                 COUNT(*) FILTER (WHERE type='add_to_cart' AND created_at >= w.prev_start AND created_at < w.this_start) AS prev_adds
@@ -244,13 +293,14 @@ def totals(days: int) -> dict:
             ),
             ord AS (
               SELECT
-                COUNT(*)                    FILTER (WHERE created_at >= w.this_start) AS orders,
-                COALESCE(SUM(total) FILTER (WHERE created_at >= w.this_start), 0)     AS revenue,
+                COUNT(*)                    FILTER (WHERE created_at >= w.this_start AND created_at < w.this_end) AS orders,
+                COALESCE(SUM(total) FILTER (WHERE created_at >= w.this_start AND created_at < w.this_end), 0) AS revenue,
                 COALESCE(SUM(total) FILTER (WHERE created_at >= w.prev_start
                                               AND created_at <  w.this_start), 0)     AS prev_revenue,
-                COUNT(*) FILTER (WHERE created_at >= w.this_start
+                COUNT(*) FILTER (WHERE created_at >= w.this_start AND created_at < w.this_end
                                    AND direct_total > 0)                              AS direct_orders,
-                COALESCE(SUM(direct_total) FILTER (WHERE created_at >= w.this_start), 0) AS direct_revenue,
+                COALESCE(SUM(direct_total) FILTER (WHERE created_at >= w.this_start
+                                                     AND created_at <  w.this_end), 0) AS direct_revenue,
                 COALESCE(SUM(direct_total) FILTER (WHERE created_at >= w.prev_start
                                                      AND created_at <  w.this_start), 0) AS prev_direct_revenue,
                 MAX(currency)                                                         AS currency
@@ -258,7 +308,7 @@ def totals(days: int) -> dict:
             )
             SELECT * FROM ev, ord
             """,
-            {"days": days},
+            {"this_start": this_start, "this_end": this_end, "prev_start": prev_start},
         ).fetchone()
 
     if row is None:
@@ -307,20 +357,21 @@ def _change(now, before) -> float | None:
     return round((now - before) / before, 4)
 
 
-def daily(days: int) -> list[dict]:
+def daily(days: int = 30, start=None, end=None) -> list[dict]:
     """
     One row per day: clicks and attributed revenue.
 
     Every day in the range is returned, including the empty ones. A chart that
     silently drops quiet days compresses time and makes a gap look like a dip.
     """
+    this_start, this_end = window(days, start, end)
     with connection() as conn:
         rows = conn.execute(
             """
             WITH days AS (
               SELECT generate_series(
-                date_trunc('day', now() - make_interval(days => %(days)s - 1)),
-                date_trunc('day', now()),
+                date_trunc('day', %(start)s::timestamptz),
+                date_trunc('day', %(end)s::timestamptz - interval '1 second'),
                 interval '1 day'
               ) AS day
             ),
@@ -328,11 +379,15 @@ def daily(days: int) -> list[dict]:
               SELECT date_trunc('day', created_at) AS day, COUNT(*) AS n
                 FROM events
                WHERE type = 'click'
+                 AND created_at >= %(start)s::timestamptz
+                 AND created_at <  %(end)s::timestamptz
                GROUP BY 1
             ),
             money AS (
               SELECT date_trunc('day', created_at) AS day, SUM(total) AS revenue
                 FROM attributed_orders
+               WHERE created_at >= %(start)s::timestamptz
+                 AND created_at <  %(end)s::timestamptz
                GROUP BY 1
             )
             SELECT to_char(d.day, 'YYYY-MM-DD'),
@@ -343,7 +398,7 @@ def daily(days: int) -> list[dict]:
               LEFT JOIN money  m ON m.day = d.day
              ORDER BY d.day
             """,
-            {"days": days},
+            {"start": this_start, "end": this_end},
         ).fetchall()
 
     return [

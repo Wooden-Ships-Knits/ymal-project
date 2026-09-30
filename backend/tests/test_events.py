@@ -227,3 +227,28 @@ def test_only_a_and_b_are_labels():
     # silent typos that record events nobody ever finds.
     assert not events.known_block("top_selling_c")
     assert not events.known_block("top_selling_1")
+
+
+def test_window_counts_the_end_day_in_full():
+    from ymal import db
+
+    start, end = db.window(start="2026-09-01", end="2026-09-01")
+
+    # One day picked on its own is a whole day, not nothing.
+    assert (end - start).days == 1
+
+
+def test_window_rolling_days():
+    from ymal import db
+
+    start, end = db.window(30)
+
+    assert 29 <= (end - start).days <= 30
+
+
+def test_window_refuses_more_than_a_year():
+    from ymal import db
+    import pytest
+
+    with pytest.raises(db.BadRange):
+        db.window(start="2024-01-01", end="2026-01-01")

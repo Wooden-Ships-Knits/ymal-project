@@ -14,8 +14,17 @@ import TrendChart from './TrendChart'
  */
 const RANGES = [7, 30, 90]
 
+// Today, in the browser's own date, for the pickers' upper bound. Tomorrow has
+// nothing in it and asking for it looks like a broken screen.
+const today = () => new Date().toISOString().slice(0, 10)
+
 export default function Analytics() {
   const [days, setDays] = useState(30)
+  // The custom range, once applied. Empty means the preset buttons are in
+  // charge; the inputs below hold what is being typed, which is not the same
+  // thing - half a typed range must not reload the screen.
+  const [range, setRange] = useState(null)
+  const [draft, setDraft] = useState({ start: '', end: '' })
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   // Checked once per visit, not per range change - it probes the network.
@@ -33,10 +42,10 @@ export default function Analytics() {
   useEffect(() => {
     setError('')
     setData(null)
-    getAnalytics(days)
+    getAnalytics(days, range)
       .then(setData)
       .catch((err) => setError(err.message))
-  }, [days])
+  }, [days, range])
 
   if (error) {
     return (
@@ -62,23 +71,90 @@ export default function Analytics() {
 
   return (
     <>
-      <p style={{ marginBottom: 18 }}>
+      <div
+        style={{
+          marginBottom: 18,
+          display: 'flex',
+          gap: 8,
+          alignItems: 'center',
+          flexWrap: 'wrap',
+        }}
+      >
         {RANGES.map((n) => (
           <button
             key={n}
             type="button"
             className="btn"
-            onClick={() => setDays(n)}
-            aria-pressed={n === days}
-            style={{
-              marginRight: 8,
-              fontWeight: n === days ? 600 : 400,
+            onClick={() => {
+              setRange(null)
+              setDraft({ start: '', end: '' })
+              setDays(n)
             }}
+            // Pressed only while a preset is what is actually being shown: with
+            // a custom range applied, none of them is.
+            aria-pressed={!range && n === days}
+            style={{ fontWeight: !range && n === days ? 600 : 400 }}
           >
             Last {n} days
           </button>
         ))}
-      </p>
+
+        <form
+          onSubmit={(event) => {
+            event.preventDefault()
+            if (draft.start && draft.end) setRange({ ...draft })
+          }}
+          style={{ display: 'flex', gap: 6, alignItems: 'center', marginLeft: 6 }}
+        >
+          <label htmlFor="range-start" className="card__sub">
+            From
+          </label>
+          <input
+            id="range-start"
+            type="date"
+            className="input"
+            max={draft.end || today()}
+            value={draft.start}
+            onChange={(e) => setDraft({ ...draft, start: e.target.value })}
+          />
+          <label htmlFor="range-end" className="card__sub">
+            to
+          </label>
+          <input
+            id="range-end"
+            type="date"
+            className="input"
+            min={draft.start || undefined}
+            max={today()}
+            value={draft.end}
+            onChange={(e) => setDraft({ ...draft, end: e.target.value })}
+          />
+          {/* Disabled until both ends exist: the API refuses half a range, and
+              a button that only ever errors is not a button. */}
+          <button type="submit" className="btn" disabled={!draft.start || !draft.end}>
+            Apply
+          </button>
+          {range && (
+            <button
+              type="button"
+              className="btn"
+              onClick={() => {
+                setRange(null)
+                setDraft({ start: '', end: '' })
+              }}
+            >
+              Clear
+            </button>
+          )}
+        </form>
+      </div>
+
+      {range && (
+        <p className="card__sub" style={{ marginTop: -8, marginBottom: 16 }}>
+          Showing {range.start} to {range.end}, both days included. Dates are
+          counted in UTC.
+        </p>
+      )}
 
       {/*
         Two different zeroes. "Nobody has clicked yet" is fine and expected;

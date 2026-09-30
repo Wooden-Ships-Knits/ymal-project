@@ -311,3 +311,29 @@ def test_a_run_starts_and_reports_itself(client, monkeypatch):
     assert response.status_code == 200
     assert response.json()["started"] is True
     assert seen["skip"] is True
+
+
+# A valid range needs a database to answer from, so what is tested here is the
+# rejection of ranges that cannot be honoured - which happens before any query
+# runs. db.window's own arithmetic is covered in test_events.py.
+
+
+def test_analytics_rejects_a_backwards_range(client):
+    response = client.get("/api/analytics?start=2026-09-15&end=2026-09-01")
+
+    assert response.status_code == 400
+    assert "end date is before" in response.json()["detail"]
+
+
+def test_analytics_rejects_half_a_range(client):
+    response = client.get("/api/analytics?start=2026-09-01")
+
+    assert response.status_code == 400
+    assert "both" in response.json()["detail"]
+
+
+def test_analytics_rejects_a_mistyped_date(client):
+    response = client.get("/api/analytics?start=01-09-2026&end=15-09-2026")
+
+    assert response.status_code == 400
+    assert "YYYY-MM-DD" in response.json()["detail"]
