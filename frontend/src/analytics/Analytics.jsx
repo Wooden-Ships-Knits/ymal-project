@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getAnalytics, getTrackingHealth } from './api'
 import BlockTable from './BlockTable'
+import RangePicker from './RangePicker'
 import StatTiles from './StatTiles'
 import TrendChart from './TrendChart'
 
@@ -12,11 +13,7 @@ import TrendChart from './TrendChart'
  * of zeroes reads as "nothing works" when the truth is "nothing is measured
  * yet".
  */
-const RANGES = [7, 30, 90]
 
-// Today, in the browser's own date, for the pickers' upper bound. Tomorrow has
-// nothing in it and asking for it looks like a broken screen.
-const today = () => new Date().toISOString().slice(0, 10)
 
 export default function Analytics() {
   const [days, setDays] = useState(30)
@@ -71,83 +68,22 @@ export default function Analytics() {
 
   return (
     <>
-      <div
-        style={{
-          marginBottom: 18,
-          display: 'flex',
-          gap: 8,
-          alignItems: 'center',
-          flexWrap: 'wrap',
+      <RangePicker
+        days={days}
+        range={range}
+        draft={draft}
+        onDays={(n) => {
+          setRange(null)
+          setDraft({ start: '', end: '' })
+          setDays(n)
         }}
-      >
-        {RANGES.map((n) => (
-          <button
-            key={n}
-            type="button"
-            className="btn"
-            onClick={() => {
-              setRange(null)
-              setDraft({ start: '', end: '' })
-              setDays(n)
-            }}
-            // Pressed only while a preset is what is actually being shown: with
-            // a custom range applied, none of them is.
-            aria-pressed={!range && n === days}
-            style={{ fontWeight: !range && n === days ? 600 : 400 }}
-          >
-            Last {n} days
-          </button>
-        ))}
-
-        <form
-          onSubmit={(event) => {
-            event.preventDefault()
-            if (draft.start && draft.end) setRange({ ...draft })
-          }}
-          style={{ display: 'flex', gap: 6, alignItems: 'center', marginLeft: 6 }}
-        >
-          <label htmlFor="range-start" className="card__sub">
-            From
-          </label>
-          <input
-            id="range-start"
-            type="date"
-            className="input"
-            max={draft.end || today()}
-            value={draft.start}
-            onChange={(e) => setDraft({ ...draft, start: e.target.value })}
-          />
-          <label htmlFor="range-end" className="card__sub">
-            to
-          </label>
-          <input
-            id="range-end"
-            type="date"
-            className="input"
-            min={draft.start || undefined}
-            max={today()}
-            value={draft.end}
-            onChange={(e) => setDraft({ ...draft, end: e.target.value })}
-          />
-          {/* Disabled until both ends exist: the API refuses half a range, and
-              a button that only ever errors is not a button. */}
-          <button type="submit" className="btn" disabled={!draft.start || !draft.end}>
-            Apply
-          </button>
-          {range && (
-            <button
-              type="button"
-              className="btn"
-              onClick={() => {
-                setRange(null)
-                setDraft({ start: '', end: '' })
-              }}
-            >
-              Clear
-            </button>
-          )}
-        </form>
-      </div>
+        onDraft={setDraft}
+        onApply={() => setRange({ ...draft })}
+        onClear={() => {
+          setRange(null)
+          setDraft({ start: '', end: '' })
+        }}
+      />
 
       {range && (
         <p className="card__sub" style={{ marginTop: -8, marginBottom: 16 }}>

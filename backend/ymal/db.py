@@ -343,6 +343,29 @@ def totals(days: int = 30, start=None, end=None) -> dict:
     }
 
 
+def freshness() -> dict:
+    """
+    How current the two halves of the screen are.
+
+    Events arrive continuously; attributed orders only when the nightly pass
+    runs. A report that does not say so invites someone to read yesterday's
+    attribution as today's - and the gap is a day, not minutes.
+    """
+    with connection() as conn:
+        row = conn.execute(
+            """
+            SELECT (SELECT MAX(created_at) FROM events),
+                   (SELECT MAX(created_at) FROM attributed_orders)
+            """
+        ).fetchone()
+
+    events, orders = row if row else (None, None)
+    return {
+        "events_through": events.isoformat() if events else None,
+        "orders_through": orders.isoformat() if orders else None,
+    }
+
+
 def _change(now, before) -> float | None:
     """
     Percentage change against the previous window.

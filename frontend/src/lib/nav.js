@@ -16,6 +16,10 @@
  *
  * What is left is what only this console can do.
  *
+ * Report added 2026-10-02: the same numbers written as sentences, for sending
+ * to someone rather than looking something up. No impressions column on it -
+ * six figures of "seen" dominate a page about what the blocks earned.
+ *
  * Ranking added 2026-09-12. It is the one screen that changes what shoppers
  * see without a deploy, and the only place the scoring weights can be tried
  * against the real catalog before they are published.
@@ -24,6 +28,7 @@ export const NAV = [
   { id: 'dashboard', label: 'Dashboard',        status: 'live'    },
   { id: 'analytics', label: 'Analytics',        status: 'planned' },
   { id: 'exclude',   label: 'Exclude Products', status: 'planned' },
+  { id: 'report',    label: 'Report',           status: 'live'    },
   { id: 'tuning',    label: 'Ranking',          status: 'live'    },
   { id: 'run',       label: 'Manual Update',    status: 'live'    },
 ]

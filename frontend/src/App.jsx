@@ -7,6 +7,7 @@ import Dashboard from './dashboard/Dashboard'
 import Analytics from './analytics/Analytics'
 import ExcludeProducts from './exclude/ExcludeProducts'
 import ManualUpdate from './run/ManualUpdate'
+import Report from './report/Report'
 import Tuning from './tuning/Tuning'
 
 // One component per nav entry. Adding a tab is: a folder, an entry in
@@ -15,6 +16,7 @@ const SCREENS = {
   dashboard: Dashboard,
   analytics: Analytics,
   exclude: ExcludeProducts,
+  report: Report,
   tuning: Tuning,
   run: ManualUpdate,
 }

@@ -537,6 +537,9 @@ def get_analytics(
             "daily": db.daily(days, start, end),
             "blocks": db.summary(days, start, end),
             "revenue": db.revenue(days, start, end),
+            # When each half of the screen was last fed. Attribution lags by a
+            # nightly run; events do not.
+            "freshness": db.freshness(),
         }
     except db.BadRange as exc:
         raise HTTPException(status_code=400, detail=str(exc))
