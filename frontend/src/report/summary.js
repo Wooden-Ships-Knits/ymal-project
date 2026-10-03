@@ -6,6 +6,8 @@
  * it differently - which is how "top selling is doing badly" and "top selling
  * is fine" get argued from the same screen.
  */
+import { blockLabel } from '../lib/blocks'
+
 export function money(value, currency) {
   if (!value) return `${currency || 'USD'} 0`
   return `${currency || ''} ${Math.round(value).toLocaleString()}`.trim()
@@ -27,7 +29,7 @@ export function rows(data) {
       const e = earned[id] || {}
       return {
         block: id,
-        label: id.replace(/_/g, ' '),
+        label: blockLabel(id),
         impressions: m.impressions || 0,
         clicks: m.clicks || 0,
         click_rate: m.click_rate ?? null,

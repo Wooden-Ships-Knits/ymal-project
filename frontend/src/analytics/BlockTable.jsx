@@ -13,6 +13,8 @@
  * itself, in the orders that actually contained it. The gap between them is
  * the part nobody should quietly claim credit for.
  */
+import { blockLabel } from '../lib/blocks'
+
 function percent(value) {
   return value == null ? '—' : `${(value * 100).toFixed(1)}%`
 }
@@ -83,7 +85,7 @@ export default function BlockTable({ blocks, revenue }) {
           const money_ = byBlock[b.block] || {}
           return (
             <tr key={b.block}>
-              <td>{b.block.replace(/_/g, ' ')}</td>
+              <td>{blockLabel(b.block)}</td>
               <td style={{ textAlign: 'right' }}>{b.impressions.toLocaleString()}</td>
               <td style={{ textAlign: 'right' }}>{b.clicks.toLocaleString()}</td>
               <td style={{ textAlign: 'right' }}>{percent(b.click_rate)}</td>
