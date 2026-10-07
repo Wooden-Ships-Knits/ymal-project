@@ -20,6 +20,20 @@
   {%- assign ymal_is_sale = true -%}
 {%- endif -%}
 
+{%- comment -%}
+  Personalized products - a name or number knitted in, which Textify asks for
+  on the product page and nowhere else. A quick Add from this card skipped that
+  and the order arrived with neither. The console's Personalized Products tab
+  keeps the list of titles (matched upper-cased, as Textify matches by title),
+  and the scripts give these cards a link to the product page instead of Add.
+{%- endcomment -%}
+{%- assign ymal_personalized_titles = shop.metafields.ymal.config.value.personalized -%}
+{%- assign ymal_title = product.title | strip | upcase -%}
+{%- assign ymal_personalized = false -%}
+{%- if ymal_personalized_titles and ymal_personalized_titles contains ymal_title -%}
+  {%- assign ymal_personalized = true -%}
+{%- endif -%}
+
 {%- if product.available and ymal_eligible and ymal_is_sale == false -%}
   {%- comment -%}
     The variant list is emitted as JSON rather than a <select> so the script
@@ -34,6 +48,7 @@
   <div class="ymal-rv__card"
        data-handle="{{ product.handle | escape }}"
        data-url="{{ product.url | escape }}"
+       data-personalized="{{ ymal_personalized }}"
        data-variants="{{ product.variants | map: 'id' | json | escape }}"
        data-variant-titles="{{ product.variants | map: 'title' | json | escape }}"
        data-variant-available="{{ product.variants | map: 'available' | json | escape }}">

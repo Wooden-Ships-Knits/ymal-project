@@ -100,3 +100,11 @@ test.describe('shuffled', () => {
     assert.deepEqual(input, [1, 2, 3, 4, 5]);
   });
 });
+
+test.it('treats a card marked personalized as needing the product page', () => {
+  const card = (value) => ({ getAttribute: (name) => (name === 'data-personalized' ? value : null) });
+  assert.equal(popup.isPersonalized(card('true')), true);
+  assert.equal(popup.isPersonalized(card('false')), false);
+  assert.equal(popup.isPersonalized(card(null)), false);
+  assert.equal(popup.isPersonalized(null), false);
+});
