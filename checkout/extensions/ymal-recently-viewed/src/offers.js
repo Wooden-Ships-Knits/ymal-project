@@ -105,3 +105,35 @@ export function chooseOffers(products, lines, slots) {
     .slice(0, slots)
     .map((product) => ({ product, sellable: sellableOf(product) }));
 }
+
+/*
+ * PERSONALIZED PRODUCTS - a name or number knitted in, which Textify asks for
+ * on the product page and nowhere else. Adding one from here skips that, and
+ * the order arrives with neither, so these get a link to the product page.
+ *
+ * The list is the console's Personalized Products tab, saved in the shop's
+ * ymal.config metafield as upper-cased titles (one title covers every
+ * colorway, which is how Textify matches too). Declared in
+ * shopify.extension.toml, read through shopify.appMetafields.
+ */
+export function personalizedTitles(appMetafields) {
+  const entry = (appMetafields || []).find(
+    (e) =>
+      e && e.target && e.target.type === 'shop' &&
+      e.metafield && e.metafield.namespace === 'ymal' && e.metafield.key === 'config'
+  );
+  if (!entry) return [];
+  try {
+    const value = entry.metafield.value;
+    const config = typeof value === 'string' ? JSON.parse(value) : value;
+    const titles = (config && config.personalized) || [];
+    return Array.isArray(titles) ? titles : [];
+  } catch (e) {
+    // A config that will not parse must not take the checkout block down.
+    return [];
+  }
+}
+
+export function isPersonalized(product, titles) {
+  return (titles || []).indexOf(styleOf(product)) !== -1;
+}

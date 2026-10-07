@@ -15,9 +15,11 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import {
   chooseOffers,
   DEFAULT_SLOTS,
+  isPersonalized,
   lookupIds,
   numericId,
-  PRODUCTS_QUERY
+  PRODUCTS_QUERY,
+  personalizedTitles
 } from './offers.js';
 
 export default function extension() {
@@ -67,7 +69,12 @@ function Extension() {
   const slots = Number(settings.current.products_to_show) || DEFAULT_SLOTS;
   const heading = settings.current.heading || 'Recently viewed';
 
-  const offers = chooseOffers(products, lines, slots);
+  const personalized = personalizedTitles(shopify.appMetafields.value);
+  // A personalized product with no storefront page has nowhere to send the
+  // shopper, and must not be addable from here either - so it is not offered.
+  const offers = chooseOffers(products, lines, slots).filter(
+    ({ product }) => !isPersonalized(product, personalized) || product.onlineStoreUrl
+  );
 
   if (!offers.length) return null;
 
@@ -106,6 +113,9 @@ function Extension() {
 
         {offers.map(({ product, sellable }) => {
           const variant = sellable[0];
+          // The name or number is entered on the product page, so these link
+          // there instead of adding, and have no size picker of their own.
+          const needsPage = isPersonalized(product, personalized);
 
           return (
             <s-box key={product.id} border="base" borderRadius="base" padding="base">
@@ -128,16 +138,22 @@ function Extension() {
                   </s-text>
                 </s-stack>
 
-                <s-button
-                  variant="primary"
-                  onClick={() => add(product.id, variant.id)}
-                  loading={adding === product.id}
-                  disabled={Boolean(adding)}
-                >
-                  Add
-                </s-button>
+                {needsPage ? (
+                  <s-button variant="primary" href={product.onlineStoreUrl}>
+                    Personalize
+                  </s-button>
+                ) : (
+                  <s-button
+                    variant="primary"
+                    onClick={() => add(product.id, variant.id)}
+                    loading={adding === product.id}
+                    disabled={Boolean(adding)}
+                  >
+                    Add
+                  </s-button>
+                )}
 
-                {sellable.length > 1 ? (
+                {!needsPage && sellable.length > 1 ? (
                   <s-grid-item gridColumn="span 3">
                     <s-select
                       label="Size"
