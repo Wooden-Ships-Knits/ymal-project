@@ -7,6 +7,7 @@ import Dashboard from './dashboard/Dashboard'
 import Analytics from './analytics/Analytics'
 import ExcludeProducts from './exclude/ExcludeProducts'
 import ManualUpdate from './run/ManualUpdate'
+import Personalized from './personalized/Personalized'
 import Report from './report/Report'
 import Tuning from './tuning/Tuning'
 
@@ -16,6 +17,7 @@ const SCREENS = {
   dashboard: Dashboard,
   analytics: Analytics,
   exclude: ExcludeProducts,
+  personalized: Personalized,
   report: Report,
   tuning: Tuning,
   run: ManualUpdate,

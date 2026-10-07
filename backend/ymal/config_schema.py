@@ -24,7 +24,12 @@ MAX_HEADING = 60
 MIN_SLOTS = 2
 MAX_SLOTS = 12
 
-TOP_LEVEL_FIELDS = frozenset({"version", "enabled", "placements", "tuning"})
+TOP_LEVEL_FIELDS = frozenset(
+    {"version", "enabled", "placements", "tuning", "personalized"}
+)
+
+# Product titles are capped at 255 characters by Shopify.
+MAX_TITLE = 255
 
 # Written by the server on every save. A client that supplies them is asking
 # us to record an audit trail it authored, which is not an audit trail.
@@ -52,6 +57,7 @@ def validate(config: object) -> list[dict]:
     errors += _check_top_level(config)
     errors += _check_placements(config.get("placements"))
     errors += _check_tuning(config.get("tuning"))
+    errors += _check_personalized(config.get("personalized"))
     return errors
 
 
@@ -254,6 +260,28 @@ def _check_weights(weights: object) -> list[dict]:
                 }
             )
 
+    return errors
+
+
+def _check_personalized(given: object) -> list[dict]:
+    """
+    Product titles whose cards link to the product page instead of adding to
+    the cart - ymal/personalized.py. Optional, like tuning.
+    """
+    if given is None:
+        return []
+    if not isinstance(given, list):
+        return [{"path": "personalized", "message": "must be a list of product titles"}]
+
+    errors: list[dict] = []
+    for index, title in enumerate(given):
+        path = f"personalized[{index}]"
+        if not isinstance(title, str) or not title.strip():
+            errors.append({"path": path, "message": "must be a product title"})
+        elif len(title) > MAX_TITLE:
+            errors.append(
+                {"path": path, "message": f"must be at most {MAX_TITLE} characters"}
+            )
     return errors
 
 

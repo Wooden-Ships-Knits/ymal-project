@@ -210,3 +210,35 @@ def test_exactly_four_blocks_on_one_template_is_accepted():
         for b in ["trending", "top_selling", "new_arrivals", "recently_viewed"]
     ]
     assert config_schema.validate(ok) == []
+
+
+# personalized - product titles whose cards must link to the product page
+# instead of adding straight to the cart, because the product page is where
+# the shopper types the name or number.
+
+def test_personalized_is_optional():
+    assert config_schema.validate(copy.deepcopy(VALID)) == []
+
+
+def test_a_list_of_titles_is_accepted():
+    config = copy.deepcopy(VALID)
+    config["personalized"] = ["MONOGRAM CREW CHUNKY", "CUSTOMIZABLE NUMBER JERSEY COTTON"]
+    assert config_schema.validate(config) == []
+
+
+def test_personalized_must_be_a_list():
+    config = copy.deepcopy(VALID)
+    config["personalized"] = "MONOGRAM CREW CHUNKY"
+    assert "personalized" in paths(config_schema.validate(config))
+
+
+def test_a_blank_or_non_string_title_is_rejected():
+    config = copy.deepcopy(VALID)
+    config["personalized"] = ["OK", "", 7]
+    assert paths(config_schema.validate(config)) == ["personalized[1]", "personalized[2]"]
+
+
+def test_an_over_long_title_is_rejected():
+    config = copy.deepcopy(VALID)
+    config["personalized"] = ["X" * 256]
+    assert "personalized[0]" in paths(config_schema.validate(config))

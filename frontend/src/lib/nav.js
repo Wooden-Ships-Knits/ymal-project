@@ -20,6 +20,9 @@
  * to someone rather than looking something up. No impressions column on it -
  * six figures of "seen" dominate a page about what the blocks earned.
  *
+ * Personalized Products added 2026-10-07: the titles Textify asks a name or
+ * number for, so YMAL's quick Add stops putting them in the cart without one.
+ *
  * Ranking added 2026-09-12. It is the one screen that changes what shoppers
  * see without a deploy, and the only place the scoring weights can be tried
  * against the real catalog before they are published.
@@ -28,6 +31,7 @@ export const NAV = [
   { id: 'dashboard', label: 'Dashboard',        status: 'live'    },
   { id: 'analytics', label: 'Analytics',        status: 'planned' },
   { id: 'exclude',   label: 'Exclude Products', status: 'planned' },
+  { id: 'personalized', label: 'Personalized Products', status: 'live' },
   { id: 'report',    label: 'Report',           status: 'live'    },
   { id: 'tuning',    label: 'Ranking',          status: 'live'    },
   { id: 'run',       label: 'Manual Update',    status: 'live'    },

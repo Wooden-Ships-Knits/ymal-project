@@ -26,6 +26,7 @@ from ymal import (
     config_store,
     db,
     events,
+    personalized,
     preview,
     registry,
     runner,
@@ -313,6 +314,84 @@ def put_tuning(
             "ok": True,
             "tuning": written.get("tuning") or {},
             "effective": tuning.resolve(written.get("tuning")),
+            "updated_at": written["updated_at"],
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
+# Personalized products - titles whose cards must send the shopper to the
+# product page, where Textify asks for the name or number, instead of adding to
+# the cart. Same document and same split as tuning: this screen must not be
+# able to lose the placements or the ranking.
+# ---------------------------------------------------------------------------
+
+@app.get("/api/personalized")
+def get_personalized() -> dict:
+    """The saved titles, plus every catalog title to pick from."""
+    try:
+        result = config_store.read()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502, detail=f"Could not read personalized products: {exc}"
+        )
+
+    config = result["config"] or {}
+    return {
+        "titles": config.get(personalized.CONFIG_KEY) or [],
+        "known_titles": personalized.known_titles(),
+        "updated_at": config.get("updated_at"),
+    }
+
+
+@app.put("/api/personalized")
+def put_personalized(
+    payload: dict = Body(...),
+    x_ymal_token: str = Header(default=""),
+) -> JSONResponse:
+    """Replace the list, leaving placements and tuning exactly as they are."""
+    require_token(x_ymal_token)
+
+    given = payload.get("titles")
+    if not isinstance(given, list):
+        return JSONResponse(
+            status_code=422,
+            content={"errors": [{"path": "personalized",
+                                 "message": "must be a list of product titles"}]},
+        )
+
+    try:
+        stored = config_store.read()["config"] or {}
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502, detail=f"Could not read personalized products: {exc}"
+        )
+
+    config = _split_stamps(stored)["config"]
+    config.setdefault("version", config_schema.CURRENT_VERSION)
+    config.setdefault("enabled", True)
+    config.setdefault("placements", {})
+
+    titles = personalized.clean(given)
+    if titles:
+        config[personalized.CONFIG_KEY] = titles
+    else:
+        config.pop(personalized.CONFIG_KEY, None)
+
+    errors = config_schema.validate(config)
+    if errors:
+        return JSONResponse(status_code=422, content={"errors": errors})
+
+    try:
+        written = config_store.write(config, updated_by="web-team")
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Could not save: {exc}")
+
+    return JSONResponse(
+        status_code=200,
+        content={
+            "ok": True,
+            "titles": written.get(personalized.CONFIG_KEY) or [],
             "updated_at": written["updated_at"],
         },
     )

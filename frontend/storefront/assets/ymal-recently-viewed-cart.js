@@ -112,7 +112,24 @@
     );
   }
 
+  // A personalized product gets a link to its product page instead of Add:
+  // the name or number is entered there, and an Add from here skips it. The
+  // card template sets data-personalized from the console's list.
+  function personalizeLink(card) {
+    var link = document.createElement('a');
+    link.className = 'ymal-rv__add';
+    link.href = card.getAttribute('data-url') || '#';
+    link.textContent = 'Personalize';
+    return link;
+  }
+
   function buildControl(card) {
+    if (card.getAttribute('data-personalized') === 'true') {
+      var wrapLink = document.createElement('div');
+      wrapLink.appendChild(personalizeLink(card));
+      return { button: wrapLink, select: null };
+    }
+
     var ids = JSON.parse(card.getAttribute('data-variants') || '[]');
     var titles = JSON.parse(card.getAttribute('data-variant-titles') || '[]');
     var available = JSON.parse(card.getAttribute('data-variant-available') || '[]');
