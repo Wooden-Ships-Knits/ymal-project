@@ -30,6 +30,13 @@ type = "ui_extension"
   [extensions.capabilities]
   api_access = true
 
+  # The console's Personalized Products list lives in the shop's ymal.config
+  # document. Read here so a product that needs a name or number gets a link
+  # to its product page instead of Add - see src/offers.js personalizedTitles.
+  [[extensions.metafields]]
+  namespace = "ymal"
+  key = "config"
+
   [extensions.settings]
 
     [[extensions.settings.fields]]
