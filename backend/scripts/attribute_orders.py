@@ -7,17 +7,22 @@ onto the order, so a purchase can be attributed by reading them back - no
 webhook, no session-to-order join, and nothing on the thank-you page, which
 Shopify restricts.
 
-TWO NUMBERS, deliberately. Attribution is LAST TOUCH: the attribute holds
-whichever block the shopper clicked most recently before checking out.
+TWO NUMBERS, deliberately. The BLOCK is last touch: the attribute holds
+whichever block the shopper clicked most recently before checking out. The
+PRODUCTS are not - every one clicked or added for this cart is kept.
 
   total         the whole order, including tax and shipping. Answers "orders
                 that involved YMAL" - a shopper can click a recommendation,
                 buy something else entirely, and still be counted. Generous,
                 and the convention upsell apps report.
 
-  direct_total  only the lines holding the product the shopper was actually
-                recommended, and zero when they bought something else.
-                Answers the stricter "YMAL sold this".
+  direct_total  only the lines holding a product the shopper clicked or added
+                from a YMAL block, and zero when they bought something else.
+                EVERY such product counts, not just the last one clicked:
+                three sweaters taken from YMAL rows are three direct sales.
+                Answers the stricter "YMAL sold this", and is how Wiser counts
+                its own sales ("clicks on product recommendations ... and buys
+                that product").
 
 Neither is a claim that the block CAUSED the sale; the honest number for that
 is the Phase 7 holdout.
@@ -36,7 +41,13 @@ ATTRIBUTE_NAME = "YMAL block"
 # Written beside it by the storefront: the handle of the product the shopper
 # clicked or added. Orders placed before this existed simply have no direct
 # figure, which reads as 0.
+#
+# It is OVERWRITTEN on every click, so on its own it only names the last one.
+# PRODUCTS_ATTRIBUTE carries every handle clicked or added for this cart,
+# comma-separated - assets/ymal-track.js keeps the list. Orders placed before
+# the list existed have only the single product, read as a list of one.
 PRODUCT_ATTRIBUTE = "YMAL product"
+PRODUCTS_ATTRIBUTE = "YMAL products"
 
 ATTRIBUTED_ORDERS_QUERY = """
 query AttributedOrders($cursor: String, $filter: String!) {
@@ -76,19 +87,35 @@ def block_of(order: dict) -> str | None:
     return _attribute(order.get("customAttributes"), ATTRIBUTE_NAME)
 
 
-def product_of(order: dict) -> str | None:
-    """The handle of the product the shopper was recommended, if any."""
-    return _attribute(order.get("customAttributes"), PRODUCT_ATTRIBUTE)
-
-
-def direct_total(order: dict, handle: str | None) -> float:
+def products_of(order: dict) -> list[str]:
     """
-    What the recommended product itself sold for in this order.
+    Every product the shopper clicked or added from a YMAL block, in order.
+
+    The single last product is kept even when the list lacks it: another app
+    can write the cart from a stale copy and put an older list back, but the
+    last click was still a click.
+    """
+    attributes = order.get("customAttributes")
+    listed = (_attribute(attributes, PRODUCTS_ATTRIBUTE) or "").split(",")
+    last = _attribute(attributes, PRODUCT_ATTRIBUTE) or ""
+
+    handles: list[str] = []
+    for handle in listed + [last]:
+        handle = handle.strip()
+        if handle and handle not in handles:
+            handles.append(handle)
+    return handles
+
+
+def direct_total(order: dict, handles: list[str]) -> float:
+    """
+    What the recommended products themselves sold for in this order.
 
     Two ways a line counts, because the blocks reach the cart differently:
 
-      - its product is the one named on the cart, which covers every block a
-        shopper CLICKS through to the product page and buys from there;
+      - its product is one the cart says was clicked or added from YMAL, which
+        covers every block a shopper CLICKS through to the product page and
+        buys from there, and the drawer and popup's own Add buttons;
       - the line carries a "YMAL block" attribute of its own, which the
         checkout block writes when it adds straight to the order.
 
@@ -98,7 +125,7 @@ def direct_total(order: dict, handle: str | None) -> float:
     for line in (order.get("lineItems") or {}).get("nodes") or []:
         product_handle = (line.get("product") or {}).get("handle")
         from_this_line = _attribute(line.get("customAttributes"), ATTRIBUTE_NAME)
-        if (handle and product_handle == handle) or from_this_line:
+        if product_handle in handles or from_this_line:
             money = (line.get("discountedTotalSet") or {}).get("shopMoney") or {}
             total += float(money.get("amount") or 0)
     return round(total, 2)
@@ -116,15 +143,16 @@ def fetch(days: int) -> list[dict]:
         if not block:
             continue
         money = (order.get("currentTotalPriceSet") or {}).get("shopMoney") or {}
-        handle = product_of(order)
+        handles = products_of(order)
         rows.append(
             {
                 "order_id": order["id"],
                 "created_at": order["createdAt"],
                 "block": block,
                 "total": float(money.get("amount") or 0),
-                "direct_total": direct_total(order, handle),
-                "direct_product": handle,
+                "direct_total": direct_total(order, handles),
+                # Comma-separated when the shopper took several from YMAL.
+                "direct_product": ",".join(handles) or None,
                 "currency": money.get("currencyCode") or "",
             }
         )

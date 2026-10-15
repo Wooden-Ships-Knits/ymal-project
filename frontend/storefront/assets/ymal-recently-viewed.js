@@ -191,6 +191,12 @@
     if (typeof window.ymalTrack === 'function') window.ymalTrack(name, detail);
   }
 
+  // Every product taken from YMAL for this cart - see ymal-track.js
+  // ymalClicked. Just this one when tracking is not loaded.
+  function clicked(handle) {
+    return typeof window.ymalClicked === 'function' ? window.ymalClicked(handle) : handle;
+  }
+
   function render(section) {
     var list = section.querySelector('[data-ymal-items]');
     if (!list) return;
@@ -256,13 +262,33 @@
       list.addEventListener('click', function (event) {
         var card = event.target.closest('[data-ymal-handle]');
         if (!card) return;
+        var handle = card.getAttribute('data-ymal-handle');
         track('ymal_click', {
           block: 'recently_viewed',
           page_type: pageType,
           anchor: anchor,
-          handle: card.getAttribute('data-ymal-handle'),
+          handle: handle,
           position: Number(card.getAttribute('data-ymal-position'))
         });
+
+        // The cart attributes every other YMAL row writes on a click. This
+        // block never wrote them, so a sale through it was not attributed at
+        // all - not even to the whole-order revenue.
+        try {
+          fetch('/cart/update.js', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              attributes: {
+                'YMAL block': 'recently_viewed',
+                'YMAL product': handle,
+                'YMAL products': clicked(handle)
+              }
+            })
+          }).catch(function () {});
+        } catch (e) {
+          /* attribution is never worth breaking a storefront over */
+        }
       });
     });
   }
