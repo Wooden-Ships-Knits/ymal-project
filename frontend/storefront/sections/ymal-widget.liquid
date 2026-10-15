@@ -403,7 +403,11 @@
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              attributes: { "YMAL block": block, "YMAL product": handle }
+              attributes: {
+                "YMAL block": block,
+                "YMAL product": handle,
+                "YMAL products": window.ymalClicked ? window.ymalClicked(handle) : handle
+              }
             })
           }).catch(function () {});
         } catch (e) {

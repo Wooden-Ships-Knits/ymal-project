@@ -209,6 +209,12 @@
     if (typeof root.ymalTrack === 'function') root.ymalTrack(name, detail);
   }
 
+  // Every product taken from YMAL for this cart - see ymal-track.js
+  // ymalClicked. Just this one when tracking is not loaded.
+  function clicked(handle) {
+    return typeof root.ymalClicked === 'function' ? root.ymalClicked(handle) : handle;
+  }
+
   // Fetch cards in planned order until the row is full. In batches rather than
   // all at once: most candidates survive, so twice the slots is usually one
   // round, and a stock change that blanks a card just pulls from the next batch.
@@ -315,7 +321,8 @@
           body: JSON.stringify({
             attributes: {
               'YMAL block': BLOCK,
-              'YMAL product': card.getAttribute('data-ymal-handle')
+              'YMAL product': card.getAttribute('data-ymal-handle'),
+              'YMAL products': clicked(card.getAttribute('data-ymal-handle'))
             }
           })
         }).catch(function () {});

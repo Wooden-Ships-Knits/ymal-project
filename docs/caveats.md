@@ -305,17 +305,24 @@ a recommendation, ignore it, buy something else, and be counted in full. This
 is the convention upsell apps report, and it answers "orders that involved
 YMAL".
 
-**Direct** is the strict reading. The storefront also writes the handle of the
-product the shopper clicked, and the order pass keeps only the lines holding
-that product, at their discounted price. Orders where they bought something
-else contribute nothing. It answers "YMAL sold this".
+**Direct** is the strict reading. The storefront also writes the handles of
+the products the shopper clicked or added from YMAL - every one for that cart,
+not just the last (cart attribute "YMAL products", kept by ymal-track.js) - and
+the order pass keeps only the lines holding those products, at their discounted
+price. Three sweaters taken from YMAL rows are three direct sales. Orders where
+they bought something else contribute nothing. It answers "YMAL sold this".
+
+Until 2026-10-15 only the LAST product clicked was kept, so an order with
+several YMAL products counted one of them. Orders before the storefront started
+writing the list cannot be recounted; their direct figure is understated.
 
 Neither is causal. Both count shoppers who would have bought anyway; only a
 holdout measures the lift, which is Phase 7.
 
-Quote **direct** to anyone asking what the feature earns, and **revenue** only
-when comparing against another app's numbers, which will have been counted the
-generous way.
+Quote **direct** to anyone asking what the feature earns. It is also the one
+to compare with Wiser: Wiser counts a sale when a shopper "clicks on product
+recommendations ... and buys that product" (getwiser.ai/pricing), and its order
+export's Total is the recommended items only, never the whole order.
 
 Direct figures start from the day the storefront began writing the product
 handle (2026-09-24). Orders before that have no direct figure and read as 0,

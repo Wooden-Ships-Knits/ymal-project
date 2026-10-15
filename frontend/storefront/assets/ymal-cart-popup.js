@@ -135,6 +135,12 @@
     if (typeof root.ymalTrack === 'function') root.ymalTrack(name, detail);
   }
 
+  // Every product taken from YMAL for this cart - see ymal-track.js
+  // ymalClicked. Just this one when tracking is not loaded.
+  function clicked(handle) {
+    return typeof root.ymalClicked === 'function' ? root.ymalClicked(handle) : handle;
+  }
+
   // The same pair every YMAL placement writes: the block for "this order
   // involved YMAL", the handle for the stricter "YMAL sold this".
   function attribute(handle) {
@@ -142,7 +148,9 @@
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        attributes: { 'YMAL block': BLOCK, 'YMAL product': handle }
+        attributes: {
+          'YMAL block': BLOCK, 'YMAL product': handle, 'YMAL products': clicked(handle)
+        }
       })
     }).catch(function () {});
   }

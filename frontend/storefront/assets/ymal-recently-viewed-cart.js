@@ -93,6 +93,12 @@
     });
   }
 
+  // Every product taken from YMAL for this cart - see ymal-track.js
+  // ymalClicked. Just this one when tracking is not loaded.
+  function clicked(handle) {
+    return typeof window.ymalClicked === 'function' ? window.ymalClicked(handle) : handle;
+  }
+
   // The cart attributes that attribute a later purchase to this block - the
   // same ones every other YMAL row writes. The handle is what lets the order
   // pass separate "this order involved YMAL" from "YMAL sold this".
@@ -101,7 +107,9 @@
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        attributes: { 'YMAL block': BLOCK, 'YMAL product': handle }
+        attributes: {
+          'YMAL block': BLOCK, 'YMAL product': handle, 'YMAL products': clicked(handle)
+        }
       })
     }).catch(function () {});
   }

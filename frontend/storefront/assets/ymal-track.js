@@ -16,8 +16,45 @@
  * one visit's events apart from another's. There is no cookie, no identifier
  * that outlives the tab, and nothing that can be traced back to a person.
  */
-(function () {
+(function (root) {
   'use strict';
+
+  // ---------------------------------------------------------------------------
+  // Pure - tested in frontend/storefront/tests/ymal-track.test.js
+  // ---------------------------------------------------------------------------
+
+  /*
+   * Every product the shopper has clicked or added from a YMAL block, for this
+   * cart. Sent with each block's cart write as "YMAL products", so the order
+   * pass can count EVERY one of them as direct revenue - "YMAL product" beside
+   * it is overwritten on each click and only ever names the last.
+   *
+   *   stored   { cart, handles } as last saved, or anything unreadable
+   *   cart     the cart cookie now; '' when there is no cart yet
+   *   handle   the product just clicked or added
+   *   max      how many to keep, newest kept when the list is full
+   *
+   * A new cart starts a new list, so an order placed weeks ago does not lend
+   * its clicks to this one. A list saved before the cart existed (the first
+   * click on a visit creates it) is carried into that cart, not thrown away.
+   */
+  function addClicked(stored, cart, handle, max) {
+    var previous = stored && Array.isArray(stored.handles) ? stored.handles : [];
+    var previousCart = (stored && stored.cart) || '';
+    if (previousCart && cart && previousCart !== cart) previous = [];
+
+    var handles = previous.filter(function (h) { return h && h !== handle; });
+    if (handle) handles.push(handle);
+    return { cart: cart || previousCart, handles: handles.slice(-max) };
+  }
+
+  var api = { addClicked: addClicked };
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  if (typeof document === 'undefined') return;
+
+  // ---------------------------------------------------------------------------
+  // Browser
+  // ---------------------------------------------------------------------------
 
   var ENDPOINT = 'https://ymal.pt-infashion.com/api/events';
   var SESSION_KEY = 'ymal:session';
@@ -34,6 +71,12 @@
   // and pick a size; short enough that an add an hour later is not credited to
   // a recommendation the shopper has forgotten.
   var ATTRIBUTION_MS = 30 * 60 * 1000;
+
+  // The clicked-products list - see addClicked. localStorage, not session,
+  // because a cart outlives the tab. 20 handles stay well inside what a cart
+  // attribute can carry.
+  var CLICKED_KEY = 'ymal:clicked';
+  var MAX_CLICKED = 20;
 
   // The body IS json. The content type says text/plain so that this stays a
   // CORS "simple request" and the browser sends NO preflight.
@@ -143,6 +186,32 @@
       return null;
     }
   }
+
+  function cartCookie() {
+    var match = document.cookie.match(/(?:^|;\s*)cart=([^;]*)/);
+    return match ? match[1] : '';
+  }
+
+  /*
+   * Record a product as clicked or added from YMAL, and return the whole list
+   * as the "YMAL products" cart attribute value.
+   *
+   * Every block that writes "YMAL product" sends this beside it. Sending the
+   * whole list on every write, rather than reading the cart and appending,
+   * also means a write another app reverts (Redo does, see
+   * ymal-recently-viewed.js syncAttribute) is repaired by the next one.
+   */
+  window.ymalClicked = function (handle) {
+    try {
+      var stored = JSON.parse(window.localStorage.getItem(CLICKED_KEY) || 'null');
+      var next = addClicked(stored, cartCookie(), handle, MAX_CLICKED);
+      window.localStorage.setItem(CLICKED_KEY, JSON.stringify(next));
+      return next.handles.join(',');
+    } catch (e) {
+      // No storage: the one product is still worth sending.
+      return handle || '';
+    }
+  };
 
   // The block scripts emit "ymal_impression" and "ymal_click"; strip the
   // prefix so the stored type is the plain event name.
@@ -255,4 +324,4 @@
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState === 'hidden') send();
   });
-})();
+})(typeof window !== 'undefined' ? window : this);
