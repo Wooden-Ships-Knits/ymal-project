@@ -15,6 +15,14 @@
 (function () {
   'use strict';
 
+  // Run once per page. Both the recorder snippet and the display snippet load
+  // this file, and a page with both would otherwise record the product twice
+  // and append every card twice - the second <script src> for the same file
+  // still executes. ymal-recently-viewed-cart.js guards the same way, per
+  // section.
+  if (window.__ymalRecentlyViewed) return;
+  window.__ymalRecentlyViewed = true;
+
   var KEY = 'ymal:viewed';
   var MAX_STORED = 20;      // deep enough to survive filtering, cheap to keep
   var CARD_VIEW = 'ymal-card';
@@ -29,6 +37,14 @@
   // eligible, so three candidates per slot fills it in almost every case
   // without fetching all 20 every time.
   var OVERFETCH = 3;
+
+  // The cart attribute that carries the list into checkout. Deliberately plain:
+  // the shopper can see their own cart attributes.
+  var ATTRIBUTE = 'YMAL viewed';
+  var ATTRIBUTE_MAX = 12;       // 12 ids stay well inside the attribute's limit
+  var SENT_KEY = 'ymal:viewed-sent';
+  var VERIFY_AFTER_MS = 2500;   // past the other apps' own cart writes
+  var SYNC_ATTEMPTS = 3;
 
   // localStorage throws in some privacy modes rather than returning null, so
   // every access is guarded. A browser that refuses storage simply never shows
@@ -51,13 +67,113 @@
     }
   }
 
-  // Newest first, one entry per product. Only the handle is stored: title,
-  // price and image are fetched fresh at render, so nothing here goes stale.
+  // Newest first, one entry per product. Only the handle, id and eligibility
+  // are stored: title, price and image are fetched fresh at render, so nothing
+  // here goes stale.
   function record(entry) {
     if (!entry || !entry.handle) return;
     var next = read().filter(function (p) { return p.handle !== entry.handle; });
-    next.unshift({ handle: entry.handle, id: entry.id, ts: Date.now() });
+    next.unshift({
+      handle: entry.handle,
+      id: entry.id,
+      eligible: entry.eligible === true,
+      ts: Date.now()
+    });
     write(next.slice(0, MAX_STORED));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Carrying the list into checkout
+  //
+  // A checkout extension runs in a sandbox on another origin: it cannot read
+  // this localStorage list, and there is no Liquid there either. The cart is
+  // the one thing that travels from the storefront into checkout, so the list
+  // rides along as a cart attribute.
+  //
+  // IDS, NOT HANDLES. A handle runs to 50 characters and the attribute has a
+  // size limit; an id is 14. Only products that passed the eligibility gate at
+  // view time are included - see the recorder snippet.
+  // ---------------------------------------------------------------------------
+
+  function hasCart() {
+    // No cart means no checkout to carry anything into, and writing an
+    // attribute would create a cart for every product-page visitor.
+    return document.cookie.indexOf('cart=') !== -1;
+  }
+
+  function attributeValue() {
+    return read()
+      .filter(function (p) { return p && p.eligible && p.id; })
+      .slice(0, ATTRIBUTE_MAX)
+      .map(function (p) { return String(p.id); })
+      .join(',');
+  }
+
+  function remembered() {
+    try {
+      return window.sessionStorage.getItem(SENT_KEY);
+    } catch (e) {
+      // Private mode: post every time rather than not at all.
+      return null;
+    }
+  }
+
+  function remember(value) {
+    try {
+      window.sessionStorage.setItem(SENT_KEY, value);
+    } catch (e) {
+      /* nothing to remember with; the next view posts again */
+    }
+  }
+
+  function postAttribute(value) {
+    var attributes = {};
+    attributes[ATTRIBUTE] = value;
+    return fetch('/cart/update.js', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ attributes: attributes })
+    })
+      // fetch resolves for a 4xx too, and a write that never landed must not
+      // be remembered as sent - the list would silently stop following the
+      // shopper into checkout.
+      .then(function (res) { return res.ok; })
+      .catch(function () { return false; });
+  }
+
+  function liveAttribute() {
+    return fetch('/cart.js', { credentials: 'same-origin', cache: 'no-store' })
+      .then(function (res) { return res.ok ? res.json() : null; })
+      .then(function (cart) { return cart ? cart.attributes[ATTRIBUTE] || null : null; })
+      .catch(function () { return null; });
+  }
+
+  // Write, then CHECK. This store runs other apps that write cart attributes of
+  // their own, and two writes moments apart can be committed from the same
+  // starting snapshot - the second one silently puts the old value back. Seen
+  // on every product page here: Redo posts redo_loaded_on_cart about 300ms
+  // after this one, and the cart comes back carrying the previous list.
+  //
+  // So the value is verified a beat later and rewritten if it was reverted, and
+  // only a verified value is remembered as sent.
+  function syncAttribute(attempt) {
+    if (!hasCart()) return;
+
+    var value = attributeValue();
+    if (!value || remembered() === value) return;
+
+    postAttribute(value).then(function (ok) {
+      if (!ok) return;
+      window.setTimeout(function () {
+        liveAttribute().then(function (live) {
+          if (live === value) {
+            remember(value);
+            return;
+          }
+          if ((attempt || 0) + 1 < SYNC_ATTEMPTS) syncAttribute((attempt || 0) + 1);
+        });
+      }, VERIFY_AFTER_MS);
+    });
   }
 
   function fetchCard(handle) {
@@ -73,6 +189,12 @@
 
   function track(name, detail) {
     if (typeof window.ymalTrack === 'function') window.ymalTrack(name, detail);
+  }
+
+  // Every product taken from YMAL for this cart - see ymal-track.js
+  // ymalClicked. Just this one when tracking is not loaded.
+  function clicked(handle) {
+    return typeof window.ymalClicked === 'function' ? window.ymalClicked(handle) : handle;
   }
 
   function render(section) {
@@ -140,13 +262,33 @@
       list.addEventListener('click', function (event) {
         var card = event.target.closest('[data-ymal-handle]');
         if (!card) return;
+        var handle = card.getAttribute('data-ymal-handle');
         track('ymal_click', {
           block: 'recently_viewed',
           page_type: pageType,
           anchor: anchor,
-          handle: card.getAttribute('data-ymal-handle'),
+          handle: handle,
           position: Number(card.getAttribute('data-ymal-position'))
         });
+
+        // The cart attributes every other YMAL row writes on a click. This
+        // block never wrote them, so a sale through it was not attributed at
+        // all - not even to the whole-order revenue.
+        try {
+          fetch('/cart/update.js', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              attributes: {
+                'YMAL block': 'recently_viewed',
+                'YMAL product': handle,
+                'YMAL products': clicked(handle)
+              }
+            })
+          }).catch(function () {});
+        } catch (e) {
+          /* attribution is never worth breaking a storefront over */
+        }
       });
     });
   }
@@ -163,9 +305,17 @@
       }
     }
 
+    // Never the cart drawer's block: ymal-recently-viewed-cart.js owns that
+    // one, with its own compact cards and cart-aware refresh. Filling it here
+    // as well appended grid cards into the drawer and counted every drawer
+    // opening twice. (The cart snippet no longer carries data-ymal-block, so
+    // this is the second of two guards - it covers a drawer snippet copied
+    // before that change.)
     document
-      .querySelectorAll('[data-ymal-block="recently_viewed"]')
+      .querySelectorAll('[data-ymal-block="recently_viewed"]:not([data-ymal-page="cart"])')
       .forEach(render);
+
+    syncAttribute();
   }
 
   if (document.readyState === 'loading') {
@@ -173,4 +323,12 @@
   } else {
     init();
   }
+
+  // A shopper on their first product page has no cart, so nothing was written.
+  // The moment they add something, there is one to write to.
+  ['on:cart:add', 'on:cart:change'].forEach(function (name) {
+    document.addEventListener(name, function () {
+      setTimeout(syncAttribute, 150);
+    });
+  });
 })();

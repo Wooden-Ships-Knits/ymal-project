@@ -18,7 +18,7 @@ import json
 import statistics
 import sys
 
-from ymal import settings, similarity
+from ymal import settings, similarity, tuning
 
 OUT_DIR = settings.DATA_DIR / "phase3"
 
@@ -36,8 +36,12 @@ def load_units() -> dict:
     if not path.exists():
         print("  units.json not found - pools will be content-only.")
         print("  Run `python -m scripts.build_blocks` first to include sales.")
-        return {}
-    return json.loads(path.read_text())["units"]
+        return {}, None
+    data = json.loads(path.read_text())
+    # by_style is written by build_blocks. Absent on a units.json from before
+    # 2026-09-12, in which case build_pools derives it from the eligible rows
+    # and simply misses sold-out colorways.
+    return data["units"], data.get("by_style")
 
 
 def load_features() -> list[dict]:
@@ -63,15 +67,21 @@ def show_one(rows: list[dict], pools: dict, title: str) -> None:
 
 
 def main() -> None:
+    # Before anything reads a weight. The console's saved tuning overrides
+    # settings.py for this run; with nothing saved, or with Shopify
+    # unreachable, the defaults in settings.py are used and it says so.
+    changed = tuning.load_and_apply()
+    print(f"  {tuning.describe(changed)}")
+
     rows = load_features()
     print(f"Eligible products: {len(rows)}")
 
-    units = load_units()
+    units, style_units = load_units()
     if units:
         print(f"  sales for {len(units)} products, best seller "
               f"{max(units.values())} units")
 
-    pools = similarity.build_pools(rows, units=units)
+    pools = similarity.build_pools(rows, units=units, style_units=style_units)
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     out = OUT_DIR / "pools.json"
@@ -81,6 +91,12 @@ def main() -> None:
                 "depth": settings.POOL_DEPTH,
                 "require_same_season": settings.REQUIRE_SAME_SEASON,
                 "weights": settings.SIMILARITY_WEIGHTS,
+                # Recorded so a pool file can be read back against the
+                # settings that produced it. Without this, "why does this look
+                # different from yesterday" has no answer on disk.
+                "popularity_weight": settings.POPULARITY_WEIGHT,
+                "idf_power": settings.IDF_POWER,
+                "tuning_overrides": changed,
                 "pools": pools,
             },
             indent=2,
@@ -101,6 +117,7 @@ def main() -> None:
     print(f"  empty pools     : {empty}")
     print(f"  thin (under 6)  : {thin}")
     print(f"  popularity      : {'on' if units else 'off (no units.json)'}")
+    print(f"  {tuning.describe(changed)}")
     print(f"\n  -> {out}")
 
     if "--show" in sys.argv:

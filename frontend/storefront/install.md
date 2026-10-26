@@ -22,35 +22,76 @@ cd backend
 .venv/bin/python -m scripts.publish_all
 ```
 
-## 2. Two ways to render a block
+## 2. Which files to copy, and which NOT to
 
-**Preferred: the theme's own `product-list` section.** It already has the
-slider, the aspect-ratio handling, quick buy and `product-block`, so a YMAL row
-looks exactly like every other product row on the site and stays that way when
-the theme changes.
+`ymal-widget.liquid` IS the theme's own `product-list` section, copied and
+given one extra setting - **Products from**. Same slider, same aspect-ratio
+handling, same quick buy, same `product-block`, so a YMAL row looks like every
+other product row on the site. It is installed under a new name rather than
+over the original, so the theme keeps a working `product-list` either way.
 
-Copy `sections/product-list.liquid` over the theme's copy. It adds one setting,
-**Products from**, and leaves the collection behaviour as the default - so
-every existing use of that section is unaffected.
-
-Then in the theme editor: add a Product list section as usual, and set
-**Products from** to a YMAL list instead of a collection.
-
-**Alternative: the standalone `ymal-widget` section.** Self-contained, with its
-own card and layout settings. Useful on a theme that has no reusable product
-row, but on this store `product-list` is the better fit.
+### Safe: new files, nothing in the theme shares these names
 
 | File | Needed for |
 |---|---|
-| `sections/product-list.liquid` | the preferred route |
-| `sections/ymal-widget.liquid` | the standalone route |
-| `snippets/ymal-card.liquid` | the standalone route |
-| `snippets/ymal-recently-viewed.liquid` | Recently Viewed, either route |
-| `templates/product.ymal-card.liquid` | Recently Viewed, either route |
-| `assets/ymal-recently-viewed.js` | Recently Viewed, either route |
+| `sections/ymal-widget.liquid` | every block except Recently Viewed |
+| `snippets/ymal-card.liquid` | the card used inside that section |
+| `snippets/ymal-recently-viewed.liquid` | Recently Viewed on a product or home page |
+| `snippets/ymal-recently-viewed-cart.liquid` | Recently Viewed in the cart drawer |
+| `snippets/ymal-recently-viewed-recorder.liquid` | **recording** Recently Viewed history - required for every placement |
+| `templates/product.ymal-card.liquid` | Recently Viewed card fetch |
+| `templates/product.ymal-card-compact.liquid` | Recently Viewed card in the cart drawer |
+| `assets/ymal-recently-viewed.js` | Recently Viewed |
+| `assets/ymal-recently-viewed-cart.js` | Recently Viewed in the cart drawer |
+| `snippets/ymal-cart-popup.liquid` | the add to cart popup |
+| `templates/product.ymal-popup.liquid` | the popup's source list |
+| `assets/ymal-cart-popup.js` | the add to cart popup |
+| `assets/ymal-track.js` | analytics AND purchase attribution |
 
-Recently Viewed is not a `product-list` option: it has no metafield to read, so
-it is rendered client-side from the shopper's browser and needs its own snippet.
+### DO NOT copy: `sections/product-list.liquid`
+
+That file is the theme's ORIGINAL section, reconstructed and kept here only so
+the YMAL version can be diffed against it. It contains no YMAL code at all.
+Copying it over the theme reverts that section to the day it was reconstructed
+and silently discards anything the web team has changed since.
+
+Install `ymal-widget.liquid` instead. If you ever do want the setting on the
+real `product-list` section, diff the two files and apply the difference by
+hand - do not overwrite.
+
+### Hand-edit, do not overwrite: `sections/cart-drawer.liquid`
+
+The copy here is the theme's own cart drawer plus a three-line insertion. The
+theme's version moves; this one does not. Paste the insertion rather than the
+file, after the cross-sells block:
+
+```liquid
+<div class="cart-drawer__content-item">
+  {%- render 'ymal-recently-viewed-cart', slots: 3 -%}
+</div>
+```
+
+### Hand-edit: `layout/theme.liquid`
+
+```liquid
+<script src="{{ 'ymal-track.js' | asset_url }}" defer></script>
+```
+
+Anywhere in `<head>` is fine, and `defer` is correct - it must NOT be dropped
+to force ordering. The section's own inline script waits for DOMContentLoaded
+precisely so that a deferred track script has already run by the time it looks
+for `window.ymalTrack`. Loading it without `defer` also works but blocks
+parsing for no benefit.
+
+Without this there is no analytics AND no purchase attribution. The block
+script starts with `if (typeof window.ymalTrack !== "function") return;`, so a
+missing tag also skips the `/cart/update.js` call that writes the `YMAL block`
+cart attribute - the thing `attribute_orders` reads back off orders. It fails
+silently, with no console error and no empty state; the Analytics tab simply
+stays at zero.
+
+Recently Viewed is not a `Products from` option: it has no metafield to read,
+so it renders client-side from the shopper's browser and needs its own snippet.
 
 ## 4. Add blocks in the theme editor
 
@@ -65,7 +106,11 @@ Recommendations**. Then set:
 | Columns on desktop | 2-6. Phones always show one scrolling row |
 | Layout | Carousel with arrows, or a grid that wraps |
 | Full width | Edge to edge, matching the app blocks already on this store |
-| Page type | Used for tracking, so Analytics can group by page |
+
+
+There is no page-type setting: it is derived from the template, so tracking
+cannot be mislabelled by someone forgetting to set it. `index` is recorded
+as `home` and `404` as `not_found`, matching docs/config-contract.md section 5.
 
 Add the section more than once for more than one block on a page.
 
@@ -141,6 +186,43 @@ product that sold out in between renders nothing.
 Ships on its own. No backend, no metafields, no config - the one block that can
 go live before anything else exists.
 
+### Recording and displaying are separate - install the recorder first
+
+A shopper's history is written on **product pages**, because that is the only
+place a product is viewed. It is read wherever the block is **displayed**. Those
+are different snippets, and it is easy to install only the second:
+
+| Snippet | Records? | Displays? |
+|---|---|---|
+| `ymal-recently-viewed-recorder` | yes | no |
+| `ymal-recently-viewed` (with `anchor`) | yes | yes, a row on the page |
+| `ymal-recently-viewed-cart` | **no** | yes, in the cart drawer |
+
+**Install the cart-drawer block alone and it shows nothing, forever** - nothing
+is ever recorded for it to read. It fails the same way every block in this
+project has failed: silently, with a perfectly empty-looking drawer.
+
+So the recorder goes in `layout/theme.liquid`, just before `</body>`, guarded to
+product pages:
+
+```liquid
+{%- if template.name == 'product' -%}
+  {%- render 'ymal-recently-viewed-recorder', product: product -%}
+{%- endif -%}
+```
+
+`product: product` is not optional. `render` gives a snippet its own scope, so
+without it the snippet sees no product and silently records nothing.
+
+Recording here rather than inside a product section means history builds from
+every product page no matter where Recently Viewed is shown - and moving the
+display later (the homepage, a second drawer) needs no thought about recording.
+Inspired By Your Views builds on the same history.
+
+It is safe to also place the display snippet on a product page. Both load
+`ymal-recently-viewed.js`, and the script runs only once per page, so nothing is
+recorded twice and no card appears twice.
+
 It stores `{handle, id, ts}` for twenty products in `localStorage` and nothing
 else, and never leaves the device. Title, price, image and availability are
 fetched fresh from the theme on every render, so a handle stored three weeks
@@ -156,6 +238,73 @@ different lists. Every store works this way, Wiser almost certainly included.
 | Product sold out, on `*SALE*`, or fixed stock | The gate rejects it, the script skips it. |
 | Product deleted or handle renamed | The fetch fails, the script skips it. |
 | Nothing survives | Section stays hidden. |
+
+## Inspired By Your Views
+
+A row built from the shopper's own browsing: the first 4 Featured products of
+each of their last 5 viewed products, minus anything already viewed or in the
+cart, shuffled once per visit. Product pages only.
+
+### Requires the Recently Viewed recorder
+
+The row is built from the history `snippets/ymal-recently-viewed-recorder.liquid`
+writes - see *Recently Viewed, specifically*. **Without the recorder in
+`theme.liquid`, this row stays hidden forever**, with nothing on the page to say
+why. Install that first.
+
+### Files
+
+| File | Into | What it does |
+|---|---|---|
+| `ymal-inspired.js` | `assets/` | builds and renders the row |
+| `ymal-inspired.liquid` | `sections/` | the section added in the theme editor |
+| `product.ymal-ibyv.liquid` | `templates/` | a product's first 4 Featured that would actually appear |
+| `product.ymal-block.liquid` | `templates/` | the theme's own product card, with the eligibility gate |
+
+**Do not copy** `frontend/storefront/package.json` or `frontend/storefront/tests/`.
+They exist only so `node --test` can run the row's logic, and mean nothing to
+Shopify.
+
+Then in the theme editor, on the product template: **Add section -> YMAL
+Inspired By Your Views**. It is restricted to product templates, so it will not
+be offered anywhere else.
+
+### What it does, precisely
+
+1. Takes the last 5 viewed products, **not counting the one on this page** - its
+   Featured top 4 is what the YMAL row on the same page already shows.
+2. For each, fetches `?view=ymal-ibyv`: the first 4 of its Featured list that
+   pass the same gate as the YMAL row (in stock, eligible, no `*SALE*`, not
+   itself). Skipped products do not count toward the four.
+3. Combines them, dropping duplicates, anything in the shopper's viewing
+   history, anything in the cart, and this product.
+4. Orders them by a seed kept in `sessionStorage`: the same order on every page
+   of a visit, a new order next visit, and products already on show keep their
+   relative order when browsing adds more.
+5. Fetches cards via `?view=ymal-block` until the row is full, and unhides the
+   section only if at least one survived.
+
+It does nothing until the shopper scrolls within about 600px of it, so it never
+competes with the product page itself loading.
+
+### Why the theme's product card, not `snippets/ymal-card.liquid`
+
+`ymal-card` has no styles anywhere in the theme any more. They lived in the
+original custom widget, which was replaced by a copy of the theme's own
+`product-list` section. A row built from it renders as a bare list.
+`product.ymal-block.liquid` renders `product-block` - the card every other
+product row uses - so this row looks like the rest of the site and follows the
+theme when it is restyled. Quick buy is left off: the theme wires it on page
+load, and a card injected later would show a button that does nothing.
+
+### Tracking
+
+Block id `inspired_by_views`. Impressions when half the row is on screen,
+clicks, and the `YMAL block` cart attribute, so orders and revenue are
+attributed. Add to cart is recorded by `ymal-track.js` with no extra code.
+
+The block id is registered in the API allowlist and the console's Analytics
+table. A block missing from either records nothing or shows nothing - silently.
 
 ## Tracking
 
@@ -176,6 +325,64 @@ the first day is gone, and it is what the Phase 8 ranking model trains on.
 What is recorded: which block, which page, which product, its position in the
 row, and a random session id the browser generates for itself. No cookie, no
 identifier that outlives the tab, nothing traceable to a person.
+
+### The endpoint must be reachable WITHOUT the console's password
+
+This is the step that was missed on 2026-09-12, and it recorded nothing for as
+long as it went unnoticed. The VM's nginx puts HTTP basic auth in front of
+`ymal.pt-infashion.com` so the console is not public. That auth also covered
+`/api/events`, and a shopper's browser has no password - so every beacon got a
+401 before it ever reached the API. Nothing failed visibly: the block rendered,
+the console showed no error, and Analytics simply stayed at zero.
+
+Add an exact-match location to the VM's nginx server block. `location =` has
+higher priority than a prefix match, so it wins wherever it is placed:
+
+```nginx
+location = /api/events {
+    auth_basic off;
+    proxy_pass http://127.0.0.1:8083;
+    proxy_set_header Host              $host;
+    proxy_set_header X-Real-IP         $remote_addr;
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+Then `sudo nginx -t && sudo systemctl reload nginx`.
+
+Everything else stays behind the password. This is the only unauthenticated
+write in the project: the endpoint validates every event against a fixed shape
+and reduces it to known columns before storage, precisely so that being open
+costs nothing more than junk rows. Adding `limit_req` in front of it is
+reasonable if that ever becomes a problem.
+
+Check it from a machine that has never seen the password:
+
+```bash
+curl -i -X POST https://ymal.pt-infashion.com/api/events \
+  -H 'Content-Type: text/plain' \
+  -d '{"events":[]}'
+```
+
+**202 is correct. 401 means the location block is missing or not reloaded.**
+
+### The beacon sends text/plain, and must keep doing so
+
+`ymal-track.js` sends JSON with `Content-Type: text/plain`. That looks wrong and
+is deliberate: `application/json` is not on the CORS safelist, so the browser
+must send a preflight `OPTIONS` first, and a beacon fired while the page is
+unloading loses that race often enough to matter. `text/plain` keeps it a simple
+request with no preflight. The API parses the body by hand and ignores the
+header.
+
+### The CORS allowlist must name the real domain
+
+`YMAL_STOREFRONT_ORIGINS` in `.env`, or the default in `app/main.py`. It said
+`woodenships.com` for a while; the shop is `wooden-ships.com`, **with a
+hyphen**, and one missing character was enough for the browser to refuse every
+beacon. It is not a wildcard on purpose - otherwise any page on the internet
+could post events into this shop's analytics.
 
 Purchases work differently. Clicking a product in a YMAL row writes a cart
 attribute naming the block; Shopify carries that through checkout onto the
@@ -198,3 +405,95 @@ reporting the moment it lands.
 
 Events carry `block` and the page type. Without those two fields the Analytics
 tab has nothing to group by.
+
+
+## The add to cart popup
+
+Opens the moment a shopper adds anything, offering up to three products from
+the added product's Featured list - which the nightly pass orders by what
+shoppers buy in the SAME order, not by what looks similar.
+
+Install:
+
+1. `assets/ymal-cart-popup.js`, `snippets/ymal-cart-popup.liquid` and
+   `templates/product.ymal-popup.liquid` (a product template, type **liquid**,
+   named `ymal-popup`).
+2. `templates/product.ymal-card-compact.liquid`, if the cart drawer block is
+   not already installed. The popup renders the same compact cards.
+3. In `layout/theme.liquid`, just before `</body>`, on every page:
+
+   ```liquid
+   {%- render 'ymal-cart-popup' -%}
+   ```
+
+   Every page, not only product pages: a collection page's quick buy adds to
+   the cart too, and the popup has to exist before the add happens.
+
+### Turn the drawer off first
+
+The theme opens the cart drawer after every add. Two overlays at once is not a
+decision anyone made, so before installing this, set **Theme settings → Cart →
+After adding to cart** to *Show a notification* (or to nothing at all). The
+popup's own buttons cover what the drawer offered: "View cart" and "Keep
+shopping".
+
+### What it offers
+
+Not the top of the Featured list: the first eight are what the YMAL row on the
+product page already showed, and the shopper has just scrolled past them. The
+popup starts at position nine, takes twelve, shuffles them, and shows three -
+so adding twice does not show the same panel twice.
+
+### What it will not do
+
+- Offer another colorway of the sweater just added. They have bought it.
+- Offer anything already in the cart, sold out, fixed-stock or `*SALE*`.
+- Open at all with fewer than two products to show. One product in a box reads
+  as something that failed to load.
+
+It records under its own block name, `cart_popup`, so the Analytics tab can
+tell it apart from the Featured row it reads from. That name must be in the
+API's allowlist - it is, from v1.4 - or every event is rejected silently.
+
+## Running an A/B test
+
+To ask "does Top Selling earn more above the fold or below it", add the YMAL
+section twice with the same source, and set **A/B test group** to *Group A* on
+one and *Group B* on the other.
+
+Each shopper is assigned a group at random on their first visit, remembered in
+their browser, and only ever sees that placement. The other one is removed
+before it can record anything, so nobody is counted as having seen both.
+
+Both read the same published list and show the same products. Only the name
+they report changes, so Analytics gets two rows - `top selling a` and
+`top selling b` - and their click rates are comparable. The rows appear on
+their own; nothing needs adding to the console.
+
+Set both back to **Off** when the test ends, or the block stays hidden from
+half your shoppers.
+
+### Read it honestly
+
+Judge it on **click rate**, not revenue. At Top Selling's traffic - 42,000
+views and 154 clicks a month - each arm sees half of that, and orders are far
+too few to compare: 10 a month means 5 per arm.
+
+Roughly what the traffic can prove, per block:
+
+| Difference in click rate | Time to detect |
+| --- | --- |
+| +50% | about 30 days |
+| +30% | about 11 weeks |
+| +20% | about 5 months |
+
+So run it four weeks minimum and treat anything under about +50% as "no
+signal" rather than as a result. On **Featured**, with 124,000 views a month,
+the same question answers roughly three times faster.
+
+And it compares PLACEMENTS, not whether the block is worth having: everyone in
+both arms sees a block. The honest instrument for that is a holdout, which is
+Phase 7.
+
+Only `_a` and `_b` are accepted. A typo like `top_selling_c` is rejected as an
+unknown block - silently, from the shopper's side - so stick to two.

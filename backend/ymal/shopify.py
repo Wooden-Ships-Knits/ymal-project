@@ -18,14 +18,29 @@ class ShopifyGraphQLError(RuntimeError):
     """Shopify returned a GraphQL-level error."""
 
 
-def graphql(query: str, variables: dict | None = None) -> dict:
-    """POST a GraphQL query and return its `data` block."""
-    response = requests.post(
+def _post(query: str, variables: dict | None) -> requests.Response:
+    return requests.post(
         settings.GRAPHQL_URL,
         headers=auth.get_headers(),
         json={"query": query, "variables": variables or {}},
         timeout=60,
     )
+
+
+def graphql(query: str, variables: dict | None = None) -> dict:
+    """POST a GraphQL query and return its `data` block."""
+    response = _post(query, variables)
+
+    # A refused token gets exactly one retry with a freshly issued one.
+    # auth.get_token() already refreshes before expiry; this covers a token
+    # Shopify stops accepting early - revoked, secret rotated, clock skew. A
+    # second 401 means the credentials themselves are wrong, so it raises
+    # rather than looping. Other errors are not retried: a new token would not
+    # fix a 500.
+    if response.status_code == 401:
+        auth.get_token(force_refresh=True)
+        response = _post(query, variables)
+
     response.raise_for_status()
     payload = response.json()
 

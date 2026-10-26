@@ -224,3 +224,106 @@ pool (`SEASONLESS_IGNORES_SEASON`).
 
 Nothing is published to Shopify by that script, so retuning is free.
 
+
+---
+
+## 7. Two images, one storefront — the stale pipeline bug
+
+**Found 2026-09-11 by the web team**, who saw Top Selling revert to an older,
+longer-window list overnight and come back correct after clicking Manual Update.
+
+`backend/Dockerfile` ends in `COPY . .`, so the code is baked into the image.
+The compose file had a separate `pipeline` service, profile-gated so that
+`docker compose up` would not pull thousands of orders just to start the
+console. But **`docker compose up -d --build` does not rebuild services outside
+the default profile.** So:
+
+| What ran | Which image | `TOP_SELLING_WINDOW_DAYS` |
+|---|---|---|
+| the nightly cron | `pipeline`, never rebuilt | 90 |
+| the console's Manual Update | `api`, rebuilt on every deploy | 14 |
+
+Both read `settings.py`. There were two copies of it on the VM. Nothing failed,
+no error was logged, and the only visible symptom was a storefront list that
+changed back and forth depending on which one had written last.
+
+**Fixed** by deleting the `pipeline` service. One-shot pipeline work now runs as
+`docker compose run --rm api python -m scripts.nightly`, matching the six
+warehouse syncs already in that VM's crontab, which all use
+`docker compose run --rm api`.
+
+Two lessons worth keeping:
+
+- **A profile gate is not free.** It exempts a service from `--build`, which
+  turns "we deployed that" into a claim nobody can check by reading the repo.
+- **Verify against the image, not the file.** `git pull` proves nothing about
+  what runs. `docker compose run --rm api python -c "from ymal import settings;
+  print(settings.TOP_SELLING_WINDOW_DAYS)"` does.
+
+The same day, three *descriptions* were found still saying "90 days" after the
+window became 14. `ymal/registry.py` now builds them from `settings` so the
+console cannot describe a window it is not using.
+
+---
+
+## 8. Measuring convergence: count styles, not products
+
+Pools keep **one product per `style_key`**, and `style_key` is the title. So the
+ceiling on "how many different things can appear across all pools" is the number
+of distinct styles, not the number of eligible products.
+
+On 2026-09-11 that was **128 styles across 261 eligible products** - colorways
+are most of the catalog. A measurement of 124 distinct styles in some pool's top
+six is therefore 97% of the maximum, not a concentration problem.
+
+This was briefly misread as a sharp regression, because an earlier note counted
+products (224 of 257) against a later count of styles (124 of 261). The two
+numbers describe different things and must not be compared.
+
+When checking for convergence, the honest denominator is:
+
+```python
+len({r["style_key"] for r in rows})
+```
+
+A style with many colorways does have a real advantage - `build_pool` takes the
+best-scoring colorway of each style, so a twelve-colorway style gets twelve
+attempts to match each anchor while a one-colorway style gets one. That is worth
+knowing, and is not the same as the pools collapsing onto the bestsellers.
+
+## 9. Two revenue figures, and which one to quote
+
+The Analytics screen reports revenue twice, because one number on its own is
+either too generous or too mean and there is no way to tell which from the
+figure alone.
+
+**Revenue** is last-touch and whole-order. A click on a YMAL card writes a
+marker onto the cart; it rides through checkout onto the order; the nightly
+pass reads it back. Whatever that order was worth - including tax and shipping,
+including products the shopper found on their own - counts. A shopper can click
+a recommendation, ignore it, buy something else, and be counted in full. This
+is the convention upsell apps report, and it answers "orders that involved
+YMAL".
+
+**Direct** is the strict reading. The storefront also writes the handles of
+the products the shopper clicked or added from YMAL - every one for that cart,
+not just the last (cart attribute "YMAL products", kept by ymal-track.js) - and
+the order pass keeps only the lines holding those products, at their discounted
+price. Three sweaters taken from YMAL rows are three direct sales. Orders where
+they bought something else contribute nothing. It answers "YMAL sold this".
+
+Until 2026-10-15 only the LAST product clicked was kept, so an order with
+several YMAL products counted one of them. Orders before the storefront started
+writing the list cannot be recounted; their direct figure is understated.
+
+Neither is causal. Both count shoppers who would have bought anyway; only a
+holdout measures the lift, which is Phase 7.
+
+Quote **direct** to anyone asking what the feature earns. It is also the one
+to compare with Wiser: Wiser counts a sale when a shopper "clicks on product
+recommendations ... and buys that product" (getwiser.ai/pricing), and its order
+export's Total is the recommended items only, never the whole order.
+
+Direct figures start from the day the storefront began writing the product
+handle (2026-09-24). Orders before that have no direct figure and read as 0,
+which is why the two columns diverge sharply at that boundary.

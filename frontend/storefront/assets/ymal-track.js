@@ -16,11 +16,78 @@
  * one visit's events apart from another's. There is no cookie, no identifier
  * that outlives the tab, and nothing that can be traced back to a person.
  */
-(function () {
+(function (root) {
   'use strict';
+
+  // ---------------------------------------------------------------------------
+  // Pure - tested in frontend/storefront/tests/ymal-track.test.js
+  // ---------------------------------------------------------------------------
+
+  /*
+   * Every product the shopper has clicked or added from a YMAL block, for this
+   * cart. Sent with each block's cart write as "YMAL products", so the order
+   * pass can count EVERY one of them as direct revenue - "YMAL product" beside
+   * it is overwritten on each click and only ever names the last.
+   *
+   *   stored   { cart, handles } as last saved, or anything unreadable
+   *   cart     the cart cookie now; '' when there is no cart yet
+   *   handle   the product just clicked or added
+   *   max      how many to keep, newest kept when the list is full
+   *
+   * A new cart starts a new list, so an order placed weeks ago does not lend
+   * its clicks to this one. A list saved before the cart existed (the first
+   * click on a visit creates it) is carried into that cart, not thrown away.
+   */
+  function addClicked(stored, cart, handle, max) {
+    var previous = stored && Array.isArray(stored.handles) ? stored.handles : [];
+    var previousCart = (stored && stored.cart) || '';
+    if (previousCart && cart && previousCart !== cart) previous = [];
+
+    var handles = previous.filter(function (h) { return h && h !== handle; });
+    if (handle) handles.push(handle);
+    return { cart: cart || previousCart, handles: handles.slice(-max) };
+  }
+
+  var api = { addClicked: addClicked };
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  if (typeof document === 'undefined') return;
+
+  // ---------------------------------------------------------------------------
+  // Browser
+  // ---------------------------------------------------------------------------
 
   var ENDPOINT = 'https://ymal.pt-infashion.com/api/events';
   var SESSION_KEY = 'ymal:session';
+
+  // The last YMAL card clicked, kept across page loads.
+  //
+  // Clicking a recommendation NAVIGATES to the product page, so the add to
+  // cart happens on a different pageview with no YMAL row on it. Without this
+  // there is nothing left to attribute the add to, which is why add_to_cart
+  // was flat zero while clicks worked.
+  var CLICK_KEY = 'ymal:lastclick';
+
+  // How long a click may still explain an add. Long enough to read the page
+  // and pick a size; short enough that an add an hour later is not credited to
+  // a recommendation the shopper has forgotten.
+  var ATTRIBUTION_MS = 30 * 60 * 1000;
+
+  // The clicked-products list - see addClicked. localStorage, not session,
+  // because a cart outlives the tab. 20 handles stay well inside what a cart
+  // attribute can carry.
+  var CLICKED_KEY = 'ymal:clicked';
+  var MAX_CLICKED = 20;
+
+  // The body IS json. The content type says text/plain so that this stays a
+  // CORS "simple request" and the browser sends NO preflight.
+  //
+  // application/json is not on the CORS safelist, so it forces an OPTIONS
+  // round trip first - and a beacon fired while the page is unloading loses
+  // that race often enough to matter. The API parses the body by hand and does
+  // not care what the header says.
+  //
+  // DO NOT "correct" this to application/json.
+  var CONTENT_TYPE = 'text/plain;charset=UTF-8';
 
   // Events are batched and flushed on a timer rather than sent one by one: a
   // row of six products fires six impressions at once, and six requests to say
@@ -55,13 +122,13 @@
 
     try {
       if (navigator.sendBeacon) {
-        navigator.sendBeacon(ENDPOINT, new Blob([body], { type: 'application/json' }));
+        navigator.sendBeacon(ENDPOINT, new Blob([body], { type: CONTENT_TYPE }));
       } else {
         // Older browsers: keepalive lets the request outlive the page.
         fetch(ENDPOINT, {
           method: 'POST',
           body: body,
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': CONTENT_TYPE },
           keepalive: true,
           mode: 'cors'
         }).catch(function () {});
@@ -92,6 +159,60 @@
     }
   }
 
+  function rememberClick(detail) {
+    if (!detail.handle) return;
+    try {
+      window.sessionStorage.setItem(CLICK_KEY, JSON.stringify({
+        block: detail.block,
+        page_type: detail.page_type,
+        anchor: detail.anchor || null,
+        handle: detail.handle,
+        ts: Date.now()
+      }));
+    } catch (e) {
+      /* private browsing throws; add_to_cart is simply not attributed */
+    }
+  }
+
+  function lastClick() {
+    try {
+      var raw = window.sessionStorage.getItem(CLICK_KEY);
+      if (!raw) return null;
+      var click = JSON.parse(raw);
+      if (!click || !click.handle) return null;
+      if (Date.now() - click.ts > ATTRIBUTION_MS) return null;
+      return click;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function cartCookie() {
+    var match = document.cookie.match(/(?:^|;\s*)cart=([^;]*)/);
+    return match ? match[1] : '';
+  }
+
+  /*
+   * Record a product as clicked or added from YMAL, and return the whole list
+   * as the "YMAL products" cart attribute value.
+   *
+   * Every block that writes "YMAL product" sends this beside it. Sending the
+   * whole list on every write, rather than reading the cart and appending,
+   * also means a write another app reverts (Redo does, see
+   * ymal-recently-viewed.js syncAttribute) is repaired by the next one.
+   */
+  window.ymalClicked = function (handle) {
+    try {
+      var stored = JSON.parse(window.localStorage.getItem(CLICKED_KEY) || 'null');
+      var next = addClicked(stored, cartCookie(), handle, MAX_CLICKED);
+      window.localStorage.setItem(CLICKED_KEY, JSON.stringify(next));
+      return next.handles.join(',');
+    } catch (e) {
+      // No storage: the one product is still worth sending.
+      return handle || '';
+    }
+  };
+
   // The block scripts emit "ymal_impression" and "ymal_click"; strip the
   // prefix so the stored type is the plain event name.
   window.ymalTrack = function (name, detail) {
@@ -110,12 +231,97 @@
       });
       return;
     }
+    // Remembered here rather than in the section's script, so the widget file
+    // needs no change and any future block gets this for free.
+    if (type === 'click') rememberClick(detail || {});
     queueEvent(type, detail);
   };
+
+  /*
+   * Add to cart.
+   *
+   * The theme dispatches `on:cart:add` on its product form, bubbling, carrying
+   * only detail.variantId - see the CartForm/ProductForm component in main.js.
+   * A variant id is not enough: we need the product handle to know whether
+   * this is the product the shopper clicked in a YMAL row. /cart.js has it,
+   * and the item is definitely there because the add has just succeeded.
+   *
+   * This is deliberately NOT a fetch interceptor. The theme gives us a real
+   * event, and wrapping window.fetch on a live storefront to infer the same
+   * thing would be guessing at someone else's internals.
+   *
+   * Only adds that match a recent YMAL click are recorded. An add from the
+   * product page reached any other way is not ours to claim.
+   */
+  var lastAddSeen = 0;
+
+  function recordAdd(click, handle) {
+    queueEvent('add_to_cart', {
+      block: click.block,
+      page_type: click.page_type,
+      anchor: click.anchor,
+      handle: handle,
+      // The row that caused this is on the previous page, so there is no
+      // position to report.
+      position: null
+    });
+    // Sent at once rather than waiting for the batch timer: the page may be
+    // about to navigate to the cart.
+    send();
+  }
+
+  function onCartAdd(event) {
+    var variantId = event && event.detail && event.detail.variantId;
+    if (!variantId) return;
+
+    // The theme can fire this more than once for one add (form submit plus a
+    // drawer refresh). One add is one event.
+    var now = Date.now();
+    if (now - lastAddSeen < 1500) return;
+    lastAddSeen = now;
+
+    var click = lastClick();
+    if (!click) return;
+
+    // On a product page the handle is in the URL, so the add can be recorded
+    // synchronously. That matters: with the theme's "after add to cart" set to
+    // `page`, it navigates to the cart 300ms later (main.js, the ProductForm
+    // submit handler), and an in-flight /cart.js would lose the race.
+    //
+    // Quick buy has no such hurry - it opens in place and the page stays put -
+    // so falling back to a lookup there is safe.
+    var fromUrl = window.location.pathname.match(/\/products\/([^/?#]+)/);
+    if (fromUrl) {
+      if (fromUrl[1] !== click.handle) return;
+      recordAdd(click, click.handle);
+      return;
+    }
+
+    fetch('/cart.js', { credentials: 'same-origin' })
+      .then(function (res) { return res.ok ? res.json() : null; })
+      .then(function (cart) {
+        if (!cart || !cart.items) return;
+
+        var added = null;
+        for (var i = 0; i < cart.items.length; i++) {
+          if (String(cart.items[i].variant_id) === String(variantId)) {
+            added = cart.items[i];
+            break;
+          }
+        }
+        if (!added || added.handle !== click.handle) return;
+        recordAdd(click, added.handle);
+      })
+      .catch(function () {
+        /* tracking must never break a storefront */
+      });
+  }
+
+  document.addEventListener('on:cart:add', onCartAdd);
 
   // Anything still queued when the page goes away. visibilitychange rather
   // than unload, which mobile browsers often skip entirely.
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState === 'hidden') send();
   });
-})();
+})(typeof window !== 'undefined' ? window : this);

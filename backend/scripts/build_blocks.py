@@ -2,7 +2,7 @@
 Build every block that can be computed from the backend, and report on each.
 
     trending      rising  — this 14-day window vs the previous one
-    top_selling   volume  — units sold over 90 days
+    top_selling   volume  — units sold over the last 14 days
     new_arrivals  date    — published in the last 30 days
 
 Featured and Recently Viewed are not here: Featured is per-product rather than
@@ -21,7 +21,7 @@ Output -> backend/data/blocks/<block>.json
 import json
 import sys
 
-from ymal import settings
+from ymal import excluded_tags, settings
 from ymal.blocks import new_arrivals, top_selling, trending
 from ymal.orders import count_orders, units_sold, window_is_reachable
 
@@ -126,12 +126,33 @@ def build_top_selling(products, eligible, titles, dedupe_by) -> None:
     # Every product's units, not just the ranked thirty. build_pools uses this
     # to nudge similar products by how well they sell, and counting them again
     # there would mean a second pull of the same orders.
+    # Summed per style as well as per product. A pool row is a style -
+    # build_pool keeps one product per style and shows the best colorway - so
+    # ranking it on one colorway's sales understates a style with many. Done
+    # here because this is the only step that can see EVERY active product, so
+    # a sold-out colorway's sales still count as demand for the style.
+    #
+    # *SALE* products are skipped: they carry the marker in their title, so
+    # they are a different style anyway, and markdown volume is not evidence of
+    # full-price demand.
+    by_style: dict[str, int] = {}
+    for gid, sold in units.items():
+        title = titles.get(gid)
+        if not title or "*SALE*" in title:
+            continue
+        key = dedupe_by[gid]
+        by_style[key] = by_style.get(key, 0) + sold
+
     write("units", {
         "block": "units",
         "definition": "units sold per product over the Top Selling window",
         "window_days": days,
         "window": report["window"],
         "units": dict(units),
+        "by_style": by_style,
+        "by_style_definition": (
+            "units summed across every active colorway of a title, *SALE* excluded"
+        ),
     })
 
 
@@ -171,11 +192,21 @@ def main() -> None:
     # Title doubles as the style key on this catalog: colorways of one style
     # share a title and differ by variant.
     dedupe_by = {gid: title.strip().upper() for gid, title in titles.items()}
-    print(f"{len(eligible)} eligible products in the pool\n")
+    print(f"{len(eligible)} eligible products in the pool")
+
+    # Still on sale, no longer recommended by Top Selling and Trending - set in
+    # the console's Exclude by Tag tab. See ymal/excluded_tags.py.
+    tags = excluded_tags.load()
+    excluded = excluded_tags.matching(products, tags) & eligible
+    if tags:
+        print(f"{len(excluded)} of them skipped by Top Selling and Trending, "
+              f"tagged: {', '.join(tags)}")
+    print()
 
     for block in wanted:
         print(f"--- {block}")
-        BUILDERS[block](products, eligible, titles, dedupe_by)
+        pool = excluded_tags.pool_for(block, eligible, excluded)
+        BUILDERS[block](products, pool, titles, dedupe_by)
 
     print(f"\n  → {settings.DATA_DIR / 'blocks'}")
     print("  Nothing was written to Shopify. Publishing is a separate step.")

@@ -20,7 +20,15 @@
   handle stored three weeks ago still shows today's price and stock.
 {%- endcomment -%}
 
-<div class="ymal-rv" data-ymal-block="recently_viewed"
+{%- comment -%}
+  No data-ymal-block="recently_viewed" here, deliberately. That attribute is
+  what ymal-recently-viewed.js (loaded on every product page by the recorder)
+  looks for to FILL a block - so with it, that script also stuffed its own
+  grid cards into this drawer block and counted a second impression whenever
+  the drawer opened. This block is found by class + data-ymal-page instead,
+  and belongs to ymal-recently-viewed-cart.js alone.
+{%- endcomment -%}
+<div class="ymal-rv"
      data-ymal-page="cart"
      data-ymal-slots="{{ slots | default: 3 }}"
      hidden>
@@ -57,10 +65,22 @@
     font:inherit; font-size:13px; line-height:1;
   }
   .ymal-rv__arrow[hidden]{display:none}
-  .ymal-rv__items{display:flex; flex-direction:column; gap:8px}
+  /* One card at a time, slid sideways. Scroll snap does the swiping itself,
+     so a touch drag needs no script - the arrows only scroll by one card. */
+  .ymal-rv__items{
+    display:flex; flex-direction:row; gap:8px;
+    overflow-x:auto; overscroll-behavior-x:contain;
+    scroll-snap-type:x mandatory; scroll-behavior:smooth;
+    scrollbar-width:none; -ms-overflow-style:none;
+  }
+  .ymal-rv__items::-webkit-scrollbar{display:none}
+  @media (prefers-reduced-motion:reduce){
+    .ymal-rv__items{scroll-behavior:auto}
+  }
 
   /* One row per product: image, then name and price, then the control. */
   .ymal-rv__card{
+    flex:0 0 100%; scroll-snap-align:start; box-sizing:border-box;
     display:flex; gap:11px; align-items:center;
     background:#fff; border:1px solid rgba(0,0,0,.1); padding:9px;
   }
@@ -77,6 +97,7 @@
     font:inherit; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase;
   }
   .ymal-rv__add[disabled]{opacity:.5; cursor:default}
+  a.ymal-rv__add{display:inline-block; text-decoration:none; text-align:center}
   .ymal-rv__variant{
     font:inherit; font-size:11px; max-width:100%;
     margin-top:4px; padding:3px 4px; border:1px solid rgba(0,0,0,.15);

@@ -7,9 +7,25 @@ onto the order, so a purchase can be attributed by reading them back - no
 webhook, no session-to-order join, and nothing on the thank-you page, which
 Shopify restricts.
 
-Attribution is LAST TOUCH: the attribute holds whichever block the shopper
-clicked most recently before checking out. It is not a claim that the block
-caused the sale; the honest number for that is the Phase 7 holdout.
+TWO NUMBERS, deliberately. The BLOCK is last touch: the attribute holds
+whichever block the shopper clicked most recently before checking out. The
+PRODUCTS are not - every one clicked or added for this cart is kept.
+
+  total         the whole order, including tax and shipping. Answers "orders
+                that involved YMAL" - a shopper can click a recommendation,
+                buy something else entirely, and still be counted. Generous,
+                and the convention upsell apps report.
+
+  direct_total  only the lines holding a product the shopper clicked or added
+                from a YMAL block, and zero when they bought something else.
+                EVERY such product counts, not just the last one clicked:
+                three sweaters taken from YMAL rows are three direct sales.
+                Answers the stricter "YMAL sold this", and is how Wiser counts
+                its own sales ("clicks on product recommendations ... and buys
+                that product").
+
+Neither is a claim that the block CAUSED the sale; the honest number for that
+is the Phase 7 holdout.
 
 Run:  cd backend && python -m scripts.attribute_orders
       cd backend && python -m scripts.attribute_orders --days 7
@@ -22,6 +38,16 @@ from ymal.orders import day_bounds
 from ymal.shopify import paginate
 
 ATTRIBUTE_NAME = "YMAL block"
+# Written beside it by the storefront: the handle of the product the shopper
+# clicked or added. Orders placed before this existed simply have no direct
+# figure, which reads as 0.
+#
+# It is OVERWRITTEN on every click, so on its own it only names the last one.
+# PRODUCTS_ATTRIBUTE carries every handle clicked or added for this cart,
+# comma-separated - assets/ymal-track.js keeps the list. Orders placed before
+# the list existed have only the single product, read as a list of one.
+PRODUCT_ATTRIBUTE = "YMAL product"
+PRODUCTS_ATTRIBUTE = "YMAL products"
 
 ATTRIBUTED_ORDERS_QUERY = """
 query AttributedOrders($cursor: String, $filter: String!) {
@@ -33,6 +59,13 @@ query AttributedOrders($cursor: String, $filter: String!) {
         createdAt
         customAttributes { key value }
         currentTotalPriceSet { shopMoney { amount currencyCode } }
+        lineItems(first: 100) {
+          nodes {
+            product { handle }
+            customAttributes { key value }
+            discountedTotalSet { shopMoney { amount } }
+          }
+        }
       }
     }
   }
@@ -40,14 +73,62 @@ query AttributedOrders($cursor: String, $filter: String!) {
 """
 
 
-def block_of(order: dict) -> str | None:
-    """The YMAL block named on the order, if any."""
-    for attribute in order.get("customAttributes") or []:
-        if attribute.get("key") == ATTRIBUTE_NAME:
+def _attribute(attributes: list | None, key: str) -> str | None:
+    for attribute in attributes or []:
+        if attribute.get("key") == key:
             value = (attribute.get("value") or "").strip()
             if value:
                 return value
     return None
+
+
+def block_of(order: dict) -> str | None:
+    """The YMAL block named on the order, if any."""
+    return _attribute(order.get("customAttributes"), ATTRIBUTE_NAME)
+
+
+def products_of(order: dict) -> list[str]:
+    """
+    Every product the shopper clicked or added from a YMAL block, in order.
+
+    The single last product is kept even when the list lacks it: another app
+    can write the cart from a stale copy and put an older list back, but the
+    last click was still a click.
+    """
+    attributes = order.get("customAttributes")
+    listed = (_attribute(attributes, PRODUCTS_ATTRIBUTE) or "").split(",")
+    last = _attribute(attributes, PRODUCT_ATTRIBUTE) or ""
+
+    handles: list[str] = []
+    for handle in listed + [last]:
+        handle = handle.strip()
+        if handle and handle not in handles:
+            handles.append(handle)
+    return handles
+
+
+def direct_total(order: dict, handles: list[str]) -> float:
+    """
+    What the recommended products themselves sold for in this order.
+
+    Two ways a line counts, because the blocks reach the cart differently:
+
+      - its product is one the cart says was clicked or added from YMAL, which
+        covers every block a shopper CLICKS through to the product page and
+        buys from there, and the drawer and popup's own Add buttons;
+      - the line carries a "YMAL block" attribute of its own, which the
+        checkout block writes when it adds straight to the order.
+
+    Discounted totals, so a half-price sweater counts what was actually paid.
+    """
+    total = 0.0
+    for line in (order.get("lineItems") or {}).get("nodes") or []:
+        product_handle = (line.get("product") or {}).get("handle")
+        from_this_line = _attribute(line.get("customAttributes"), ATTRIBUTE_NAME)
+        if product_handle in handles or from_this_line:
+            money = (line.get("discountedTotalSet") or {}).get("shopMoney") or {}
+            total += float(money.get("amount") or 0)
+    return round(total, 2)
 
 
 def fetch(days: int) -> list[dict]:
@@ -62,12 +143,16 @@ def fetch(days: int) -> list[dict]:
         if not block:
             continue
         money = (order.get("currentTotalPriceSet") or {}).get("shopMoney") or {}
+        handles = products_of(order)
         rows.append(
             {
                 "order_id": order["id"],
                 "created_at": order["createdAt"],
                 "block": block,
                 "total": float(money.get("amount") or 0),
+                "direct_total": direct_total(order, handles),
+                # Comma-separated when the shopper took several from YMAL.
+                "direct_product": ",".join(handles) or None,
                 "currency": money.get("currencyCode") or "",
             }
         )
@@ -89,12 +174,16 @@ def store(rows: list[dict]) -> int:
             cur.executemany(
                 """
                 INSERT INTO attributed_orders
-                  (order_id, created_at, block, total, currency)
+                  (order_id, created_at, block, total, direct_total,
+                   direct_product, currency)
                 VALUES
-                  (%(order_id)s, %(created_at)s, %(block)s, %(total)s, %(currency)s)
+                  (%(order_id)s, %(created_at)s, %(block)s, %(total)s,
+                   %(direct_total)s, %(direct_product)s, %(currency)s)
                 ON CONFLICT (order_id) DO UPDATE
                   SET block = EXCLUDED.block,
                       total = EXCLUDED.total,
+                      direct_total = EXCLUDED.direct_total,
+                      direct_product = EXCLUDED.direct_product,
                       currency = EXCLUDED.currency
                 """,
                 rows,
@@ -123,9 +212,11 @@ def main() -> None:
     print("\n" + "=" * 52)
     print("ATTRIBUTED ORDERS")
     print("=" * 52)
+    print(f"  {'block':<18} {'orders':>6} {'whole order':>13} {'direct':>10}")
     for block, items in sorted(by_block.items(), key=lambda kv: -len(kv[1])):
         total = sum(i["total"] for i in items)
-        print(f"  {block:<18} {len(items):>4} orders   {total:>10,.2f}")
+        direct = sum(i["direct_total"] for i in items)
+        print(f"  {block:<18} {len(items):>6} {total:>13,.2f} {direct:>10,.2f}")
     if not by_block:
         print("  none yet - the storefront has not been tracking long enough,")
         print("  or the tracking script is not installed on the theme.")

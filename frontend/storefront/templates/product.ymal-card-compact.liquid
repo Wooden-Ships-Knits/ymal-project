@@ -20,19 +20,106 @@
   {%- assign ymal_is_sale = true -%}
 {%- endif -%}
 
+{%- comment -%}
+  Personalized products - a name or number knitted in, which Textify asks for
+  on the product page and nowhere else. A quick Add from this card skipped that
+  and the order arrived with neither. The console's Personalized Products tab
+  keeps the list of titles (matched upper-cased, as Textify matches by title),
+  and the scripts give these cards a link to the product page instead of Add.
+{%- endcomment -%}
+{%- assign ymal_personalized_titles = shop.metafields.ymal.config.value.personalized -%}
+{%- assign ymal_title = product.title | strip | upcase -%}
+{%- assign ymal_personalized = false -%}
+{%- if ymal_personalized_titles and ymal_personalized_titles contains ymal_title -%}
+  {%- assign ymal_personalized = true -%}
+{%- endif -%}
+
 {%- if product.available and ymal_eligible and ymal_is_sale == false -%}
   {%- comment -%}
     The variant list is emitted as JSON rather than a <select> so the script
     owns the markup. It needs the ids anyway to add to the cart, and building
     the control in one place keeps the drawer and any future placement
     consistent.
+
+    `| json | escape`, in double quotes: `json` does not escape an apostrophe,
+    so a variant title like "Men's L" inside a single-quoted attribute ended
+    the attribute early and the card's JSON failed to parse.
   {%- endcomment -%}
+  {%- liquid
+    comment
+      Inventory routing (snippets/inventory-route.liquid): a variant with the metafield
+      inventory_sync.primary_variant is added as its main variant and is available only when that one is; when
+      the route cannot be used it is not offered (id null). Its own id is never offered. Without the metafield
+      both lists are the product's own, exactly as before.
+    endcomment
+    assign ymal_ids = product.variants | map: 'id' | json
+    assign ymal_available = product.variants | map: 'available' | json
+    assign ymal_routed = false
+    for ymal_v in product.variants
+      if ymal_v.metafields.inventory_sync.primary_variant != blank
+        assign ymal_routed = true
+        break
+      endif
+    endfor
+    if ymal_routed
+      assign ymal_ids = ''
+      assign ymal_available = ''
+      for ymal_v in product.variants
+        assign ymal_id = ymal_v.id
+        assign ymal_ok = ymal_v.available
+        if ymal_v.metafields.inventory_sync.primary_variant != blank
+          capture ymal_route
+            render 'inventory-route', variant: ymal_v
+          endcapture
+          assign ymal_parts = ymal_route | split: '|'
+          assign ymal_id = 'null'
+          assign ymal_ok = false
+          if ymal_parts[0] != '0'
+            assign ymal_id = ymal_parts[0]
+            if ymal_parts[1] == '1'
+              assign ymal_ok = true
+            endif
+          endif
+        endif
+        unless forloop.first
+          assign ymal_ids = ymal_ids | append: ','
+          assign ymal_available = ymal_available | append: ','
+        endunless
+        assign ymal_ids = ymal_ids | append: ymal_id
+        assign ymal_available = ymal_available | append: ymal_ok
+      endfor
+      assign ymal_ids = '[' | append: ymal_ids | append: ']'
+      assign ymal_available = '[' | append: ymal_available | append: ']'
+    endif
+
+    comment
+      The price shown is the lowest of the page's OWN prices: a linked SALE colour (on sale and routed, see
+      snippets/product-block.liquid pb_linked) is left out, so a full-price page is not shown at the SALE price.
+      Without such a variant it is product.price, exactly as before; a page whose variants are all linked keeps it.
+    endcomment
+    assign ymal_price = product.price
+    if ymal_routed
+      assign ymal_own_min = nil
+      for ymal_v in product.variants
+        if ymal_v.compare_at_price > ymal_v.price and ymal_v.metafields.inventory_sync.primary_variant != blank
+          continue
+        endif
+        if ymal_own_min == nil or ymal_v.price < ymal_own_min
+          assign ymal_own_min = ymal_v.price
+        endif
+      endfor
+      if ymal_own_min != nil
+        assign ymal_price = ymal_own_min
+      endif
+    endif
+  -%}
   <div class="ymal-rv__card"
-       data-handle="{{ product.handle }}"
-       data-url="{{ product.url }}"
-       data-variants='{{ product.variants | map: 'id' | json }}'
-       data-variant-titles='{{ product.variants | map: 'title' | json }}'
-       data-variant-available='{{ product.variants | map: 'available' | json }}'>
+       data-handle="{{ product.handle | escape }}"
+       data-url="{{ product.url | escape }}"
+       data-personalized="{{ ymal_personalized }}"
+       data-variants="{{ ymal_ids | escape }}"
+       data-variant-titles="{{ product.variants | map: 'title' | json | escape }}"
+       data-variant-available="{{ ymal_available | escape }}">
     <a class="ymal-rv__link" href="{{ product.url }}">
       {%- if product.featured_media -%}
         <img class="ymal-rv__img"
@@ -43,7 +130,7 @@
     </a>
     <div class="ymal-rv__meta">
       <a class="ymal-rv__name" href="{{ product.url }}">{{ product.title | escape }}</a>
-      <span class="ymal-rv__price">{{ product.price | money }}</span>
+      <span class="ymal-rv__price">{{ ymal_price | money }}</span>
     </div>
   </div>
 {%- endif -%}

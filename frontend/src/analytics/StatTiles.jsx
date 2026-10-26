@@ -45,10 +45,20 @@ export default function StatTiles({ totals }) {
 
   return (
     <div className="tiles">
+      {/*
+        Two figures, because they answer two different questions and the
+        difference between them is large. The headline is the whole value of
+        every order that involved YMAL - a shopper can click a recommendation,
+        buy something else, and still be counted. "direct" is only the
+        recommended products themselves, in the orders that actually contained
+        them.
+      */}
       <Tile
         label="Attributed sales"
         value={money(t.revenue)}
-        sub={`${(t.orders || 0).toLocaleString()} orders`}
+        sub={`${(t.orders || 0).toLocaleString()} orders · ${money(
+          t.direct_revenue
+        )} direct`}
         change={t.change?.revenue}
       />
       <Tile

@@ -1,0 +1,164 @@
+{%- comment -%}
+  YMAL — the add to cart popup.
+
+  Usage, in layout/theme.liquid just before </body>, on EVERY page:
+
+    {%- render 'ymal-cart-popup' -%}
+
+  Every page, not just product pages: a shopper can add from a collection
+  page's quick buy, and the popup has to exist before the add happens.
+
+  Optional:
+    heading: 'You may also like'  what the popup calls the row
+    slots:   3                   how many products to offer
+
+  Renders an empty, hidden dialog. assets/ymal-cart-popup.js fills it from
+  templates/product.ymal-popup.liquid - the added product's Featured list from
+  position NINE, past what the row on the page already showed - shuffles them,
+  and opens only if at least two survive the cart, colorway and stock rules.
+
+  REPLACES THE CART DRAWER OPENING. The theme is set to open the drawer after
+  every add; two overlays at once is not a decision anyone made. Set
+  Theme settings -> Cart -> "After adding to cart" to "Show a notification"
+  (or nothing) before installing this, or the drawer will slide out underneath
+  it.
+
+  Needs two templates on the theme: product.ymal-popup.liquid for the list, and
+  product.ymal-card-compact.liquid for the cards, which are the drawer's.
+{%- endcomment -%}
+{%- liquid
+  comment
+    Derived, never a setting - the same mapping every other placement uses, so
+    an event from the popup says which kind of page the shopper was on.
+  endcomment
+  assign ymal_page_type = template.name | default: 'unknown'
+  case ymal_page_type
+    when 'index'
+      assign ymal_page_type = 'home'
+    when '404'
+      assign ymal_page_type = 'not_found'
+    when 'article'
+      assign ymal_page_type = 'blog'
+    when 'customers/login', 'customers/account', 'customers/register'
+      assign ymal_page_type = 'account'
+    when 'product', 'cart', 'collection', 'search', 'blog', 'page'
+      comment
+        Already the right name.
+      endcomment
+    else
+      assign ymal_page_type = 'unknown'
+  endcase
+-%}
+<div
+  class="ymal-pop"
+  data-ymal-popup
+  data-ymal-page="{{ ymal_page_type | escape }}"
+  data-ymal-slots="{{ slots | default: 3 }}"
+  hidden
+>
+  <div class="ymal-pop__scrim" data-ymal-close></div>
+
+  <div class="ymal-pop__panel" role="dialog" aria-modal="true" aria-labelledby="ymal-pop-title">
+    <div class="ymal-pop__head">
+      <span class="ymal-pop__added">
+        Added to cart<span data-ymal-added class="ymal-pop__product"></span>
+      </span>
+      <button type="button" class="ymal-pop__close" data-ymal-close aria-label="Close">&times;</button>
+    </div>
+
+    <h2 class="ymal-pop__title" id="ymal-pop-title">{{ heading | default: 'You may also like' }}</h2>
+
+    <div class="ymal-pop__items" data-ymal-items></div>
+
+    <div class="ymal-pop__actions">
+      <button type="button" class="ymal-pop__keep" data-ymal-close>Keep shopping</button>
+      <a class="ymal-pop__cart" href="{{ routes.cart_url }}">View cart</a>
+    </div>
+  </div>
+</div>
+
+<style>
+  .ymal-pop{position:fixed; inset:0; z-index:1000; display:flex;
+    align-items:center; justify-content:center; padding:16px}
+  .ymal-pop[hidden]{display:none !important}
+  .ymal-pop__scrim{position:absolute; inset:0; background:rgba(0,0,0,.45)}
+  .ymal-pop__panel{
+    position:relative; z-index:1; width:100%; max-width:560px;
+    max-height:86vh; overflow-y:auto;
+    background:#fff; padding:18px 18px 16px;
+    box-shadow:0 10px 40px rgba(0,0,0,.2);
+  }
+  .ymal-pop__head{display:flex; align-items:baseline; justify-content:space-between; gap:12px}
+  .ymal-pop__added{font-size:12px; letter-spacing:.06em; text-transform:uppercase; opacity:.7}
+  /* The product's own name, so it is clear WHAT was added, not just that
+     something was. */
+  .ymal-pop__product{display:block; letter-spacing:0; text-transform:none;
+    font-size:13px; opacity:1; margin-top:3px}
+  .ymal-pop__close{
+    background:none; border:0; padding:0 2px; cursor:pointer;
+    font:inherit; font-size:22px; line-height:1; opacity:.6;
+  }
+  .ymal-pop__title{
+    margin:14px 0 10px; font-size:13px; letter-spacing:.09em;
+    text-transform:uppercase; opacity:.7;
+  }
+  /* Three across, each with the full portrait photo - the same shape as the
+     cards in a YMAL row, rather than the drawer's small crop. */
+  .ymal-pop__items{display:grid; grid-template-columns:repeat(3, 1fr); gap:10px}
+
+  /* A phone cannot fit three portrait cards side by side without shrinking
+     them to stamps, so the row scrolls instead, one and a bit in view. */
+  @media (max-width: 600px){
+    .ymal-pop__items{
+      grid-template-columns:repeat(3, 72%);
+      overflow-x:auto; scroll-snap-type:x mandatory;
+      scrollbar-width:none; -ms-overflow-style:none;
+    }
+    .ymal-pop__items::-webkit-scrollbar{display:none}
+    .ymal-pop .ymal-rv__card{scroll-snap-align:start}
+  }
+  .ymal-pop__actions{display:flex; gap:8px; margin-top:16px}
+  .ymal-pop__keep, .ymal-pop__cart{
+    flex:1; text-align:center; padding:11px 14px; cursor:pointer;
+    font:inherit; font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+    text-decoration:none;
+  }
+  .ymal-pop__keep{background:#fff; color:#000; border:1px solid rgba(0,0,0,.25)}
+  .ymal-pop__cart{background:#000; color:#fff; border:1px solid #000}
+
+  /* The card markup is the cart drawer's - the same compact template - but it
+     is laid out as a column here rather than a row, so no second template is
+     needed to show the photo properly. */
+  .ymal-pop .ymal-rv__card{
+    display:flex; flex-direction:column; gap:6px; align-items:stretch;
+    background:#fff; border:0; padding:0; min-width:0;
+  }
+  .ymal-pop .ymal-rv__img{
+    width:100%; height:auto; aspect-ratio:3/4; object-fit:cover; display:block; flex:none;
+  }
+  .ymal-pop .ymal-rv__meta{width:100%; min-width:0; display:flex; flex-direction:column; gap:3px}
+  .ymal-pop .ymal-rv__name{
+    font-size:11px; line-height:1.3; text-transform:uppercase; letter-spacing:.02em;
+    text-decoration:none; color:inherit;
+    /* Two lines reserved, so the Add buttons stay level across three cards
+       whose names are rarely the same length. */
+    min-height:2.6em;
+  }
+  .ymal-pop .ymal-rv__price{font-size:11.5px; opacity:.7}
+  .ymal-pop .ymal-rv__variant{
+    font:inherit; font-size:10.5px; width:100%; max-width:100%;
+    margin-top:2px; padding:4px; border:1px solid rgba(0,0,0,.18);
+  }
+  .ymal-pop .ymal-rv__add{
+    width:100%; padding:8px 4px; cursor:pointer;
+    background:#000; color:#fff; border:0;
+    font:inherit; font-size:9.5px; letter-spacing:.08em; text-transform:uppercase;
+  }
+  .ymal-pop .ymal-rv__add[disabled]{opacity:.5; cursor:default}
+  .ymal-pop a.ymal-rv__add{display:block; text-decoration:none; text-align:center}
+
+  /* Nothing behind the popup scrolls while it is open. */
+  .ymal-pop-open, .ymal-pop-open body{overflow:hidden}
+</style>
+
+<script src="{{ 'ymal-cart-popup.js' | asset_url }}" defer></script>

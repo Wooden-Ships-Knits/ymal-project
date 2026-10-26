@@ -1,0 +1,6 @@
+{
+  "name": "ymal-storefront",
+  "private": true,
+  "type": "commonjs",
+  "description": "Shopify theme files, not a Node package. Exists only so `node --test` treats these browser scripts as CommonJS: frontend/package.json sets type=module for the console, and Node uses the nearest package.json. Never copy this file into the theme."
+}

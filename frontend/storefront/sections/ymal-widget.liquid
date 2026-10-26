@@ -25,6 +25,58 @@
 
   assign ymal_source = section.settings.ymal_source | default: 'collection'
 
+  comment
+    A/B: the name this placement REPORTS, and who sees it.
+
+    Set a placement to group A and another to group B, and each shopper is
+    assigned to one group on their first visit and only ever sees that one.
+    Both read the same published list and show the same products, so the only
+    difference between the two rows in Analytics is the placement itself -
+    which is what makes them comparable.
+
+    Each shopper sees one, both groups run over the same days, so a promotion
+    or a good week lands on both arms equally. Running A one week and B the
+    next would not: the weeks differ in ways nobody can subtract afterwards.
+  endcomment
+  assign ymal_block = ymal_source
+  assign ymal_ab = section.settings.ab_group | default: 'none'
+  unless ymal_ab == 'none'
+    assign ymal_block = ymal_source | append: '_' | append: ymal_ab
+  endunless
+
+  comment
+    Which kind of page this is, for tracking. DERIVED, not a setting: a
+    dropdown someone has to set correctly on every placement is a dropdown
+    that will be wrong somewhere, and the events it mislabels cannot be
+    corrected afterwards.
+
+    Names match docs/config-contract.md section 5 so Analytics can group by
+    them. Shopify's own template names differ in four places.
+  endcomment
+  assign ymal_page_type = template.name | default: 'unknown'
+  case ymal_page_type
+    when 'index'
+      assign ymal_page_type = 'home'
+    when '404'
+      assign ymal_page_type = 'not_found'
+    when 'article'
+      assign ymal_page_type = 'blog'
+    when 'customers/login', 'customers/account', 'customers/register'
+      assign ymal_page_type = 'account'
+    when 'product', 'cart', 'collection', 'search', 'blog', 'page'
+      comment
+        Already the right name. Listed so the else below can catch everything
+        else rather than passing Shopify's own template names through.
+      endcomment
+    else
+      comment
+        The API rejects a page_type it does not know, and a rejected event is
+        invisible - so anything unrecognised is reported as `unknown` rather
+        than silently dropped.
+      endcomment
+      assign ymal_page_type = 'unknown'
+  endcase
+
   case ymal_source
     when 'featured'
       assign ymal_items = product.metafields.ymal.featured.value
@@ -60,30 +112,60 @@
   endif
 -%}
 {%- if ymal_source == 'collection' or ymal_eligible_count > 0 -%}
-<div class="section-id-{{ section.id }} collection-slider-row {% if section.settings.color_scheme != 'default' %}use-color-scheme use-color-scheme--{{ section.settings.color_scheme }}{% endif %}">
-  <div class="container{% if section.settings.enable_carousel %} container--not-mobile{% endif %}{% if section.settings.full_width %} container--no-max{% endif %}">
-    <!-- NEW IN Section -->
-    {% if section.settings.show_new_in %}
-      <div class="new-in-section">
-        <h2 class="new-in-heading">{{ section.settings.new_in_heading }}</h2>
-        <p class="new-in-text">
-          <span class="desktop-text">{{ section.settings.desktop_text }}</span>
-          <span class="mobile-text">{{ section.settings.mobile_text }}</span>
-        </p>
-        <style>
-          /* Default: hide mobile text and show desktop text */
-          .mobile-text { display: none; }
-          /* For screens smaller than 768px (mobile devices), show mobile text and hide desktop text */
-          @media screen and (max-width: 768px) {
-            .desktop-text { display: none; }
-            .mobile-text { display: inline; }
+{%- if ymal_ab != 'none' -%}
+  {%- comment -%}
+    Assigns the shopper a group once and remembers it, then stamps it on <html>
+    so the CSS below can hide the other group with no flicker - a block that
+    appears and then vanishes is worse than either arm of the test.
+
+    Inline and parsed here rather than in an asset: a deferred file runs after
+    the page has been laid out, which is exactly the flicker this avoids.
+
+    The mismatched section is also REMOVED before its own tracking script runs,
+    so it records no impression. Hiding it alone would have counted every
+    shopper as having seen both placements, which would flatten the very
+    difference the test is looking for.
+  {%- endcomment -%}
+  <script>
+    (function () {
+      var KEY = 'ymal:ab';
+      var root = document.documentElement;
+      var bucket = root.getAttribute('data-ymal-ab');
+
+      if (!bucket) {
+        try {
+          bucket = window.localStorage.getItem(KEY);
+          if (bucket !== 'a' && bucket !== 'b') {
+            bucket = Math.random() < 0.5 ? 'a' : 'b';
+            window.localStorage.setItem(KEY, bucket);
           }
-        </style>
-        {% if section.settings.show_new_in_button %}
-          <a href="{{ section.settings.new_in_button_link }}" class="btn btn-primary">{{ section.settings.new_in_button_text }}</a>
-        {% endif %}
-      </div>
-    {% endif %}
+        } catch (e) {
+          // Storage refused: still split, just not stable across visits. A
+          // shopper who cannot be remembered is better counted somewhere than
+          // shown both placements.
+          bucket = Math.random() < 0.5 ? 'a' : 'b';
+        }
+        root.setAttribute('data-ymal-ab', bucket);
+      }
+
+      if (bucket !== {{ ymal_ab | json }}) {
+        document.addEventListener('DOMContentLoaded', function () {
+          var el = document.getElementById('shopify-section-{{ section.id }}');
+          if (el) el.remove();
+        });
+      }
+    })();
+  </script>
+
+  <style>
+    html[data-ymal-ab="a"] #shopify-section-{{ section.id }}.ymal-ab-b,
+    html[data-ymal-ab="b"] #shopify-section-{{ section.id }}.ymal-ab-a {
+      display: none !important;
+    }
+  </style>
+{%- endif -%}
+<div class="section-id-{{ section.id }} collection-slider-row {% unless ymal_ab == 'none' %}ymal-ab-{{ ymal_ab }} {% endunless %}{% if section.settings.color_scheme != 'default' %}use-color-scheme use-color-scheme--{{ section.settings.color_scheme }}{% endif %}">
+  <div class="container{% if section.settings.enable_carousel %} container--not-mobile{% endif %}{% if section.settings.full_width %} container--no-max{% endif %}">
     {%- if section.settings.enable_carousel -%}
       <carousel-slider class="carousel block collection-slider">
     {%- endif -%}
@@ -236,93 +318,113 @@
 {%- if ymal_source != 'collection' -%}
 <script>
   (function () {
-    var root = document.getElementById("shopify-section-{{ section.id }}");
-    if (!root || typeof window.ymalTrack !== "function") return;
+    // Wrapped in a DOM-ready guard for ONE reason: ymal-track.js is loaded
+    // with `defer`, and a deferred script runs AFTER parsing while this inline
+    // one runs DURING it. Called immediately, the ymalTrack check below always
+    // failed and this whole block returned - no impressions, no clicks, and no
+    // cart attribute, so no purchase attribution either. Silently, with no
+    // console error and a block that rendered perfectly.
+    //
+    // Deferred scripts finish before DOMContentLoaded fires, so waiting for it
+    // is enough, and it costs nothing when tracking is absent.
+    function start() {
+      var root = document.getElementById("shopify-section-{{ section.id }}");
+      if (!root || typeof window.ymalTrack !== "function") return;
 
-    var block = {{ ymal_source | json }};
-    var pageType = {{ section.settings.page_type | default: 'unknown' | json }};
-    var anchor = {{ anchor_product.handle | default: '' | json }};
+      var block = {{ ymal_block | json }};
+      var pageType = {{ ymal_page_type | json }};
+      var anchor = {{ anchor_product.handle | default: '' | json }};
 
-    function handleOf(card) {
-      var link = card.querySelector('a[href*="/products/"]');
-      if (!link) return null;
-      // The href may carry a collection prefix or a query string; the handle
-      // is the segment straight after /products/.
-      var match = link.getAttribute("href").match(/\/products\/([^/?#]+)/);
-      return match ? match[1] : null;
-    }
-
-    var cards = Array.prototype.slice.call(
-      root.querySelectorAll("product-block, .product-block")
-    );
-    if (!cards.length) return;
-
-    var handles = cards.map(handleOf).filter(Boolean);
-
-    // An impression is fired when the row is actually seen, not when it
-    // renders. A block below the fold that nobody scrolled to is not an
-    // impression, and counting it would flatter every click rate on the page.
-    if ("IntersectionObserver" in window && handles.length) {
-      var seen = false;
-      var io = new IntersectionObserver(function (entries) {
-        entries.forEach(function (entry) {
-          if (!entry.isIntersecting || seen) return;
-          seen = true;
-          io.disconnect();
-          window.ymalTrack("ymal_impression", {
-            block: block,
-            page_type: pageType,
-            anchor: anchor,
-            handles: handles
-          });
-        });
-      }, { threshold: 0.5 });
-      io.observe(root);
-    }
-
-    // Delegated, so it survives the slider moving cards around.
-    root.addEventListener("click", function (event) {
-      var card = event.target.closest("product-block, .product-block");
-      if (!card || !root.contains(card)) return;
-      var handle = handleOf(card);
-      if (!handle) return;
-
-      window.ymalTrack("ymal_click", {
-        block: block,
-        page_type: pageType,
-        anchor: anchor,
-        handle: handle,
-        position: cards.indexOf(card) + 1
-      });
-
-      // Attribution for the purchase, carried through checkout onto the order.
-      // Read back by the nightly order pass, so no webhook and no session
-      // join is needed. Deliberately a plain block name: the shopper can see
-      // this on their own order.
-      try {
-        fetch("/cart/update.js", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ attributes: { "YMAL block": block } })
-        }).catch(function () {});
-      } catch (e) {
-        /* Attribution is never worth breaking a storefront over. */
+      function handleOf(card) {
+        var link = card.querySelector('a[href*="/products/"]');
+        if (!link) return null;
+        // The href may carry a collection prefix or a query string; the handle
+        // is the segment straight after /products/.
+        var match = link.getAttribute("href").match(/\/products\/([^/?#]+)/);
+        return match ? match[1] : null;
       }
-    });
+
+      var cards = Array.prototype.slice.call(
+        root.querySelectorAll("product-block, .product-block")
+      );
+      if (!cards.length) return;
+
+      var handles = cards.map(handleOf).filter(Boolean);
+
+      // An impression is fired when the row is actually seen, not when it
+      // renders. A block below the fold that nobody scrolled to is not an
+      // impression, and counting it would flatter every click rate on the page.
+      if ("IntersectionObserver" in window && handles.length) {
+        var seen = false;
+        var io = new IntersectionObserver(function (entries) {
+          entries.forEach(function (entry) {
+            if (!entry.isIntersecting || seen) return;
+            seen = true;
+            io.disconnect();
+            window.ymalTrack("ymal_impression", {
+              block: block,
+              page_type: pageType,
+              anchor: anchor,
+              handles: handles
+            });
+          });
+        }, { threshold: 0.5 });
+        io.observe(root);
+      }
+
+      // Delegated, so it survives the slider moving cards around.
+      root.addEventListener("click", function (event) {
+        var card = event.target.closest("product-block, .product-block");
+        if (!card || !root.contains(card)) return;
+        var handle = handleOf(card);
+        if (!handle) return;
+
+        window.ymalTrack("ymal_click", {
+          block: block,
+          page_type: pageType,
+          anchor: anchor,
+          handle: handle,
+          position: cards.indexOf(card) + 1
+        });
+
+        // Attribution for the purchase, carried through checkout onto the order.
+        // Read back by the nightly order pass, so no webhook and no session
+        // join is needed. Deliberately plain names: the shopper can see these
+        // on their own order.
+        //
+        // The HANDLE is what separates the two revenue figures on the console.
+        // The block alone says "this order involved YMAL" - it counts even
+        // when the shopper clicked here and then bought something else. The
+        // handle lets the order pass also ask the stricter question: was the
+        // product we recommended actually in the order, and what did it sell
+        // for.
+        try {
+          fetch("/cart/update.js", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              attributes: {
+                "YMAL block": block,
+                "YMAL product": handle,
+                "YMAL products": window.ymalClicked ? window.ymalClicked(handle) : handle
+              }
+            })
+          }).catch(function () {});
+        } catch (e) {
+          /* Attribution is never worth breaking a storefront over. */
+        }
+      });
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", start);
+    } else {
+      start();
+    }
   })();
 </script>
 {%- endif -%}
 
-<script>
-  document.querySelectorAll('.new-in-heading').forEach(element => {
-    const text = element.textContent;
-    if (text.length > 0) {
-      const lastLetter = text.slice(-1);
-      const rest = text.slice(0, -1);
-      element.innerHTML = `${rest}<span class="last-letter">${lastLetter}</span>`;
-    }
-  });
-</script>
 <style>
   {%- comment -%}
     Cap how wide the row may get. "Products per row" stays whatever it is set
@@ -339,32 +441,6 @@
   }
   {%- endif -%}
 
-  .new-in-heading span.last-letter {
-    font-family: "Times New Roman", serif;
-  }
-  .new-in-section {
-    margin-right: 20px;
-    padding: 20px;
-    background-color: white; /* fixed */
-  }
-  .new-in-heading {
-    font-size: 26px;
-    margin-bottom: 10px;
-  }
-  .new-in-text {
-    font-size: 18px;
-    margin-bottom: 15px;
-  }
-  .btn-primary {
-    color: white;
-    padding: 10px 20px;
-    text-decoration: none;
-    border-radius: 0px;
-    border: none;
-  }
-  .btn-primary:hover {
-    background-color: grey; /* fixed */
-  }
   /* Slider Navigation Button Styles */
   .slider-nav__btn {
     position: absolute;
@@ -394,10 +470,6 @@
   }
   .slider-nav__btn:hover {
     background-color: rgba(0, 0, 0, 0.8);
-  }
-  @media screen and (max-width: 768px) {
-    .new-in-text { font-size: 15px; }
-    .new-in-heading { font-size: 20px; }
   }
 </style>
 {% schema %}
@@ -445,6 +517,27 @@
       "id": "source_collection",
       "label": "Collection to mirror",
       "info": "Used only when \"Products from\" is set to a collection."
+    },
+    {
+      "type": "select",
+      "id": "ab_group",
+      "label": "A/B test group",
+      "options": [
+        {
+          "value": "none",
+          "label": "Off - show to everyone"
+        },
+        {
+          "value": "a",
+          "label": "Group A - half of shoppers"
+        },
+        {
+          "value": "b",
+          "label": "Group B - the other half"
+        }
+      ],
+      "default": "none",
+      "info": "For comparing this block in two places. Add the section twice with the same source, set one to A and the other to B: each shopper is assigned a group on their first visit and only sees that one. Analytics reports them separately (\"top selling a\"). Leave Off unless a test is running."
     },
     {
       "type": "range",
@@ -513,47 +606,6 @@
       "default": 0,
       "unit": "px",
       "info": "0 uses the theme's own width. A narrower row divides the same number of products into less space, so the images get smaller."
-    },
-    {
-      "id": "show_new_in",
-      "type": "checkbox",
-      "label": "Show New In Header",
-      "default": true
-    },
-    {
-      "id": "new_in_heading",
-      "type": "text",
-      "label": "New In Heading",
-      "default": "BLACK FRIDAY SALE!"
-    },
-    {
-      "id": "desktop_text",
-      "type": "textarea",
-      "label": "Desktop Text",
-      "default": "Happening now! Buy One Sample (at already discounted prices), Get Another for 20% OFF! Hurry! Limited Qty's! SAVE UP TO 50% FROM ORIGINAL PRICES"
-    },
-    {
-      "id": "mobile_text",
-      "type": "textarea",
-      "label": "Mobile Text",
-      "default": "Happening now! Buy One Sample (at already discounted prices), Get Another for 20% OFF! Hurry! Limited Qty's! SAVE UP TO 50% FROM ORIGINAL PRICES"
-    },
-    {
-      "id": "show_new_in_button",
-      "type": "checkbox",
-      "label": "Show New In Button",
-      "default": true
-    },
-    {
-      "id": "new_in_button_text",
-      "type": "text",
-      "label": "New In Button Text",
-      "default": "SHOP SALE"
-    },
-    {
-      "id": "new_in_button_link",
-      "type": "url",
-      "label": "New In Button Link"
     }
   ],
   "presets": [

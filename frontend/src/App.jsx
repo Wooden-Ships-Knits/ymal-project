@@ -7,6 +7,10 @@ import Dashboard from './dashboard/Dashboard'
 import Analytics from './analytics/Analytics'
 import ExcludeProducts from './exclude/ExcludeProducts'
 import ManualUpdate from './run/ManualUpdate'
+import Personalized from './personalized/Personalized'
+import ExcludedTags from './excludedtags/ExcludedTags'
+import Report from './report/Report'
+import Tuning from './tuning/Tuning'
 
 // One component per nav entry. Adding a tab is: a folder, an entry in
 // lib/nav.js, and a line here. No router, same as wholesale-order-entry.
@@ -14,6 +18,10 @@ const SCREENS = {
   dashboard: Dashboard,
   analytics: Analytics,
   exclude: ExcludeProducts,
+  personalized: Personalized,
+  excludedtags: ExcludedTags,
+  report: Report,
+  tuning: Tuning,
   run: ManualUpdate,
 }
 

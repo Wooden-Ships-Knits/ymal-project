@@ -8,15 +8,33 @@ ymal/config_store.py. Nothing here decides anything.
 Run:  cd backend && uvicorn app.main:app --reload
 """
 
+import json
 import os
 import secrets
+import threading
+import time
 
 from dotenv import load_dotenv
-from fastapi import Body, FastAPI, Header, HTTPException
+from datetime import timedelta
+
+from fastapi import Body, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from ymal import config_schema, config_store, db, events, registry, runner, settings
+from ymal import (
+    config_schema,
+    config_store,
+    db,
+    events,
+    excluded_tags,
+    personalized,
+    preview,
+    registry,
+    runner,
+    settings,
+    tracking_health,
+    tuning,
+)
 
 load_dotenv(settings.REPO_ROOT / ".env", override=True)
 
@@ -42,7 +60,11 @@ STOREFRONT_ORIGINS = [
     o.strip()
     for o in os.getenv(
         "YMAL_STOREFRONT_ORIGINS",
-        "https://www.woodenships.com,https://woodenships.com",
+        # wooden-SHIPS, with the hyphen. The first version of this list said
+        # "woodenships.com", a domain that does not exist, so the browser
+        # refused every beacon before it left the page and tracking recorded
+        # nothing at all. Verified against the live shop: www.wooden-ships.com.
+        "https://www.wooden-ships.com,https://wooden-ships.com",
     ).split(",")
     if o.strip()
 ]
@@ -113,6 +135,48 @@ def health() -> dict:
     return {"ok": True}
 
 
+def tracking_url() -> str:
+    return settings.YMAL_PUBLIC_URL.rstrip("/") + "/api/events"
+
+
+@app.on_event("startup")
+def _check_tracking() -> None:
+    """
+    Say, in the log, whether a shopper's browser can reach tracking.
+
+    In a background thread with a short timeout: this probes our own public
+    URL, so doing it inline would make the API wait on nginx, which may not be
+    up yet during a `docker compose up`. A slow or failing probe must never
+    delay or prevent the console starting.
+    """
+
+    def run() -> None:
+        # nginx and TLS need a moment after a compose up; a probe fired the
+        # instant uvicorn binds reports a false failure.
+        time.sleep(5)
+        result = tracking_health.probe(tracking_url(), settings.SHOP_ORIGIN)
+        print(tracking_health.describe(result), flush=True)
+
+    threading.Thread(target=run, daemon=True, name="tracking-health").start()
+
+
+@app.get("/api/tracking-health")
+def get_tracking_health() -> dict:
+    """
+    Probed on demand, from the console.
+
+    Unauthenticated like the endpoint it tests: it sends an empty batch, stores
+    nothing, and reveals only whether a public URL answers.
+    """
+    result = tracking_health.probe(tracking_url(), settings.SHOP_ORIGIN)
+    return {
+        **result,
+        "url": tracking_url(),
+        "shop_origin": settings.SHOP_ORIGIN,
+        "summary": tracking_health.describe(result),
+    }
+
+
 @app.get("/api/config")
 def get_config() -> dict:
     try:
@@ -167,6 +231,331 @@ def post_undo(x_ymal_token: str = Header(default="")) -> dict:
 
     # Same split as GET: the restored document is a stored one, stamps and all.
     return {"ok": True, **_split_stamps(restored)}
+
+
+# ---------------------------------------------------------------------------
+# Tuning — the ranking knobs, editable from the console.
+#
+# Stored inside the same ymal.config document as placements, so it inherits the
+# validator, the previous-version copy and undo. These routes exist rather than
+# making the console PUT the whole config because the tuning screen has no
+# business holding, or being able to lose, the placements.
+# ---------------------------------------------------------------------------
+
+@app.get("/api/tuning")
+def get_tuning() -> dict:
+    """What is saved, what the defaults are, and what values are allowed."""
+    try:
+        result = config_store.read()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Could not read tuning: {exc}")
+
+    saved = (result["config"] or {}).get("tuning") or {}
+    return {
+        "saved": saved,
+        "effective": tuning.resolve(saved),
+        "defaults": tuning.DEFAULTS,
+        "facets": list(tuning.WEIGHT_FACETS),
+        "limits": {
+            "popularity_weight": [
+                tuning.MIN_POPULARITY_WEIGHT,
+                tuning.MAX_POPULARITY_WEIGHT,
+            ],
+            "idf_power": [tuning.MIN_IDF_POWER, tuning.MAX_IDF_POWER],
+            "weight": [tuning.MIN_WEIGHT, tuning.MAX_WEIGHT],
+        },
+        "updated_at": (result["config"] or {}).get("updated_at"),
+    }
+
+
+@app.put("/api/tuning")
+def put_tuning(
+    payload: dict = Body(...),
+    x_ymal_token: str = Header(default=""),
+) -> JSONResponse:
+    """
+    Replace the tuning block, leaving placements exactly as they are.
+
+    Validated as part of a whole config rather than on its own, so there is one
+    validator and the error paths the console renders are the same either way.
+    """
+    require_token(x_ymal_token)
+
+    try:
+        stored = config_store.read()["config"] or {}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Could not read tuning: {exc}")
+
+    config = _split_stamps(stored)["config"]
+    config.setdefault("version", config_schema.CURRENT_VERSION)
+    config.setdefault("enabled", True)
+    config.setdefault("placements", {})
+
+    given = payload.get("tuning")
+    if given is None:
+        # An explicit "go back to the code defaults", which is not the same as
+        # saving a copy of them: a stored value would then survive a later
+        # change to settings.py.
+        config.pop("tuning", None)
+    else:
+        config["tuning"] = given
+
+    errors = config_schema.validate(config)
+    if errors:
+        return JSONResponse(status_code=422, content={"errors": errors})
+
+    try:
+        written = config_store.write(config, updated_by="web-team")
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Could not save: {exc}")
+
+    return JSONResponse(
+        status_code=200,
+        content={
+            "ok": True,
+            "tuning": written.get("tuning") or {},
+            "effective": tuning.resolve(written.get("tuning")),
+            "updated_at": written["updated_at"],
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
+# Personalized products - titles whose cards must send the shopper to the
+# product page, where Textify asks for the name or number, instead of adding to
+# the cart. Same document and same split as tuning: this screen must not be
+# able to lose the placements or the ranking.
+# ---------------------------------------------------------------------------
+
+@app.get("/api/personalized")
+def get_personalized() -> dict:
+    """The saved titles, plus every catalog title to pick from."""
+    try:
+        result = config_store.read()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502, detail=f"Could not read personalized products: {exc}"
+        )
+
+    config = result["config"] or {}
+    return {
+        "titles": config.get(personalized.CONFIG_KEY) or [],
+        "known_titles": personalized.known_titles(),
+        "updated_at": config.get("updated_at"),
+    }
+
+
+@app.put("/api/personalized")
+def put_personalized(
+    payload: dict = Body(...),
+    x_ymal_token: str = Header(default=""),
+) -> JSONResponse:
+    """Replace the list, leaving placements and tuning exactly as they are."""
+    require_token(x_ymal_token)
+
+    given = payload.get("titles")
+    if not isinstance(given, list):
+        return JSONResponse(
+            status_code=422,
+            content={"errors": [{"path": "personalized",
+                                 "message": "must be a list of product titles"}]},
+        )
+
+    try:
+        stored = config_store.read()["config"] or {}
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502, detail=f"Could not read personalized products: {exc}"
+        )
+
+    config = _split_stamps(stored)["config"]
+    config.setdefault("version", config_schema.CURRENT_VERSION)
+    config.setdefault("enabled", True)
+    config.setdefault("placements", {})
+
+    titles = personalized.clean(given)
+    if titles:
+        config[personalized.CONFIG_KEY] = titles
+    else:
+        config.pop(personalized.CONFIG_KEY, None)
+
+    errors = config_schema.validate(config)
+    if errors:
+        return JSONResponse(status_code=422, content={"errors": errors})
+
+    try:
+        written = config_store.write(config, updated_by="web-team")
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Could not save: {exc}")
+
+    return JSONResponse(
+        status_code=200,
+        content={
+            "ok": True,
+            "titles": written.get(personalized.CONFIG_KEY) or [],
+            "updated_at": written["updated_at"],
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
+# Excluded tags - products still on sale that Top Selling (MYNTS) and Trending
+# must stop recommending, such as Halloween sweaters after the shipping cutoff.
+# Same document and same split as tuning and personalized.
+# ---------------------------------------------------------------------------
+
+@app.get("/api/excluded-tags")
+def get_excluded_tags() -> dict:
+    """The saved tags, how many products each catches, and every catalog tag."""
+    try:
+        config = config_store.read()["config"] or {}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Could not read excluded tags: {exc}")
+
+    tags = config.get(excluded_tags.CONFIG_KEY) or []
+    catalog = excluded_tags.products()
+    return {
+        "tags": tags,
+        "counts": excluded_tags.counts(catalog, tags),
+        "known_tags": excluded_tags.known(catalog),
+        "blocks": list(excluded_tags.BLOCKS),
+        "updated_at": config.get("updated_at"),
+    }
+
+
+@app.put("/api/excluded-tags")
+def put_excluded_tags(
+    payload: dict = Body(...),
+    x_ymal_token: str = Header(default=""),
+) -> JSONResponse:
+    """Replace the list, leaving every other setting exactly as it is."""
+    require_token(x_ymal_token)
+
+    given = payload.get("tags")
+    if not isinstance(given, list):
+        return JSONResponse(
+            status_code=422,
+            content={"errors": [{"path": "excluded_tags", "message": "must be a list of tags"}]},
+        )
+
+    try:
+        stored = config_store.read()["config"] or {}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Could not read excluded tags: {exc}")
+
+    config = _split_stamps(stored)["config"]
+    config.setdefault("version", config_schema.CURRENT_VERSION)
+    config.setdefault("enabled", True)
+    config.setdefault("placements", {})
+
+    tags = excluded_tags.clean(given)
+    if tags:
+        config[excluded_tags.CONFIG_KEY] = tags
+    else:
+        config.pop(excluded_tags.CONFIG_KEY, None)
+
+    errors = config_schema.validate(config)
+    if errors:
+        return JSONResponse(status_code=422, content={"errors": errors})
+
+    try:
+        written = config_store.write(config, updated_by="web-team")
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Could not save: {exc}")
+
+    saved = written.get(excluded_tags.CONFIG_KEY) or []
+    return JSONResponse(
+        status_code=200,
+        content={
+            "ok": True,
+            "tags": saved,
+            "counts": excluded_tags.counts(excluded_tags.products(), saved),
+            "updated_at": written["updated_at"],
+        },
+    )
+
+
+@app.get("/api/tuning/products")
+def get_tuning_products() -> list[dict]:
+    """The anchors a preview may be run against, one per style."""
+    try:
+        return preview.styles()
+    except preview.NotBuilt as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+
+
+@app.post("/api/tuning/preview")
+def post_tuning_preview(payload: dict = Body(...)) -> dict:
+    """
+    Rank one product under an unsaved tuning.
+
+    No token: it writes nothing, publishes nothing and reads only files the
+    pipeline already produced. Validated all the same, because an out-of-range
+    weight should be reported by the same message the save would give rather
+    than silently previewing something that cannot be saved.
+    """
+    product_id = payload.get("product_id")
+    if not product_id:
+        raise HTTPException(status_code=422, detail="product_id is required")
+
+    given = payload.get("tuning") or {}
+    errors = config_schema.validate(
+        {
+            "version": config_schema.CURRENT_VERSION,
+            "enabled": True,
+            "placements": {},
+            "tuning": given,
+        }
+    )
+    if errors:
+        return JSONResponse(status_code=422, content={"errors": errors})
+
+    limit = payload.get("limit") or 10
+    if not isinstance(limit, int) or not 1 <= limit <= 30:
+        raise HTTPException(status_code=422, detail="limit must be 1-30")
+
+    try:
+        return preview.rank(str(product_id), given, limit=limit)
+    except preview.NotBuilt as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+# ---------------------------------------------------------------------------
+# Version notes — docs/version.md, rendered on the Dashboard.
+#
+# The file is NOT baked into the image: backend/Dockerfile's build context is
+# ./backend and cannot reach ../docs. docker-compose bind-mounts it read-only
+# instead, which also means a `git pull` updates the notes without a rebuild.
+#
+# Two candidate paths because the layout differs. In a checkout the backend
+# sits beside docs/; in the container the backend IS /app, so the mount lands
+# at /app/docs.
+# ---------------------------------------------------------------------------
+
+VERSION_PATHS = (
+    settings.BACKEND_ROOT / "docs" / "version.md",
+    settings.REPO_ROOT / "docs" / "version.md",
+)
+
+
+@app.get("/api/version")
+def get_version() -> dict:
+    for path in VERSION_PATHS:
+        if path.exists():
+            return {"markdown": path.read_text(), "source": path.name}
+
+    # Not an error. A deployment without the mount should show the console, not
+    # a red banner about release notes.
+    return {
+        "markdown": "",
+        "source": None,
+        "detail": (
+            "docs/version.md is not readable from the API. On the VM, check "
+            "that docker-compose mounts ./docs into the api service."
+        ),
+    }
 
 
 @app.get("/api/blocks")
@@ -234,7 +623,7 @@ def post_run(
 
 
 @app.post("/api/events")
-def post_events(payload: dict = Body(...)) -> JSONResponse:
+async def post_events(request: Request) -> JSONResponse:
     """
     Record storefront tracking events.
 
@@ -246,7 +635,22 @@ def post_events(payload: dict = Body(...)) -> JSONResponse:
     A partly-bad batch stores its good events rather than failing whole: the
     browser sends by beacon and has no way to retry, so rejecting everything
     would lose real data over one malformed row.
+
+    PARSED BY HAND RATHER THAN WITH Body(...), so the content type does not
+    matter. sendBeacon must send `text/plain` to stay a CORS "simple request":
+    `application/json` is not on the safelist, so the browser has to send a
+    preflight OPTIONS first, and a beacon fired while the page is unloading
+    frequently loses that race. Declaring a JSON body would have made FastAPI
+    reject the very requests this endpoint exists to receive.
     """
+    raw = await request.body()
+    try:
+        payload = json.loads(raw or b"{}")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Body must be JSON.")
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Body must be a JSON object.")
+
     good, problems = events.clean_batch(payload.get("events"))
 
     try:
@@ -265,17 +669,37 @@ def post_events(payload: dict = Body(...)) -> JSONResponse:
 
 
 @app.get("/api/analytics")
-def get_analytics(days: int = 30) -> dict:
-    """Per-block performance for the console's Analytics screen."""
+def get_analytics(
+    days: int = 30, start: str | None = None, end: str | None = None
+) -> dict:
+    """
+    Per-block performance for the console's Analytics screen.
+
+    Either a rolling window - `days`, what the preset buttons send - or a pair
+    of calendar dates, `start` and `end`, both included. Dates win when both
+    are given.
+    """
     days = max(1, min(days, 365))
     try:
+        # Fails here rather than four queries deep, so a mistyped date is a 400
+        # naming the problem instead of a 502 naming nothing.
+        first, last = db.window(days, start, end)
         return {
             "days": days,
-            "totals": db.totals(days),
-            "daily": db.daily(days),
-            "blocks": db.summary(days),
-            "revenue": db.revenue(days),
+            "start": first.date().isoformat(),
+            # Inclusive in the answer, as the console asked for it: the query
+            # is half-open internally, which is an implementation detail.
+            "end": (last.date() - timedelta(days=1)).isoformat(),
+            "totals": db.totals(days, start, end),
+            "daily": db.daily(days, start, end),
+            "blocks": db.summary(days, start, end),
+            "revenue": db.revenue(days, start, end),
+            # When each half of the screen was last fed. Attribution lags by a
+            # nightly run; events do not.
+            "freshness": db.freshness(),
         }
+    except db.BadRange as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     except db.NoDatabase:
         raise HTTPException(
             status_code=503, detail="Tracking storage is not configured."

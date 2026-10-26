@@ -5,7 +5,16 @@
  * built from two different periods is not a rate. A block with no impressions
  * shows a dash rather than 0%, because "not seen" and "seen and ignored" are
  * different things and only one of them is bad.
+ *
+ * TWO REVENUE COLUMNS. "Revenue" is the whole value of every order that
+ * involved the block, which is the convention upsell apps report and is
+ * generous: a shopper can click a recommendation, buy something else entirely,
+ * and the order still counts here. "Direct" is only the recommended product
+ * itself, in the orders that actually contained it. The gap between them is
+ * the part nobody should quietly claim credit for.
  */
+import { blockLabel } from '../lib/blocks'
+
 function percent(value) {
   return value == null ? '—' : `${(value * 100).toFixed(1)}%`
 }
@@ -24,6 +33,10 @@ const ALL_BLOCKS = [
   'top_selling',
   'new_arrivals',
   'recently_viewed',
+  // Hardcoded, so a block missing here records events that never appear in the
+  // table - silent in the same way a block missing from the API allowlist is.
+  'inspired_by_views',
+  'cart_popup',
 ]
 
 export default function BlockTable({ blocks, revenue }) {
@@ -33,7 +46,15 @@ export default function BlockTable({ blocks, revenue }) {
   // Every block is listed whether or not it has been seen, so the report has
   // its full shape from the first day and a block with no traffic is visibly
   // absent rather than silently missing from the table.
-  const rows = ALL_BLOCKS.map(
+  // A/B placements ("top_selling_a") are not in the list above: they are the
+  // same block under two names, created in the theme editor without touching
+  // this file. Anything measured that the list does not know is appended, or
+  // the web team would run a comparison whose rows never appear.
+  const extra = [...new Set([...Object.keys(measured), ...Object.keys(byBlock)])]
+    .filter((id) => !ALL_BLOCKS.includes(id))
+    .sort()
+
+  const rows = [...ALL_BLOCKS, ...extra].map(
     (id) =>
       measured[id] || {
         block: id,
@@ -56,6 +77,7 @@ export default function BlockTable({ blocks, revenue }) {
           <th style={{ textAlign: 'right' }}>Added to cart</th>
           <th style={{ textAlign: 'right' }}>Orders</th>
           <th style={{ textAlign: 'right' }}>Revenue</th>
+          <th style={{ textAlign: 'right' }}>Direct</th>
         </tr>
       </thead>
       <tbody>
@@ -63,7 +85,7 @@ export default function BlockTable({ blocks, revenue }) {
           const money_ = byBlock[b.block] || {}
           return (
             <tr key={b.block}>
-              <td>{b.block.replace(/_/g, ' ')}</td>
+              <td>{blockLabel(b.block)}</td>
               <td style={{ textAlign: 'right' }}>{b.impressions.toLocaleString()}</td>
               <td style={{ textAlign: 'right' }}>{b.clicks.toLocaleString()}</td>
               <td style={{ textAlign: 'right' }}>{percent(b.click_rate)}</td>
@@ -72,10 +94,25 @@ export default function BlockTable({ blocks, revenue }) {
               <td style={{ textAlign: 'right' }}>
                 {money(money_.revenue, money_.currency)}
               </td>
+              <td style={{ textAlign: 'right' }}>
+                {money(money_.direct_revenue, money_.currency)}
+                {money_.direct_orders ? (
+                  <span className="card__sub"> ({money_.direct_orders})</span>
+                ) : null}
+              </td>
             </tr>
           )
         })}
       </tbody>
+      <caption
+        style={{ captionSide: 'bottom', textAlign: 'left', paddingTop: 10 }}
+        className="card__sub"
+      >
+        Revenue is the whole value of every order that involved the block, even
+        when the shopper bought something else. Direct counts only the
+        recommended product itself, in the orders that contained it, with the
+        number of such orders in brackets.
+      </caption>
     </table>
   )
 }

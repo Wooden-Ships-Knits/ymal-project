@@ -24,11 +24,47 @@ BLOCK_IDS = (
     "top_selling",
     "new_arrivals",
     "recently_viewed",
+    # Must be listed, or every event it sends is rejected - silently from the
+    # shopper's side, which makes a block nobody can see indistinguishable from
+    # a block nobody scrolled to.
+    "inspired_by_views",
+    # The add-to-cart popup. Its own id rather than sharing "featured": it
+    # reads the same list, but it is a different moment and a different ask,
+    # and one row in the table cannot say which of them earned the click.
+    "cart_popup",
 )
 
+# An A/B label the web team can put on a placement in the theme editor, to
+# compare the SAME block in two positions: "top_selling_a" above the fold,
+# "top_selling_b" below it. Both read the same published list; only the name
+# they report differs, so Analytics can tell the two placements apart.
+#
+# Accepted as a suffix rather than as eight more ids, so a new block gets its
+# A/B pair without anyone remembering to add them here - the failure mode when
+# they forget is an event rejected in silence.
+AB_SUFFIXES = ("_a", "_b")
+
+
+def known_block(block: str | None) -> bool:
+    if block in BLOCK_IDS:
+        return True
+    for suffix in AB_SUFFIXES:
+        if isinstance(block, str) and block.endswith(suffix):
+            return block[: -len(suffix)] in BLOCK_IDS
+    return False
+
+# The nine from docs/config-contract.md section 5, plus two the theme can
+# genuinely produce.
+#
+# `page` because a block may be placed on any Shopify page, and `unknown`
+# because the theme maps every template it does not recognise to that rather
+# than passing Shopify's own name through. An unlisted value is REJECTED, and
+# rejection is invisible to a shopper - a block on the wrong kind of page would
+# record nothing and look exactly like a block nobody scrolled to.
 PAGE_TYPES = (
     "product", "home", "cart", "collection", "search",
     "not_found", "blog", "account", "thank_you",
+    "page", "unknown",
 )
 
 # A batch is one beacon. Generous enough for a page with several blocks, small
@@ -49,7 +85,7 @@ def validate(event: object) -> list[str]:
     if event.get("type") not in EVENT_TYPES:
         problems.append(f"type must be one of: {', '.join(EVENT_TYPES)}")
 
-    if event.get("block") not in BLOCK_IDS:
+    if not known_block(event.get("block")):
         problems.append("block is not a known block")
 
     if event.get("page_type") not in PAGE_TYPES:

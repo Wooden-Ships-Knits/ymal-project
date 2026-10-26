@@ -57,7 +57,7 @@ def stub_store(monkeypatch):
     )
     monkeypatch.setattr(config_store, "undo", lambda: state["config"])
     monkeypatch.setattr(
-        config_store, "published_block_ids", lambda: {"recently_viewed"}
+        config_store, "published_block_ids", lambda: {"recently_viewed", "inspired_by_views"}
     )
     return state
 
@@ -145,12 +145,13 @@ def test_undo_without_a_previous_config_returns_409(client, monkeypatch):
     assert response.status_code == 409
 
 
-def test_blocks_lists_five_with_publish_state(client):
+def test_blocks_lists_every_block_with_publish_state(client):
     blocks = client.get("/api/blocks").json()
 
-    assert len(blocks) == 5
+    assert len(blocks) == 7
     by_id = {b["id"]: b for b in blocks}
     assert by_id["recently_viewed"]["list_published"] is True
+    assert by_id["inspired_by_views"]["list_published"] is True
     assert by_id["trending"]["list_published"] is False
     assert by_id["featured"]["supported_page_templates"] == ["product"]
 
@@ -163,7 +164,7 @@ def test_blocks_still_answers_when_shopify_is_unreachable(client, monkeypatch):
 
     blocks = client.get("/api/blocks").json()
 
-    assert len(blocks) == 5
+    assert len(blocks) == 7
     assert all(b["list_published"] is False for b in blocks)
 
 
@@ -310,3 +311,29 @@ def test_a_run_starts_and_reports_itself(client, monkeypatch):
     assert response.status_code == 200
     assert response.json()["started"] is True
     assert seen["skip"] is True
+
+
+# A valid range needs a database to answer from, so what is tested here is the
+# rejection of ranges that cannot be honoured - which happens before any query
+# runs. db.window's own arithmetic is covered in test_events.py.
+
+
+def test_analytics_rejects_a_backwards_range(client):
+    response = client.get("/api/analytics?start=2026-09-15&end=2026-09-01")
+
+    assert response.status_code == 400
+    assert "end date is before" in response.json()["detail"]
+
+
+def test_analytics_rejects_half_a_range(client):
+    response = client.get("/api/analytics?start=2026-09-01")
+
+    assert response.status_code == 400
+    assert "both" in response.json()["detail"]
+
+
+def test_analytics_rejects_a_mistyped_date(client):
+    response = client.get("/api/analytics?start=01-09-2026&end=15-09-2026")
+
+    assert response.status_code == 400
+    assert "YYYY-MM-DD" in response.json()["detail"]

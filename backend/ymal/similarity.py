@@ -255,17 +255,58 @@ def prepare(rows: list[dict]) -> tuple[list[dict], dict[str, float]]:
     return prepared, idf, collection_idf
 
 
-def popularity(units: dict, gid: str, most: int) -> float:
+def style_of(row: dict) -> str:
     """
-    How well this product sells, as 0-1 against the best seller in the catalog.
+    The key a style's sales are counted under.
 
-    Square-rooted so the scale is not owned by its extremes: one product here
-    sells 153 units in a fortnight while most sell single digits, and a linear
-    scale would leave every other product indistinguishable at nearly zero.
+    build_blocks keys its map on TITLE.strip().upper() while features.json
+    keeps the title exactly as Shopify has it, so both sides normalise here.
+    """
+    return (row.get("style_key") or "").strip().upper()
+
+
+def units_by_style(rows: list[dict], units: dict) -> dict[str, int]:
+    """
+    Units summed across every colorway of each style.
+
+    A pool row IS a style - build_pool keeps one product per style_key and
+    shows the best-scoring colorway - so the sales figure beside it has to be
+    the style's. Counting a single colorway meant a sweater selling 38 units
+    across twelve colorways scored as though it had sold 9. On this catalog 18
+    of 128 styles understated by 2x or more.
+
+    Built from the eligible rows, which is also what keeps the SCALE honest.
+    The raw units table is topped by things no pool can ever contain - a
+    product that is not even active at 499 units, and "Front & Back Placement
+    Add-on", a service line, at 119. Dividing every garment by 499 squashed the
+    entire popularity column into the bottom third of its range.
+
+    *SALE* colorways drop out for free: their title carries the marker, so they
+    are a different style_key. That is correct - markdown volume is not
+    evidence of full-price demand.
+    """
+    totals: dict[str, int] = {}
+    if not units:
+        return totals
+    for row in rows:
+        sold = units.get(row["product_gid"], 0)
+        if sold:
+            totals[style_of(row)] = totals.get(style_of(row), 0) + sold
+    return totals
+
+
+def popularity(totals: dict, style_key: str, most: int) -> float:
+    """
+    How well this STYLE sells, as 0-1 against the best-selling style that could
+    actually be recommended.
+
+    Square-rooted so the scale is not owned by its extremes: the top style
+    sells 318 units in a fortnight while most sell single digits, and a linear
+    scale would leave every other style indistinguishable at nearly zero.
     """
     if most <= 0:
         return 0.0
-    return (max(units.get(gid, 0), 0) / most) ** 0.5
+    return (max(totals.get(style_key, 0), 0) / most) ** 0.5
 
 
 def build_pool(
@@ -302,7 +343,7 @@ def build_pool(
         # Popularity reorders within the pool; it never decides membership.
         # A product that is not similar enough to be here does not get in by
         # selling well.
-        sells = popularity(units or {}, candidate["product_gid"], most_units)
+        sells = popularity(units or {}, style_of(candidate), most_units)
         value = content * (1 + settings.POPULARITY_WEIGHT * sells)
 
         current = best_by_style.get(candidate["style_key"])
@@ -327,6 +368,7 @@ def build_pools(
     rows: list[dict],
     depth: int | None = None,
     units: dict | None = None,
+    style_units: dict | None = None,
 ) -> dict[str, list[dict]]:
     """
     Every eligible product's pool, keyed by product_id.
@@ -337,11 +379,25 @@ def build_pools(
     """
     depth = depth or settings.POOL_DEPTH
     prepared, idf, collection_idf = prepare(rows)
-    most_units = max(units.values()) if units else 0
+
+    # Per style, not per product, and scaled against the best style that can
+    # actually appear in a pool. See units_by_style for why both halves matter.
+    #
+    # `style_units` comes from build_blocks, which can see every ACTIVE product
+    # and so counts colorways that are currently sold out - real demand for the
+    # style, even though that colorway cannot be shown today. Deriving from
+    # `rows` is the fallback and misses exactly those.
+    totals = style_units if style_units is not None else units_by_style(rows, units or {})
+
+    # The denominator is the best style that can actually appear in a pool, so
+    # a style with sales but no eligible colorway cannot set an unreachable top
+    # of the scale.
+    in_pool = {style_of(row) for row in rows}
+    most_units = max((totals.get(s, 0) for s in in_pool), default=0)
 
     return {
         anchor["product_id"]: build_pool(
-            anchor, prepared, idf, depth, collection_idf, units, most_units
+            anchor, prepared, idf, depth, collection_idf, totals, most_units
         )
         for anchor in prepared
     }

@@ -111,3 +111,144 @@ def test_an_awkward_password_does_not_break_the_connection_string(monkeypatch):
 
     assert "host=db" in conninfo
     assert "dbname=ymal" in conninfo
+
+
+class TestPageTypesTheThemeCanActuallySend:
+    """
+    page_type is derived from Shopify's template name, and an unlisted value is
+    REJECTED - silently, from the shopper's point of view. So the allowlist has
+    to cover everything the theme can produce, or a block placed on the wrong
+    kind of page records nothing and looks exactly like a block nobody scrolled
+    to.
+    """
+
+    def base(self, **over):
+        event = {
+            "type": "click",
+            "block": "featured",
+            "page_type": "product",
+            "session": "abc",
+            "handle": "some-product",
+        }
+        event.update(over)
+        return event
+
+    def test_accepts_a_regular_shopify_page(self):
+        """template.name is `page` for any Shopify page. A block can go there."""
+        assert events.validate(self.base(page_type="page")) == []
+
+    def test_accepts_unknown(self):
+        """
+        The theme maps any template it does not recognise to `unknown`. Storing
+        that is better than dropping the event: the click still happened, and a
+        bucket named unknown is a visible prompt to widen the mapping.
+        """
+        assert events.validate(self.base(page_type="unknown")) == []
+
+    def test_still_rejects_something_arbitrary(self):
+        """The allowlist has to stay an allowlist."""
+        problems = events.validate(self.base(page_type="../../etc/passwd"))
+        assert problems == ["page_type is not a known page template"]
+
+    def test_every_page_template_in_the_registry_is_accepted(self):
+        """
+        The registry and this list describe the same thing from two sides. A
+        template the console can place a block on must be one the API accepts.
+        """
+        from ymal import registry
+
+        for template_id in registry.page_template_ids():
+            assert events.validate(self.base(page_type=template_id)) == [], template_id
+
+
+class TestAddToCart:
+    def test_accepted_with_a_handle(self):
+        assert events.validate({
+            "type": "add_to_cart",
+            "block": "featured",
+            "page_type": "product",
+            "session": "abc",
+            "handle": "pumpkin-truck-crew-chunky",
+        }) == []
+
+    def test_needs_a_handle(self):
+        """
+        Unlike an impression, which carries a whole row, an add is about one
+        product. Without the handle there is nothing to report.
+        """
+        problems = events.validate({
+            "type": "add_to_cart",
+            "block": "featured",
+            "page_type": "product",
+            "session": "abc",
+        })
+        assert "handle is required for this event type" in problems
+
+    def test_a_null_position_is_fine(self):
+        """
+        The add happens on the product page, where the row that caused it is no
+        longer on screen, so there is no position to report.
+        """
+        assert events.validate({
+            "type": "add_to_cart",
+            "block": "featured",
+            "page_type": "product",
+            "session": "abc",
+            "handle": "x",
+            "position": None,
+            "anchor": None,
+        }) == []
+
+
+def test_inspired_by_views_is_an_accepted_block():
+    """
+    The allowlist rejects unknown blocks silently from the shopper's side, so a
+    block missing from it records nothing and looks like a block nobody saw.
+    """
+    assert events.validate(event(block="inspired_by_views", page_type="product")) == []
+
+
+def test_an_ab_label_is_a_known_block():
+    # The same block placed twice, to compare positions. Both read the same
+    # published list; only the name they report differs.
+    assert events.known_block("top_selling_a")
+    assert events.known_block("top_selling_b")
+    assert events.known_block("featured_a")
+
+
+def test_an_ab_label_on_an_unknown_block_is_still_unknown():
+    assert not events.known_block("wiser_upsell_a")
+    assert not events.known_block("_a")
+    assert not events.known_block(None)
+
+
+def test_only_a_and_b_are_labels():
+    # Not a general "anything with a suffix" rule: c, 1, -test would all be
+    # silent typos that record events nobody ever finds.
+    assert not events.known_block("top_selling_c")
+    assert not events.known_block("top_selling_1")
+
+
+def test_window_counts_the_end_day_in_full():
+    from ymal import db
+
+    start, end = db.window(start="2026-09-01", end="2026-09-01")
+
+    # One day picked on its own is a whole day, not nothing.
+    assert (end - start).days == 1
+
+
+def test_window_rolling_days():
+    from ymal import db
+
+    start, end = db.window(30)
+
+    assert 29 <= (end - start).days <= 30
+
+
+def test_window_refuses_more_than_a_year():
+    from ymal import db
+    import pytest
+
+    with pytest.raises(db.BadRange):
+        db.window(start="2024-01-01", end="2026-01-01")

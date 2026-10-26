@@ -8,7 +8,15 @@ two disagree, this file is right.
 
 Adding a block means editing both, plus adding it to ymal/blocks/ — a block
 configured here with nothing computing it produces a page that renders nothing.
+
+The descriptions that quote a window are built from settings rather than
+written out, because they are what the console shows the web team. Top
+Selling said "the last 90 days" for a day after the window became 14, which
+is worse than no description at all - it is a wrong one, in the one place
+someone would go to check.
 """
+
+from ymal import settings
 
 # At most four blocks on one page. A page of nothing but recommendations sells
 # nothing.
@@ -26,7 +34,10 @@ BLOCKS = [
     {
         "id": "trending",
         "label": "Trending Products",
-        "description": "Rising: selling more in the last 14 days than the 14 before.",
+        "description": (
+            f"Rising: selling more in the last {settings.TRENDING_WINDOW_DAYS} "
+            f"days than the {settings.TRENDING_WINDOW_DAYS} before."
+        ),
         "requires_anchor": False,
         "default_heading": "Trending Now",
         "default_slots": 6,
@@ -34,7 +45,9 @@ BLOCKS = [
     {
         "id": "top_selling",
         "label": "Top Selling",
-        "description": "Plain volume over the last 90 days.",
+        "description": (
+            f"Plain volume over the last {settings.TOP_SELLING_WINDOW_DAYS} days."
+        ),
         "requires_anchor": False,
         "default_heading": "Top Selling",
         "default_slots": 6,
@@ -42,7 +55,10 @@ BLOCKS = [
     {
         "id": "new_arrivals",
         "label": "New Arrivals",
-        "description": "Published in the last 30 days, newest first.",
+        "description": (
+            f"Published in the last {settings.NEW_ARRIVALS_WINDOW_DAYS} days, "
+            "newest first."
+        ),
         "requires_anchor": False,
         "default_heading": "New Arrivals",
         "default_slots": 6,
@@ -54,6 +70,34 @@ BLOCKS = [
         "requires_anchor": False,
         "default_heading": "Recently Viewed",
         "default_slots": 4,
+    },
+    {
+        "id": "inspired_by_views",
+        "label": "Inspired By Your Views",
+        "description": (
+            "The top 4 Featured products of the shopper's last 5 viewed products, "
+            "minus anything already viewed or in the cart, shuffled once per visit."
+        ),
+        # Built from the shopper's history, not from the product on the page, so
+        # it is placeable like Recently Viewed rather than restricted like
+        # Featured. The web team places it on product pages.
+        "requires_anchor": False,
+        "default_heading": "Inspired By Your Views",
+        "default_slots": 4,
+    },
+    {
+        "id": "cart_popup",
+        "label": "Add to Cart Popup",
+        "description": (
+            "Shown the moment a product is added: the Featured list of the product "
+            "just added, which the nightly pass orders by what shoppers actually "
+            "buy in the same order."
+        ),
+        # The anchor is whatever was just added, which the storefront knows and
+        # we never have to be told.
+        "requires_anchor": False,
+        "default_heading": "Pairs well with",
+        "default_slots": 3,
     },
 ]
 
