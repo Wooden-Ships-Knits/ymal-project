@@ -26,6 +26,7 @@ from ymal import (
     config_store,
     db,
     events,
+    excluded_tags,
     personalized,
     preview,
     registry,
@@ -392,6 +393,83 @@ def put_personalized(
         content={
             "ok": True,
             "titles": written.get(personalized.CONFIG_KEY) or [],
+            "updated_at": written["updated_at"],
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
+# Excluded tags - products still on sale that Top Selling (MYNTS) and Trending
+# must stop recommending, such as Halloween sweaters after the shipping cutoff.
+# Same document and same split as tuning and personalized.
+# ---------------------------------------------------------------------------
+
+@app.get("/api/excluded-tags")
+def get_excluded_tags() -> dict:
+    """The saved tags, how many products each catches, and every catalog tag."""
+    try:
+        config = config_store.read()["config"] or {}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Could not read excluded tags: {exc}")
+
+    tags = config.get(excluded_tags.CONFIG_KEY) or []
+    catalog = excluded_tags.products()
+    return {
+        "tags": tags,
+        "counts": excluded_tags.counts(catalog, tags),
+        "known_tags": excluded_tags.known(catalog),
+        "blocks": list(excluded_tags.BLOCKS),
+        "updated_at": config.get("updated_at"),
+    }
+
+
+@app.put("/api/excluded-tags")
+def put_excluded_tags(
+    payload: dict = Body(...),
+    x_ymal_token: str = Header(default=""),
+) -> JSONResponse:
+    """Replace the list, leaving every other setting exactly as it is."""
+    require_token(x_ymal_token)
+
+    given = payload.get("tags")
+    if not isinstance(given, list):
+        return JSONResponse(
+            status_code=422,
+            content={"errors": [{"path": "excluded_tags", "message": "must be a list of tags"}]},
+        )
+
+    try:
+        stored = config_store.read()["config"] or {}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Could not read excluded tags: {exc}")
+
+    config = _split_stamps(stored)["config"]
+    config.setdefault("version", config_schema.CURRENT_VERSION)
+    config.setdefault("enabled", True)
+    config.setdefault("placements", {})
+
+    tags = excluded_tags.clean(given)
+    if tags:
+        config[excluded_tags.CONFIG_KEY] = tags
+    else:
+        config.pop(excluded_tags.CONFIG_KEY, None)
+
+    errors = config_schema.validate(config)
+    if errors:
+        return JSONResponse(status_code=422, content={"errors": errors})
+
+    try:
+        written = config_store.write(config, updated_by="web-team")
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Could not save: {exc}")
+
+    saved = written.get(excluded_tags.CONFIG_KEY) or []
+    return JSONResponse(
+        status_code=200,
+        content={
+            "ok": True,
+            "tags": saved,
+            "counts": excluded_tags.counts(excluded_tags.products(), saved),
             "updated_at": written["updated_at"],
         },
     )

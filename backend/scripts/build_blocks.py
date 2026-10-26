@@ -21,7 +21,7 @@ Output -> backend/data/blocks/<block>.json
 import json
 import sys
 
-from ymal import settings
+from ymal import excluded_tags, settings
 from ymal.blocks import new_arrivals, top_selling, trending
 from ymal.orders import count_orders, units_sold, window_is_reachable
 
@@ -192,11 +192,21 @@ def main() -> None:
     # Title doubles as the style key on this catalog: colorways of one style
     # share a title and differ by variant.
     dedupe_by = {gid: title.strip().upper() for gid, title in titles.items()}
-    print(f"{len(eligible)} eligible products in the pool\n")
+    print(f"{len(eligible)} eligible products in the pool")
+
+    # Still on sale, no longer recommended by Top Selling and Trending - set in
+    # the console's Exclude by Tag tab. See ymal/excluded_tags.py.
+    tags = excluded_tags.load()
+    excluded = excluded_tags.matching(products, tags) & eligible
+    if tags:
+        print(f"{len(excluded)} of them skipped by Top Selling and Trending, "
+              f"tagged: {', '.join(tags)}")
+    print()
 
     for block in wanted:
         print(f"--- {block}")
-        BUILDERS[block](products, eligible, titles, dedupe_by)
+        pool = excluded_tags.pool_for(block, eligible, excluded)
+        BUILDERS[block](products, pool, titles, dedupe_by)
 
     print(f"\n  → {settings.DATA_DIR / 'blocks'}")
     print("  Nothing was written to Shopify. Publishing is a separate step.")

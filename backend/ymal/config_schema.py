@@ -25,7 +25,7 @@ MIN_SLOTS = 2
 MAX_SLOTS = 12
 
 TOP_LEVEL_FIELDS = frozenset(
-    {"version", "enabled", "placements", "tuning", "personalized"}
+    {"version", "enabled", "placements", "tuning", "personalized", "excluded_tags"}
 )
 
 # Product titles are capped at 255 characters by Shopify.
@@ -58,6 +58,7 @@ def validate(config: object) -> list[dict]:
     errors += _check_placements(config.get("placements"))
     errors += _check_tuning(config.get("tuning"))
     errors += _check_personalized(config.get("personalized"))
+    errors += _check_excluded_tags(config.get("excluded_tags"))
     return errors
 
 
@@ -282,6 +283,26 @@ def _check_personalized(given: object) -> list[dict]:
             errors.append(
                 {"path": path, "message": f"must be at most {MAX_TITLE} characters"}
             )
+    return errors
+
+
+def _check_excluded_tags(given: object) -> list[dict]:
+    """
+    Shopify tags whose products Top Selling and Trending skip -
+    ymal/excluded_tags.py. Optional.
+    """
+    if given is None:
+        return []
+    if not isinstance(given, list):
+        return [{"path": "excluded_tags", "message": "must be a list of tags"}]
+
+    errors: list[dict] = []
+    for index, tag in enumerate(given):
+        path = f"excluded_tags[{index}]"
+        if not isinstance(tag, str) or not tag.strip():
+            errors.append({"path": path, "message": "must be a tag"})
+        elif len(tag) > MAX_TITLE:
+            errors.append({"path": path, "message": f"must be at most {MAX_TITLE} characters"})
     return errors
 
 
