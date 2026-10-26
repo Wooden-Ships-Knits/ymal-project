@@ -20,6 +20,10 @@
  * to someone rather than looking something up. No impressions column on it -
  * six figures of "seen" dominate a page about what the blocks earned.
  *
+ * Exclude by Tag added 2026-10-26: Shopify tags whose products Top Selling
+ * (MYNTS) and Trending stop recommending - occasions past their shipping
+ * cutoff, which keep selling and so keep ranking.
+ *
  * Personalized Products added 2026-10-07: the titles Textify asks a name or
  * number for, so YMAL's quick Add stops putting them in the cart without one.
  *
@@ -32,6 +36,7 @@ export const NAV = [
   { id: 'analytics', label: 'Analytics',        status: 'planned' },
   { id: 'exclude',   label: 'Exclude Products', status: 'planned' },
   { id: 'personalized', label: 'Personalized Products', status: 'live' },
+  { id: 'excludedtags', label: 'Exclude by Tag', status: 'live' },
   { id: 'report',    label: 'Report',           status: 'live'    },
   { id: 'tuning',    label: 'Ranking',          status: 'live'    },
   { id: 'run',       label: 'Manual Update',    status: 'live'    },

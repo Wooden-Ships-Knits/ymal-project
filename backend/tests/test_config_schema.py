@@ -242,3 +242,23 @@ def test_an_over_long_title_is_rejected():
     config = copy.deepcopy(VALID)
     config["personalized"] = ["X" * 256]
     assert "personalized[0]" in paths(config_schema.validate(config))
+
+
+# excluded_tags - Shopify tags whose products Top Selling and Trending skip.
+
+def test_excluded_tags_is_optional_and_a_list_is_accepted():
+    config = copy.deepcopy(VALID)
+    config["excluded_tags"] = ["halloween", "spooky season"]
+    assert config_schema.validate(config) == []
+
+
+def test_excluded_tags_must_be_a_list():
+    config = copy.deepcopy(VALID)
+    config["excluded_tags"] = "halloween"
+    assert paths(config_schema.validate(config)) == ["excluded_tags"]
+
+
+def test_a_blank_or_non_string_excluded_tag_is_rejected():
+    config = copy.deepcopy(VALID)
+    config["excluded_tags"] = ["halloween", " ", 3]
+    assert paths(config_schema.validate(config)) == ["excluded_tags[1]", "excluded_tags[2]"]
